@@ -4,6 +4,12 @@ import (
 	"application/models"
 )
 
+type DataFormatRepository interface {
+	Get(id int) (dataformat *models.DtoDataFormat, err error)
+	GetAll() (dataformats *[]models.ApiDataFormat, err error)
+	FindByName(name string) (id int64, err error)
+}
+
 type DataFormatService struct {
 	*Repository
 }

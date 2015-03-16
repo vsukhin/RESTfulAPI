@@ -110,11 +110,11 @@ func routes() martini.Router {
 		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetUnitTables)
 		// Получение списка типов колонок +
 		a.Get("/fieldtypes/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetColumnTypes)
-		// Импорт таблицы ?
+		// Импорт таблицы ? !!
 		a.Post("/import/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewImportTable{}), controllers.ImportDataFromFile)
-		// Получение списка колонок импортируемой таблицы ?
+		// Получение списка колонок импортируемой таблицы ? !!
 		a.Get("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetImportDataColumns)
-		// Сохранение списка импортируемых колонок и присвоение типа колонкам ?
+		// Сохранение списка импортируемых колонок и присвоение типа колонкам ? !!
 		a.Put("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewImportColumns{}), controllers.UpdateImportDataColumns)
 		// Получение информации об экспорте данных +
 		a.Options("/export/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetExportDataMeta)
@@ -138,27 +138,27 @@ func routes() martini.Router {
 		a.Delete("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableColumn)
 		// Изменение порядка отображения колонки +
 		a.Put("/:tid/sequence/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiOrderTableColumns{}), controllers.UpdateOrderTableColumn)
-		// Получение информации о данных в таблице +
+		// Получение информации о данных в таблице + !!
 		a.Options("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableMetaData)
-		// Получение данных таблицы +
+		// Получение данных таблицы + !
 		a.Get("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableData)
-		// Получение строки данных таблицы +
+		// Получение строки данных таблицы + !
 		a.Get("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableRow)
-		// Внесение строки данных в таблицу +
+		// Внесение строки данных в таблицу + !
 		a.Post("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableRow{}), controllers.CreateTableRow)
-		// Изменение строки данных в таблице +
+		// Изменение строки данных в таблице + !
 		a.Put("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableRow{}), controllers.UpdateTableRow)
 		// Удаление строки данных из таблицы +
 		a.Delete("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableRow)
-		// Получение информации о данных в ячейке таблицы +
+		// Получение информации о данных в ячейке таблицы + !!
 		a.Options("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableMetaCell)
-		// Получение данных ячейки таблицы +
+		// Получение данных ячейки таблицы + !
 		a.Get("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableCell)
-		// Изменение данных ячейки таблицы +
+		// Изменение данных ячейки таблицы + !
 		a.Put("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewTableCell{}), controllers.UpdateTableCell)
-		// Удаление данных ячейки таблицы +
+		// Удаление данных ячейки таблицы + !
 		a.Delete("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableCell)
-		// Экспорт таблицы ?
+		// Экспорт таблицы ? !
 		a.Get("/:tid/export/", middlewares.RequireSessionKeepWithoutRoute, controllers.ExportDataToFile)
 		// Проверка статуса готовности экспортируемого файла +
 		a.Options("/:tid/export/:fid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetExportDataStatus)

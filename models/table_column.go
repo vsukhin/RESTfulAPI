@@ -38,6 +38,7 @@ type DtoTableColumn struct {
 	Active            bool      `db:"active"`            // Активный
 	Edition           int64     `db:"edition"`           // Версия редакции
 	Original_ID       int64     `db:"original_id"`       // Оригинальная колонка
+	FieldNum          byte      `db:"fieldnum"`          // Номер колонки
 }
 
 // Конструктор создания объекта коклонки таблицы в api
@@ -67,7 +68,7 @@ func NewApiTableColumn(id int64, name string, typeid int64, position int64) *Api
 
 // Конструктор создания объекта колонки таблицы в бд
 func NewDtoTableColumn(id int64, name string, column_type_id int64, customer_table_id int64, position int64,
-	created time.Time, prebuilt bool, active bool, edition int64, original_id int64) *DtoTableColumn {
+	created time.Time, prebuilt bool, active bool, fieldnum byte, edition int64, original_id int64) *DtoTableColumn {
 	return &DtoTableColumn{
 		ID:                id,
 		Name:              name,
@@ -77,6 +78,7 @@ func NewDtoTableColumn(id int64, name string, column_type_id int64, customer_tab
 		Created:           created,
 		Prebuilt:          prebuilt,
 		Active:            active,
+		FieldNum:          fieldnum,
 		Edition:           edition,
 		Original_ID:       original_id,
 	}

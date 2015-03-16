@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/models"
 	"application/services"
-	"bytes"
 	"errors"
 	"github.com/martini-contrib/render"
 	"net/http"
@@ -15,9 +14,9 @@ const (
 	PARAM_NAME_USER_ID = "userid"
 )
 
-func CheckUserRoles(roles []models.UserRole, language string, r render.Render, groupservice *services.GroupService) (err error) {
-	var groups *[]models.ApiGroup
-	groups, err = groupservice.GetAll()
+func CheckUserRoles(roles []models.UserRole, language string, r render.Render,
+	grouprepository services.GroupRepository) (err error) {
+	groups, err := grouprepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -42,9 +41,8 @@ func CheckUserRoles(roles []models.UserRole, language string, r render.Render, g
 	return nil
 }
 
-func CheckUser(userid int64, language string, r render.Render, userservice *services.UserService) (err error) {
-	var user *models.DtoUser
-	user, err = userservice.Get(userid)
+func CheckUser(userid int64, language string, r render.Render, userrepository services.UserRepository) (err error) {
+	user, err := userrepository.Get(userid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -60,8 +58,8 @@ func CheckUser(userid int64, language string, r render.Render, userservice *serv
 	return nil
 }
 
-func CheckUnit(unitid int64, language string, r render.Render, unitservice *services.UnitService) (err error) {
-	_, err = unitservice.Get(unitid)
+func CheckUnit(unitid int64, language string, r render.Render, unitrepository services.UnitRepository) (err error) {
+	_, err = unitrepository.Get(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -94,8 +92,9 @@ func CheckPrimaryEmail(user *models.ViewApiUserFull, language string, r render.R
 	return nil
 }
 
-func CheckEmailAvailability(value string, language string, r render.Render, emailservice *services.EmailService) (emailExists bool, err error) {
-	emailExists, err = emailservice.Exists(value)
+func CheckEmailAvailability(value string, language string, r render.Render,
+	emailrepository services.EmailRepository) (emailExists bool, err error) {
+	emailExists, err = emailrepository.Exists(value)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -103,8 +102,7 @@ func CheckEmailAvailability(value string, language string, r render.Render, emai
 	}
 
 	if emailExists {
-		var email *models.DtoEmail
-		email, err = emailservice.Get(value)
+		email, err := emailrepository.Get(value)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -122,26 +120,25 @@ func CheckEmailAvailability(value string, language string, r render.Render, emai
 }
 
 func SendConfirmations(dtouser *models.DtoUser, session *models.DtoSession, request *http.Request, r render.Render,
-	emailservice *services.EmailService, templateservice *services.TemplateService) (err error) {
+	emailrepository services.EmailRepository, templaterepository services.TemplateRepository) (err error) {
 	for _, confEmail := range *dtouser.Emails {
 		if !confEmail.Confirmed {
-			var buf *bytes.Buffer
-
 			subject := ""
 			if confEmail.Primary {
 				subject = config.Localization[confEmail.Language].Messages.RegistrationSubject
 			} else {
 				subject = config.Localization[confEmail.Language].Messages.EmailSubject
 			}
-			buf, err = templateservice.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language, request.Host, confEmail.Code),
-				services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
+
+			buf, err := templaterepository.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language,
+				request.Host, confEmail.Code), services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return err
 			}
 
-			err = emailservice.SendEmail(confEmail.Email, subject, buf.String())
+			err = emailrepository.SendEmail(confEmail.Email, subject, buf.String())
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

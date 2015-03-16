@@ -1,25 +1,38 @@
+/* Services package provides methods and data structures for database layer implementation */
+
 package services
 
 import (
+	"database/sql"
 	"github.com/coopernurse/gorp"
 	logging "github.com/op/go-logging"
 )
 
+type DbMap interface {
+	AddTableWithName(i interface{}, name string) *gorp.TableMap
+	Begin() (*gorp.Transaction, error)
+	Get(i interface{}, keys ...interface{}) (interface{}, error)
+	Insert(list ...interface{}) error
+	Update(list ...interface{}) (int64, error)
+	Delete(list ...interface{}) (int64, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Select(i interface{}, query string, args ...interface{}) ([]interface{}, error)
+	SelectInt(query string, args ...interface{}) (int64, error)
+	SelectStr(query string, args ...interface{}) (string, error)
+	SelectOne(holder interface{}, query string, args ...interface{}) error
+}
+
 type Repository struct {
-	DbContext *gorp.DbMap // объект ORM для работы с бд
-	Table     string      // имя таблицы репозитория в бд
+	DbContext DbMap  // объект ORM для работы с бд
+	Table     string // имя таблицы репозитория в бд
 }
 
 var (
-	log *logging.Logger
+	log *logging.Logger = logging.MustGetLogger("services")
 )
 
-func init() {
-	log = logging.MustGetLogger("services")
-}
-
 // Конструктор создания объекта репозитория
-func NewRepository(dbmap *gorp.DbMap, table string) *Repository {
+func NewRepository(dbmap DbMap, table string) *Repository {
 	return &Repository{
 		DbContext: dbmap,
 		Table:     table,

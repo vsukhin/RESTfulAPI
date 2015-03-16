@@ -15,7 +15,7 @@ import (
 )
 
 // get /api/v1.0/files/:key/
-func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, fileservice *services.FileService, session *models.DtoSession) {
+func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles,
 		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -27,8 +27,7 @@ func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, file
 		return
 	}
 
-	var file *models.DtoFile
-	file, err = fileservice.Get(fileid)
+	file, err := filerepository.Get(fileid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -43,7 +42,7 @@ func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, file
 }
 
 // post /api/v1.0/files/
-func UploadFile(data models.ViewFile, r render.Render, fileservice *services.FileService, session *models.DtoSession) {
+func UploadFile(data models.ViewFile, r render.Render, filerepository services.FileRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles,
 		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -60,7 +59,7 @@ func UploadFile(data models.ViewFile, r render.Render, fileservice *services.Fil
 	file.Percentage = 100
 	file.Object_ID = 0
 
-	err := fileservice.Create(file, &data)
+	err := filerepository.Create(file, &data)
 	if err != nil {
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -71,7 +70,7 @@ func UploadFile(data models.ViewFile, r render.Render, fileservice *services.Fil
 }
 
 // delete /api/v1.0/files/:key/
-func DeleteFile(r render.Render, params martini.Params, fileservice *services.FileService, session *models.DtoSession) {
+func DeleteFile(r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles,
 		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -83,8 +82,7 @@ func DeleteFile(r render.Render, params martini.Params, fileservice *services.Fi
 		return
 	}
 
-	var file *models.DtoFile
-	file, err = fileservice.Get(fileid)
+	file, err := filerepository.Get(fileid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -97,7 +95,7 @@ func DeleteFile(r render.Render, params martini.Params, fileservice *services.Fi
 		return
 	}
 
-	err = fileservice.Delete(file)
+	err = filerepository.Delete(file)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -108,7 +106,7 @@ func DeleteFile(r render.Render, params martini.Params, fileservice *services.Fi
 }
 
 // get /api/v1.0/images/:type/
-func GetImage(r render.Render, params martini.Params, fileservice *services.FileService, session *models.DtoSession) {
+func GetImage(r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles,
 		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -124,7 +122,7 @@ func GetImage(r render.Render, params martini.Params, fileservice *services.File
 		return
 	}
 
-	file, err := fileservice.FindByType(filetype)
+	file, err := filerepository.FindByType(filetype)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})

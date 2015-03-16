@@ -17,7 +17,7 @@ import (
 
 // get /api/v1.0/administration/users/
 func GetUsers(request *http.Request, r render.Render, params martini.Params,
-	userservice *services.UserService, session *models.DtoSession) {
+	userrepository services.UserRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -65,7 +65,7 @@ func GetUsers(request *http.Request, r render.Render, params martini.Params,
 	}
 	query += limit
 
-	users, err := userservice.GetAll(query)
+	users, err := userrepository.GetAll(query)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -77,9 +77,9 @@ func GetUsers(request *http.Request, r render.Render, params martini.Params,
 
 // post /api/v1.0/administration/users/
 func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *http.Request, r render.Render, params martini.Params,
-	userservice *services.UserService, emailservice *services.EmailService, sessionservice *services.SessionService,
-	unitservice *services.UnitService, templateservice *services.TemplateService,
-	groupservice *services.GroupService, session *models.DtoSession) {
+	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
+	unitrepository services.UnitRepository, templaterepository services.TemplateRepository,
+	grouprepository services.GroupRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -99,20 +99,20 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	dtouser.Code = ""
 	dtouser.Password = ""
 
-	if helpers.CheckUserRoles(user.Roles, session.Language, r, groupservice) != nil {
+	if helpers.CheckUserRoles(user.Roles, session.Language, r, grouprepository) != nil {
 		return
 	}
 	dtouser.Roles = user.Roles
 
 	if user.Creator_ID != 0 {
-		if helpers.CheckUser(user.Creator_ID, session.Language, r, userservice) != nil {
+		if helpers.CheckUser(user.Creator_ID, session.Language, r, userrepository) != nil {
 			return
 		}
 	}
 	dtouser.Creator_ID = user.Creator_ID
 
 	if user.Unit_ID != 0 {
-		if helpers.CheckUnit(user.Unit_ID, session.Language, r, unitservice) != nil {
+		if helpers.CheckUnit(user.Unit_ID, session.Language, r, unitrepository) != nil {
 			return
 		}
 	}
@@ -126,14 +126,14 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 
 	for _, apiEmail := range user.Emails {
 		apiEmail.Email = strings.ToLower(apiEmail.Email)
-		emailExists, err := helpers.CheckEmailAvailability(apiEmail.Email, session.Language, r, emailservice)
+		emailExists, err := helpers.CheckEmailAvailability(apiEmail.Email, session.Language, r, emailrepository)
 		if err != nil {
 			return
 		}
 		code := ""
 
 		if !apiEmail.Confirmed {
-			code, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+			code, err = sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -156,14 +156,14 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		})
 	}
 
-	err := userservice.Create(dtouser, true)
+	err := userrepository.Create(dtouser, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	if helpers.SendConfirmations(dtouser, session, request, r, emailservice, templateservice) != nil {
+	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository) != nil {
 		return
 	}
 
@@ -172,8 +172,8 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 
 // put /api/v1.0/administration/users/:userId/
 func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *http.Request, r render.Render, params martini.Params,
-	userservice *services.UserService, emailservice *services.EmailService, sessionservice *services.SessionService,
-	unitservice *services.UnitService, templateservice *services.TemplateService, groupservice *services.GroupService,
+	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
+	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -188,8 +188,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		return
 	}
 
-	var dtouser *models.DtoUser
-	dtouser, err = userservice.Get(userid)
+	dtouser, err := userrepository.Get(userid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -200,20 +199,20 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	dtouser.Name = user.Name
 	dtouser.Language = strings.ToLower(user.Language)
 
-	if helpers.CheckUserRoles(user.Roles, session.Language, r, groupservice) != nil {
+	if helpers.CheckUserRoles(user.Roles, session.Language, r, grouprepository) != nil {
 		return
 	}
 	dtouser.Roles = user.Roles
 
 	if user.Creator_ID != 0 {
-		if helpers.CheckUser(user.Creator_ID, session.Language, r, userservice) != nil {
+		if helpers.CheckUser(user.Creator_ID, session.Language, r, userrepository) != nil {
 			return
 		}
 	}
 	dtouser.Creator_ID = user.Creator_ID
 
 	if user.Unit_ID != 0 {
-		if helpers.CheckUnit(user.Unit_ID, session.Language, r, unitservice) != nil {
+		if helpers.CheckUnit(user.Unit_ID, session.Language, r, unitrepository) != nil {
 			return
 		}
 	}
@@ -243,7 +242,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 
 		if !found {
 			var emailExists bool
-			emailExists, err = helpers.CheckEmailAvailability(updEmail.Email, session.Language, r, emailservice)
+			emailExists, err = helpers.CheckEmailAvailability(updEmail.Email, session.Language, r, emailrepository)
 			if err != nil {
 				return
 			}
@@ -270,7 +269,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		}
 
 		if !updEmail.Confirmed {
-			code, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+			code, err = sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -287,14 +286,14 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	}
 
 	dtouser.Emails = arrOutEmails
-	err = userservice.Update(dtouser, false, true)
+	err = userrepository.Update(dtouser, false, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	if helpers.SendConfirmations(dtouser, session, request, r, emailservice, templateservice) != nil {
+	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository) != nil {
 		return
 	}
 
@@ -303,7 +302,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 }
 
 // delete /api/v1.0/administration/users/:userId/
-func DeleteUser(r render.Render, params martini.Params, userservice *services.UserService, session *models.DtoSession) {
+func DeleteUser(r render.Render, params martini.Params, userrepository services.UserRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -314,15 +313,14 @@ func DeleteUser(r render.Render, params martini.Params, userservice *services.Us
 		return
 	}
 
-	var user *models.DtoUser
-	user, err = userservice.Get(userid)
+	user, err := userrepository.Get(userid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	err = userservice.Delete(user.ID, true)
+	err = userrepository.Delete(user.ID, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -378,8 +376,8 @@ func GetUserFullInfo(r render.Render, params martini.Params, userservice *servic
 }
 
 // get /api/v1.0/administration/groups/
-func GetGroupsInfo(r render.Render, groupservice *services.GroupService, session *models.DtoSession) {
-	groups, err := groupservice.GetAll()
+func GetGroupsInfo(r render.Render, grouprepository services.GroupRepository, session *models.DtoSession) {
+	groups, err := grouprepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

@@ -1,3 +1,5 @@
+/* Controllers package provides methods responsible for RESTFul API business logic implementation */
+
 package controllers
 
 import (
@@ -5,9 +7,5 @@ import (
 )
 
 var (
-	log *logging.Logger
+	log *logging.Logger = logging.MustGetLogger("controllers")
 )
-
-func init() {
-	log = logging.MustGetLogger("controllers")
-}

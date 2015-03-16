@@ -26,8 +26,8 @@ const (
 )
 
 // get /api/v1.0/captcha/native/
-func GetCaptcha(r render.Render, captchaservice *services.CaptchaService, sessionservice *services.SessionService) {
-	token, err := sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+func GetCaptcha(r render.Render, captcharepository services.CaptchaRepository, sessionrepository services.SessionRepository) {
+	token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -52,7 +52,7 @@ func GetCaptcha(r render.Render, captchaservice *services.CaptchaService, sessio
 
 	dtocaptcha := models.NewDtoCaptcha(token, buf.Bytes(), value, time.Now(), false)
 
-	err = captchaservice.Create(dtocaptcha)
+	err = captcharepository.Create(dtocaptcha)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -64,21 +64,21 @@ func GetCaptcha(r render.Render, captchaservice *services.CaptchaService, sessio
 }
 
 // post /api/v1.0/emails/confirm/
-func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *http.Request, r render.Render, emailservice *services.EmailService,
-	sessionservice *services.SessionService, userservice *services.UserService, templateservice *services.TemplateService) {
+func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *http.Request, r render.Render,
+	emailrepository services.EmailRepository, sessionrepository services.SessionRepository, userrepository services.UserRepository,
+	templaterepository services.TemplateRepository) {
 	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
-	email, err := emailservice.FindByCode(confirm.ConfirmationToken)
+	email, err := emailrepository.FindByCode(confirm.ConfirmationToken)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Confirmation_Code_Wrong})
 		return
 	}
 
-	var user *models.DtoUser
-	user, err = userservice.Get(email.UserID)
+	user, err := userrepository.Get(email.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Confirmation_Code_Wrong})
@@ -101,8 +101,7 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 				}
 			}
 
-			var token string
-			token, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+			token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -111,7 +110,7 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 			user.Confirmed = true
 			user.Code = token
 
-			err = userservice.Update(user, false, true)
+			err = userrepository.Update(user, false, true)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -120,7 +119,7 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 
 			for _, confEmail := range *user.Emails {
 				if confEmail.Confirmed {
-					if helpers.SendPassword(user.Language, &confEmail, user, request, r, emailservice, templateservice) != nil {
+					if helpers.SendPassword(user.Language, &confEmail, user, request, r, emailrepository, templaterepository) != nil {
 						return
 					}
 				}
@@ -133,7 +132,7 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 	} else {
 		email.Code = ""
 		email.Confirmed = true
-		err = emailservice.Update(email)
+		err = emailrepository.Update(email)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -146,14 +145,14 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 
 // options /api/v1.0/services/
 // options /api/v1.0/supplier/services/
-func GetFacilities(r render.Render, facilityservice *services.FacilityService, session *models.DtoSession) {
+func GetFacilities(r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
 	}
 
-	facilities, err := facilityservice.GetAll()
+	facilities, err := facilityrepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -164,8 +163,8 @@ func GetFacilities(r render.Render, facilityservice *services.FacilityService, s
 }
 
 // get /api/v1.0/
-func HomePageTemplate(w http.ResponseWriter, templateservice *services.TemplateService) {
-	err := templateservice.GenerateHTML("homepage", w, nil)
+func HomePageTemplate(w http.ResponseWriter, templaterepository services.TemplateRepository) {
+	err := templaterepository.GenerateHTML("homepage", w, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

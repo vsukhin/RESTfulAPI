@@ -14,6 +14,10 @@ type ApiFile struct {
 	ID int64 `json:"id"` // Уникальный идентификатор файла
 }
 
+type ApiImage struct {
+	ID int64 `json:"key"` // Идентификатор запрашиваемой картинки
+}
+
 type DtoFile struct {
 	ID         int64     `db:"id"`         // Уникальный идентификатор файла
 	Name       string    `db:"name"`       // Оригинальное имя файла
@@ -24,10 +28,6 @@ type DtoFile struct {
 	Percentage byte      `db:"percentage"` // Процент готовности
 	Object_ID  int64     `db:"object_id"`  // Идентификатор связанного объекта БД
 	FileData   []byte    `db:"-"`          // Содержание файла
-}
-
-type ApiImage struct {
-	ID int64 `json:"key"` // Идентификатор запрашиваемой картинки
 }
 
 func NewApiFile(id int64) *ApiFile {

@@ -13,8 +13,19 @@ import (
 	"time"
 )
 
+type SessionRepository interface {
+	GenerateToken(length int) (token string, err error)
+	GetAndSaveSession(request *http.Request, r render.Render, params martini.Params,
+		updateSession bool, takeFromURI bool, quietMode bool) (session *models.DtoSession, token string, err error)
+	Get(token string) (session *models.DtoSession, err error)
+	Create(session *models.DtoSession, inTrans bool) (err error)
+	Update(session *models.DtoSession, briefly bool, inTrans bool) (err error)
+	Delete(token string, inTrans bool) (err error)
+	DeleteByUser(userid int64, inTrans bool) (err error)
+}
+
 type SessionService struct {
-	GroupService *GroupService
+	GroupRepository GroupRepository
 	*Repository
 }
 
@@ -111,7 +122,7 @@ func (sessionservice *SessionService) Get(token string) (session *models.DtoSess
 	}
 
 	var roles *[]models.UserRole
-	roles, err = sessionservice.GroupService.GetBySession(token)
+	roles, err = sessionservice.GroupRepository.GetBySession(token)
 	if err != nil {
 		log.Error("Error during getting session object from database %v with value %v", err, token)
 		return nil, err
@@ -141,7 +152,7 @@ func (sessionservice *SessionService) Create(session *models.DtoSession, inTrans
 		return err
 	}
 
-	err = sessionservice.GroupService.SetBySession(session.AccessToken, &session.Roles, false)
+	err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -177,12 +188,12 @@ func (sessionservice *SessionService) Update(session *models.DtoSession, briefly
 		if inTrans {
 			_ = trans.Rollback()
 		}
-		log.Error("Error during updating session object in database %v", err)
+		log.Error("Error during updating session object in database %v with value %v", err, session.AccessToken)
 		return err
 	}
 
 	if !briefly {
-		err = sessionservice.GroupService.SetBySession(session.AccessToken, &session.Roles, false)
+		err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, false)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -214,7 +225,7 @@ func (sessionservice *SessionService) Delete(token string, inTrans bool) (err er
 		}
 	}
 
-	err = sessionservice.GroupService.SetBySession(token, &[]models.UserRole{}, false)
+	err = sessionservice.GroupRepository.SetBySession(token, &[]models.UserRole{}, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -254,7 +265,7 @@ func (sessionservice *SessionService) DeleteByUser(userid int64, inTrans bool) (
 		}
 	}
 
-	err = sessionservice.GroupService.DeleteByUser(userid)
+	err = sessionservice.GroupRepository.DeleteByUser(userid)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()

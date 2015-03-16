@@ -1,13 +1,18 @@
 package middlewares
 
 import (
+	//"encoding/hex"
+	"net/http"
+	//"strings"
+
+	// "code.google.com/p/go.crypto/bcrypt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
-	"net/http"
 
 	"application/config"
 	"application/models"
 	"application/services"
+	// "application/server/memory"
 	"time"
 	"types"
 )
@@ -35,33 +40,33 @@ func GeneratingSessionErrorResponse(r render.Render, token string) {
 	return
 }
 
-func RequireSession(request *http.Request, r render.Render, sessionservice *services.SessionService,
+func RequireSession(request *http.Request, r render.Render, sessionrepository services.SessionRepository,
 	context martini.Context, params martini.Params, updateSession bool, takeParamFromURI bool) {
-	session, token, err := sessionservice.GetAndSaveSession(request, r, params, updateSession, takeParamFromURI, false)
+	session, token, err := sessionrepository.GetAndSaveSession(request, r, params, updateSession, takeParamFromURI, false)
 	if err != nil {
 		GeneratingSessionErrorResponse(r, token)
 	}
 	context.Map(session)
 }
 
-func RequireSessionCheckWithRoute(request *http.Request, r render.Render, sessionservice *services.SessionService,
+func RequireSessionCheckWithRoute(request *http.Request, r render.Render, sessionrepository services.SessionRepository,
 	context martini.Context, params martini.Params) {
-	RequireSession(request, r, sessionservice, context, params, false, true)
+	RequireSession(request, r, sessionrepository, context, params, false, true)
 }
 
-func RequireSessionCheckWithoutRoute(request *http.Request, r render.Render, sessionservice *services.SessionService,
+func RequireSessionCheckWithoutRoute(request *http.Request, r render.Render, sessionrepository services.SessionRepository,
 	context martini.Context, params martini.Params) {
-	RequireSession(request, r, sessionservice, context, params, false, false)
+	RequireSession(request, r, sessionrepository, context, params, false, false)
 }
 
-func RequireSessionKeepWithRoute(request *http.Request, r render.Render, sessionservice *services.SessionService,
+func RequireSessionKeepWithRoute(request *http.Request, r render.Render, sessionrepository services.SessionRepository,
 	context martini.Context, params martini.Params) {
-	RequireSession(request, r, sessionservice, context, params, true, true)
+	RequireSession(request, r, sessionrepository, context, params, true, true)
 }
 
-func RequireSessionKeepWithoutRoute(request *http.Request, r render.Render, sessionservice *services.SessionService,
+func RequireSessionKeepWithoutRoute(request *http.Request, r render.Render, sessionrepository services.SessionRepository,
 	context martini.Context, params martini.Params) {
-	RequireSession(request, r, sessionservice, context, params, true, false)
+	RequireSession(request, r, sessionrepository, context, params, true, false)
 }
 
 func UtcNow() time.Time {

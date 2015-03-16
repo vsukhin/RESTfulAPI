@@ -70,3 +70,12 @@ func configureI18n() {
 		}
 	}
 }
+
+//func configureI18n() {
+//	errorHandler := func(err error) {
+//		logger.Error(err.Error())
+//	}
+//	provider := yamlprovider.New(AppConfig.Paths.Translations, errorHandler)
+//
+//	setup.Setup(provider)
+//}

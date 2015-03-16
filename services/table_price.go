@@ -5,6 +5,12 @@ import (
 	"github.com/coopernurse/gorp"
 )
 
+type PricePropertiesRepository interface {
+	Get(tableid int64) (priceproperties *models.DtoPriceProperties, err error)
+	Exists(tableid int64) (found bool, err error)
+	Create(priceproperties *models.DtoPriceProperties, inTrans bool) (err error)
+}
+
 type PricePropertiesService struct {
 	*Repository
 }

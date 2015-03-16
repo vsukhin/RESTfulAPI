@@ -5,7 +5,6 @@ import (
 	"application/helpers"
 	"application/models"
 	"application/services"
-	"bytes"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -23,26 +22,25 @@ const (
 
 // post /api/v1.0/users/register/:token
 func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render, params martini.Params,
-	userservice *services.UserService, sessionservice *services.SessionService, emailservice *services.EmailService,
-	unitservice *services.UnitService, captchaservice *services.CaptchaService, templateservice *services.TemplateService,
-	groupservice *services.GroupService) {
+	userrepository services.UserRepository, sessionrepository services.SessionRepository, emailrepository services.EmailRepository,
+	unitrepository services.UnitRepository, captcharepository services.CaptchaRepository, templaterepository services.TemplateRepository,
+	grouprepository services.GroupRepository) {
 	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if captchaservice.Check(viewuser.CaptchaHash, viewuser.CaptchaValue, r) != nil {
+	if captcharepository.Check(viewuser.CaptchaHash, viewuser.CaptchaValue, r) != nil {
 		return
 	}
 
 	viewuser.Login = strings.ToLower(viewuser.Login)
-	emailExists, err := emailservice.Exists(viewuser.Login)
+	emailExists, err := emailrepository.Exists(viewuser.Login)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
 	if emailExists {
-		var email *models.DtoEmail
-		email, err = emailservice.Get(viewuser.Login)
+		email, err := emailrepository.Get(viewuser.Login)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -67,8 +65,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 		}
 	}
 
-	var roles *[]models.UserRole
-	roles, err = groupservice.GetDefault()
+	roles, err := grouprepository.GetDefault()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -84,15 +81,11 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtouser.Language = config.Configuration.Server.DefaultLanguage
 	dtouser.Roles = *roles
 
-	var session *models.DtoSession
-	var token string
-
-	session, token, err = sessionservice.GetAndSaveSession(request, r, params, false, true, true)
+	session, token, err := sessionrepository.GetAndSaveSession(request, r, params, false, true, true)
 	if err == nil {
 		dtouser.Creator_ID = session.UserID
 
-		var unit *models.DtoUnit
-		unit, err = unitservice.FindByUser(session.UserID)
+		unit, err := unitrepository.FindByUser(session.UserID)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -105,7 +98,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 		dtouser.UnitAdmin = true
 	}
 
-	token, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+	token, err = sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -126,14 +119,14 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 
 	dtouser.Emails = &[]models.DtoEmail{*dtoemail}
 
-	err = userservice.Create(dtouser, true)
+	err = userrepository.Create(dtouser, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
 
-	token, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+	token, err = sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -141,7 +134,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	}
 
 	session = models.NewDtoSession(token, dtouser.ID, dtouser.Roles, dtouser.LastLogin, dtouser.Language)
-	err = sessionservice.Create(session, true)
+	err = sessionrepository.Create(session, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -149,10 +142,8 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	}
 
 	for _, confEmail := range *dtouser.Emails {
-		var buf *bytes.Buffer
-
 		subject := config.Localization[confEmail.Language].Messages.RegistrationSubject
-		buf, err = templateservice.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language, request.Host, confEmail.Code),
+		buf, err := templaterepository.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language, request.Host, confEmail.Code),
 			services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -160,7 +151,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 			return
 		}
 
-		err = emailservice.SendEmail(confEmail.Email, subject, buf.String())
+		err = emailrepository.SendEmail(confEmail.Email, subject, buf.String())
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -172,18 +163,18 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 }
 
 // post /api/v1.0/users/password/
-func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render, emailservice *services.EmailService,
-	userservice *services.UserService, sessionservice *services.SessionService, captchaservice *services.CaptchaService,
-	templateservice *services.TemplateService) {
+func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render,
+	emailrepository services.EmailRepository, userrepository services.UserRepository, sessionrepository services.SessionRepository,
+	captcharepository services.CaptchaRepository, templaterepository services.TemplateRepository) {
 	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if captchaservice.Check(viewuser.CaptchaHash, viewuser.CaptchaValue, r) != nil {
+	if captcharepository.Check(viewuser.CaptchaHash, viewuser.CaptchaValue, r) != nil {
 		return
 	}
 
 	viewuser.Login = strings.ToLower(viewuser.Login)
-	dtouser, err := userservice.FindByLogin(viewuser.Login)
+	dtouser, err := userrepository.FindByLogin(viewuser.Login)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -197,8 +188,7 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 		return
 	}
 
-	var token string
-	token, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+	token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[dtouser.Language].Errors.Api.Data_Wrong})
@@ -206,7 +196,7 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 	}
 	dtouser.Code = token
 
-	err = userservice.Update(dtouser, true, false)
+	err = userrepository.Update(dtouser, true, false)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[dtouser.Language].Errors.Api.Data_Wrong})
@@ -215,7 +205,7 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 
 	for _, confEmail := range *dtouser.Emails {
 		if confEmail.Confirmed {
-			if helpers.SendPassword(dtouser.Language, &confEmail, dtouser, request, r, emailservice, templateservice) != nil {
+			if helpers.SendPassword(dtouser.Language, &confEmail, dtouser, request, r, emailrepository, templaterepository) != nil {
 				return
 			}
 		}
@@ -226,7 +216,7 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 
 // put /api/v1.0/users/password/:code/
 func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r render.Render, params martini.Params,
-	userservice *services.UserService, sessionservice *services.SessionService) {
+	userrepository services.UserRepository, sessionrepository services.SessionRepository) {
 	code := params[helpers.PARAMETER_NAME_CODE]
 	if len(code) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", code)
@@ -262,7 +252,7 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 		return
 	}
 
-	user, err := userservice.FindByCode(password.Code)
+	user, err := userrepository.FindByCode(password.Code)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -289,15 +279,14 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 	user.Code = ""
 	user.LastLogin = time.Now()
 
-	err = userservice.Update(user, true, false)
+	err = userrepository.Update(user, true, false)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	var token string
-	token, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+	token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -305,7 +294,7 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 	}
 
 	session := models.NewDtoSession(token, user.ID, user.Roles, user.LastLogin, user.Language)
-	err = sessionservice.Create(session, true)
+	err = sessionrepository.Create(session, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -316,7 +305,7 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 }
 
 // delete /api/v1.0/users/password/:code/
-func DeletePasswordRestoring(r render.Render, params martini.Params, userservice *services.UserService) {
+func DeletePasswordRestoring(r render.Render, params martini.Params, userrepository services.UserRepository) {
 	code := params[helpers.PARAMETER_NAME_CODE]
 	if code == "" || len(code) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", code)
@@ -325,7 +314,7 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userservice
 		return
 	}
 
-	user, err := userservice.FindByCode(code)
+	user, err := userrepository.FindByCode(code)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Confirmation_Code_Wrong})
@@ -341,7 +330,7 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userservice
 
 	user.Code = ""
 
-	err = userservice.Update(user, true, false)
+	err = userrepository.Update(user, true, false)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
@@ -352,8 +341,8 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userservice
 }
 
 // get /api/v1.0/user/groups/
-func GetGroups(r render.Render, groupservice *services.GroupService, session *models.DtoSession) {
-	groups, err := groupservice.GetByUserExt(session.UserID)
+func GetGroups(r render.Render, grouprepository services.GroupRepository, session *models.DtoSession) {
+	groups, err := grouprepository.GetByUserExt(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -364,8 +353,8 @@ func GetGroups(r render.Render, groupservice *services.GroupService, session *mo
 }
 
 // get /api/v1.0/user/
-func GetUserInfo(r render.Render, userservice *services.UserService, session *models.DtoSession) {
-	user, err := userservice.Get(session.UserID)
+func GetUserInfo(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -378,11 +367,11 @@ func GetUserInfo(r render.Render, userservice *services.UserService, session *mo
 
 // put /api/v1.0/user/
 func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r render.Render,
-	userservice *services.UserService, session *models.DtoSession) {
+	userrepository services.UserRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
-	user, err := userservice.Get(session.UserID)
+	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -396,7 +385,7 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 		user.Language = session.Language
 	}
 
-	err = userservice.Update(user, true, false)
+	err = userrepository.Update(user, true, false)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -408,8 +397,8 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 }
 
 // get /api/v1.0/user/emails/
-func GetUserEmails(r render.Render, userservice *services.UserService, session *models.DtoSession) {
-	user, err := userservice.Get(session.UserID)
+func GetUserEmails(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -425,8 +414,9 @@ func GetUserEmails(r render.Render, userservice *services.UserService, session *
 }
 
 // put /api/v1.0/user/emails/
-func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render, sessionservice *services.SessionService,
-	emailservice *services.EmailService, userservice *services.UserService, templateservice *services.TemplateService, session *models.DtoSession) {
+func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render,
+	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, userrepository services.UserRepository,
+	templaterepository services.TemplateRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -443,7 +433,7 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 		return
 	}
 
-	user, err := userservice.Get(session.UserID)
+	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -469,7 +459,7 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 
 		if !found {
 			var emailExists bool
-			emailExists, err = helpers.CheckEmailAvailability(updEmail.Email, session.Language, r, emailservice)
+			emailExists, err = helpers.CheckEmailAvailability(updEmail.Email, session.Language, r, emailrepository)
 			if err != nil {
 				return
 			}
@@ -502,7 +492,7 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 		}
 
 		if !updEmail.Confirmed {
-			code, err = sessionservice.GenerateToken(helpers.TOKEN_LENGTH)
+			code, err = sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -522,14 +512,14 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 	}
 
 	user.Emails = arrEmails
-	err = userservice.Update(user, false, true)
+	err = userrepository.Update(user, false, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	if helpers.SendConfirmations(user, session, request, r, emailservice, templateservice) != nil {
+	if helpers.SendConfirmations(user, session, request, r, emailrepository, templaterepository) != nil {
 		return
 	}
 

@@ -6,6 +6,18 @@ import (
 	"github.com/coopernurse/gorp"
 )
 
+type GroupRepository interface {
+	GetByUser(userid int64) (groups *[]models.UserRole, err error)
+	GetDefault() (groups *[]models.UserRole, err error)
+	GetByUserExt(userid int64) (groups *[]models.ApiGroup, err error)
+	GetBySession(token string) (groups *[]models.UserRole, err error)
+	GetBySessionExt(token string) (groups *[]models.ApiGroup, err error)
+	GetAll() (groups *[]models.ApiGroup, err error)
+	SetByUser(userid int64, groups *[]models.UserRole, inTrans bool) (err error)
+	SetBySession(token string, groups *[]models.UserRole, inTrans bool) (err error)
+	DeleteByUser(userid int64) (err error)
+}
+
 type GroupService struct {
 	*Repository
 }

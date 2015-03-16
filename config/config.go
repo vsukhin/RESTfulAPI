@@ -1,3 +1,5 @@
+/* Config package provides methods and data structures to work with system configuration */
+
 package config
 
 import (
@@ -5,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	gelf "github.com/probkiizokna/go-gelf"
@@ -32,10 +35,12 @@ type MysqlConfiguration struct {
 }
 
 var Configuration struct {
-	Server struct {
+	WorkingDirectory string `yaml:"WorkingDirectory"` // Рабочая директория сервера, сразу после запуска приложение меняет текущую директирию
+	Server           struct {
 		Host               string        `yaml:"Host"` // IP адрес или имя хоста на котором поднимается сервер, можно указывать 0.0.0.0 для всех ip адресов
 		Port               uint32        `yaml:"Port"` // tcp/ip порт занимаемый сервером
 		Address            string        // Консолидированный адрес Host:Port
+		PublicAddress      string        `yaml:"PublicAddress"`      // Публичный адрес на котором сервер доступен извне
 		Socket             string        `yaml:"Socket"`             // Unix socket на котором поднимается сервер, только для unix-like операционных систем Linux, Unix, Mac
 		Mode               string        `yaml:"Mode"`               // Режим работы
 		ReadTimeout        time.Duration `yaml:"ReadTimeout"`        // Время в милисекундах ожидания запроса
@@ -139,5 +144,10 @@ func loadAppConfig() {
 		logger.Fatalf("Can't unmarshal data from yaml to configuration structure: %v", unmarshalErr)
 	} else {
 		Configuration.Server.Address = fmt.Sprintf("%s:%d", Configuration.Server.Host, Configuration.Server.Port)
+
+		// Подготовка значения переменных для дальнейшего использования (удаление / в конце строки если есть)
+		var rex *regexp.Regexp
+		rex, _ = regexp.Compile(`(/+)$`)
+		Configuration.Server.PublicAddress = rex.ReplaceAllString(Configuration.Server.PublicAddress, "")
 	}
 }

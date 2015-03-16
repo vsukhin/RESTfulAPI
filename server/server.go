@@ -1,13 +1,16 @@
 package server
 
 import (
+	"net/http"
+	"os"
+	"runtime"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/render"
+
 	"application/config"
 	"application/db"
 	"application/services"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
-	"net/http"
-	"runtime"
 )
 
 var userservice *services.UserService
@@ -35,6 +38,13 @@ func Start() {
 	// Setting to use the maximum number of sockets and cores
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	// Change working directory
+	logger.Info("Working directory is: '%s'", config.Configuration.WorkingDirectory)
+	err = os.Chdir(config.Configuration.WorkingDirectory)
+	if err != nil {
+		logger.Fatalf("Can't change working directory: %v", err)
+	}
+
 	userservice = services.NewUserService(services.NewRepository(db.DbMap, db.TABLE_USERS))
 	sessionservice = services.NewSessionService(services.NewRepository(db.DbMap, db.TABLE_SESSIONS))
 	groupservice = services.NewGroupService(services.NewRepository(db.DbMap, db.TABLE_GROUPS))
@@ -54,15 +64,15 @@ func Start() {
 	dataformatservice = services.NewDataFormatService(services.NewRepository(db.DbMap, db.TABLE_DATA_FORMATS))
 	virtualdirservice = services.NewVirtualDirService(services.NewRepository(db.DbMap, db.TABLE_VIRTUAL_DIRS))
 
-	userservice.SessionService = sessionservice
-	userservice.EmailService = emailservice
-	userservice.GroupService = groupservice
-	userservice.UnitService = unitservice
-	sessionservice.GroupService = groupservice
-	customertableservice.TableColumnService = tablecolumnservice
-	customertableservice.TableRowService = tablerowservice
-	tablerowservice.TableCellService = tablecellservice
-	tablecolumnservice.TableCellService = tablecellservice
+	userservice.SessionRepository = sessionservice
+	userservice.EmailRepository = emailservice
+	userservice.GroupRepository = groupservice
+	userservice.UnitRepository = unitservice
+	sessionservice.GroupRepository = groupservice
+	customertableservice.TableColumnRepository = tablecolumnservice
+	customertableservice.TableRowRepository = tablerowservice
+	tablerowservice.TableCellRepository = tablecellservice
+	tablecolumnservice.TableCellRepository = tablecellservice
 
 	go fileservice.ClearExpiredFiles()
 	go customertableservice.ClearExpiredTables()
@@ -77,6 +87,13 @@ func Start() {
 		martini.Recovery(),
 		render.Renderer(render.Options{}),
 	)
+
+	// File server
+	logger.Info("Server DocumentRoot is: '%s'", config.Configuration.Server.DocumentRoot)
+	mrt.Use(martini.Static(config.Configuration.Server.DocumentRoot,
+		martini.StaticOptions{
+			Exclude: "/api/",
+		}))
 
 	mrt.MapTo(route, (*martini.Routes)(nil))
 

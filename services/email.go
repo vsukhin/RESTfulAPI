@@ -7,6 +7,18 @@ import (
 	"strconv"
 )
 
+type EmailRepository interface {
+	SendEmail(email string, subject string, body string) (err error)
+	Exists(email string) (found bool, err error)
+	FindByCode(code string) (email *models.DtoEmail, err error)
+	Get(email string) (dtoemail *models.DtoEmail, err error)
+	GetByUser(userid int64) (emails *[]models.DtoEmail, err error)
+	Create(email *models.DtoEmail) (err error)
+	Update(email *models.DtoEmail) (err error)
+	Delete(email string) (err error)
+	DeleteByUser(userid int64) (err error)
+}
+
 type EmailService struct {
 	*Repository
 }
@@ -102,7 +114,7 @@ func (emailservice *EmailService) Create(email *models.DtoEmail) (err error) {
 func (emailservice *EmailService) Update(email *models.DtoEmail) (err error) {
 	_, err = emailservice.DbContext.Update(email)
 	if err != nil {
-		log.Error("Error during updating email object in database %v", err)
+		log.Error("Error during updating email object in database %v with value %v", err, email.Email)
 		return err
 	}
 

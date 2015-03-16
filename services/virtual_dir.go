@@ -4,6 +4,11 @@ import (
 	"application/models"
 )
 
+type VirtualDirRepository interface {
+	Get(token string) (virtualdir *models.DtoVirtualDir, err error)
+	Create(virtualdir *models.DtoVirtualDir) (err error)
+}
+
 type VirtualDirService struct {
 	*Repository
 }

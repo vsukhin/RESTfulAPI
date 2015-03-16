@@ -58,3 +58,19 @@ func GetAllSearchTags(object interface{}) (tags *[]string) {
 
 	return tags
 }
+
+func CheckDbTagValue(param string, object interface{}) (value interface{}, found bool) {
+	found = false
+	value = nil
+	structAddr := reflect.ValueOf(object).Elem()
+	for i := 0; i < structAddr.NumField(); i++ {
+		fieldTag := structAddr.Type().Field(i).Tag.Get("db")
+		if param == fieldTag {
+			found = true
+			value = structAddr.Field(i).Interface()
+			break
+		}
+	}
+
+	return value, found
+}

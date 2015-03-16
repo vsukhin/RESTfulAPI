@@ -1,3 +1,5 @@
+/* Helpers package provides supporting methods for controller functions */
+
 package helpers
 
 import (
@@ -18,12 +20,8 @@ const (
 )
 
 var (
-	log *logging.Logger
+	log *logging.Logger = logging.MustGetLogger("helpers")
 )
-
-func init() {
-	log = logging.MustGetLogger("helpers")
-}
 
 func CheckValidation(binerrs binding.Errors, r render.Render, language string) error {
 	fielderrors, errcode := models.ConvertErrors(language, binerrs)

@@ -4,6 +4,11 @@ import (
 	"application/models"
 )
 
+type ColumnTypeRepository interface {
+	Get(id int64) (columntype *models.DtoColumnType, err error)
+	GetAll() (columntypes *[]models.ApiColumnType, err error)
+}
+
 type ColumnTypeService struct {
 	*Repository
 }

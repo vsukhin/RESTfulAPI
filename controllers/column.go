@@ -15,14 +15,14 @@ import (
 )
 
 // get /api/v1.0/tables/fieldtypes/
-func GetColumnTypes(r render.Render, columntypeservice *services.ColumnTypeService, session *models.DtoSession) {
+func GetColumnTypes(r render.Render, columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
 	}
 
-	columntypes, err := columntypeservice.GetAll()
+	columntypes, err := columntyperepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -34,8 +34,8 @@ func GetColumnTypes(r render.Render, columntypeservice *services.ColumnTypeServi
 
 // post /api/v1.0/tables/:tid/field/
 func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
-	customertableservice *services.CustomerTableService, columntypeservice *services.ColumnTypeService,
-	tablecolumnservice *services.TableColumnService, session *models.DtoSession) {
+	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
+	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -48,14 +48,14 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	if err != nil {
 		return
 	}
-	_, err = helpers.IsTableAvailable(r, customertableservice, tableid, session.Language)
+	_, err = helpers.IsTableAvailable(r, customertablerepository, tableid, session.Language)
 	if err != nil {
 		return
 	}
 
 	var typeid int64 = 0
 	if viewtablecolumn.TypeID != 0 {
-		if helpers.IsColumnTypeActive(r, columntypeservice, viewtablecolumn.TypeID, session.Language) != nil {
+		if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
 			return
 		}
 		typeid = viewtablecolumn.TypeID
@@ -68,10 +68,14 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	dtotablecolumn.Column_Type_ID = typeid
 	dtotablecolumn.Customer_Table_ID = tableid
 	dtotablecolumn.Prebuilt = false
+	dtotablecolumn.FieldNum, err = helpers.FindFreeColumn(tableid, r, tablecolumnrepository, session.Language)
+	if err != nil {
+		return
+	}
 	dtotablecolumn.Active = true
 	dtotablecolumn.Edition = 0
 
-	err = tablecolumnservice.Create(dtotablecolumn)
+	err = tablecolumnrepository.Create(dtotablecolumn)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -82,8 +86,8 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 }
 
 // get /api/v1.0/tables/:tid/field/
-func GetTableColumns(r render.Render, params martini.Params, tablecolumnservice *services.TableColumnService,
-	customertableservice *services.CustomerTableService, session *models.DtoSession) {
+func GetTableColumns(r render.Render, params martini.Params, tablecolumnrepository services.TableColumnRepository,
+	customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -93,31 +97,35 @@ func GetTableColumns(r render.Render, params martini.Params, tablecolumnservice 
 	if err != nil {
 		return
 	}
-	_, err = helpers.IsTableAvailable(r, customertableservice, tableid, session.Language)
+	_, err = helpers.IsTableAvailable(r, customertablerepository, tableid, session.Language)
 	if err != nil {
 		return
 	}
 
-	var tablecolumns *[]models.ApiTableColumn
-	tablecolumns, err = tablecolumnservice.GetByTable(tableid)
+	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	r.JSON(http.StatusOK, tablecolumns)
+	apicolumns := new([]models.ApiTableColumn)
+	for _, tablecolumn := range *tablecolumns {
+		*apicolumns = append(*apicolumns, *models.NewApiTableColumn(tablecolumn.ID, tablecolumn.Name, tablecolumn.Column_Type_ID, tablecolumn.Position))
+	}
+
+	r.JSON(http.StatusOK, apicolumns)
 }
 
 // get /api/v1.0/tables/:tid/field/:cid/
-func GetTableColumn(r render.Render, params martini.Params, customertableservice *services.CustomerTableService,
-	columntypeservice *services.ColumnTypeService, tablecolumnservice *services.TableColumnService, session *models.DtoSession) {
+func GetTableColumn(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
 	}
-	dtotablecolumn, err := helpers.CheckTableColumn(r, params, columntypeservice, customertableservice, tablecolumnservice, session.Language)
+	dtotablecolumn, err := helpers.CheckTableColumn(r, params, columntyperepository, customertablerepository, tablecolumnrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -127,8 +135,8 @@ func GetTableColumn(r render.Render, params martini.Params, customertableservice
 
 // put /api/v1.0/tables/:tid/field/:cid/
 func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
-	customertableservice *services.CustomerTableService, columntypeservice *services.ColumnTypeService,
-	tablecolumnservice *services.TableColumnService, session *models.DtoSession) {
+	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
+	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -137,7 +145,7 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
-	oldtablecolumn, err := helpers.CheckTableColumn(r, params, columntypeservice, customertableservice, tablecolumnservice, session.Language)
+	oldtablecolumn, err := helpers.CheckTableColumn(r, params, columntyperepository, customertablerepository, tablecolumnrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -150,7 +158,7 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 
 	var typeid int64 = 0
 	if viewtablecolumn.TypeID != 0 {
-		if helpers.IsColumnTypeActive(r, columntypeservice, viewtablecolumn.TypeID, session.Language) != nil {
+		if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
 			return
 		}
 		typeid = viewtablecolumn.TypeID
@@ -168,7 +176,7 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	oldtablecolumn.Active = false
 	oldtablecolumn.Original_ID = newtablecolumn.ID
 
-	err = tablecolumnservice.Update(newtablecolumn, oldtablecolumn, false, true)
+	err = tablecolumnrepository.Update(newtablecolumn, oldtablecolumn, false, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -179,14 +187,14 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 }
 
 // delete /api/v1.0/tables/:tid/field/:cid/
-func DeleteTableColumn(r render.Render, params martini.Params, customertableservice *services.CustomerTableService,
-	columntypeservice *services.ColumnTypeService, tablecolumnservice *services.TableColumnService, session *models.DtoSession) {
+func DeleteTableColumn(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
 	}
-	dtotablecolumn, err := helpers.CheckTableColumn(r, params, columntypeservice, customertableservice, tablecolumnservice, session.Language)
+	dtotablecolumn, err := helpers.CheckTableColumn(r, params, columntyperepository, customertablerepository, tablecolumnrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -197,7 +205,7 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertableserv
 		return
 	}
 
-	err = tablecolumnservice.Deactivate(dtotablecolumn)
+	err = tablecolumnrepository.Deactivate(dtotablecolumn)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -209,8 +217,7 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertableserv
 
 // put /api/v1.0/tables/:tid/sequence/
 func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.ViewApiOrderTableColumns, r render.Render, params martini.Params,
-	customertableservice *services.CustomerTableService, columntypeservice *services.ColumnTypeService,
-	tablecolumnservice *services.TableColumnService, session *models.DtoSession) {
+	customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -223,17 +230,17 @@ func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.
 	if err != nil {
 		return
 	}
-	_, err = helpers.IsTableAvailable(r, customertableservice, tableid, session.Language)
+	_, err = helpers.IsTableAvailable(r, customertablerepository, tableid, session.Language)
 	if err != nil {
 		return
 	}
-	if helpers.CheckColumnSet(viewordertablecolumns, tableid, r, tablecolumnservice, session.Language) != nil {
+	if helpers.CheckColumnSet(viewordertablecolumns, tableid, r, tablecolumnrepository, session.Language) != nil {
 		return
 	}
 
 	var dtotablecolumns *[]models.DtoTableColumn
 	for _, viewordertablecolumn := range viewordertablecolumns {
-		dtotablecolumn, err := tablecolumnservice.Get(viewordertablecolumn.ID)
+		dtotablecolumn, err := tablecolumnrepository.Get(viewordertablecolumn.ID)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -243,7 +250,7 @@ func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.
 		*dtotablecolumns = append(*dtotablecolumns, *dtotablecolumn)
 	}
 
-	err = tablecolumnservice.UpdateBriefly(dtotablecolumns, true)
+	err = tablecolumnrepository.UpdateBriefly(dtotablecolumns, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

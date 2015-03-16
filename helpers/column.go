@@ -8,16 +8,18 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"sort"
 	"types"
 )
 
 const (
 	PARAM_NAME_COLUMN_ID = "cid"
+	MAX_COLUMN_NUMBER    = 85
 )
 
-func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columntypeservice *services.ColumnTypeService,
-	tablecolumnservice *services.TableColumnService, language string) (dtotablecolumn *models.DtoTableColumn, err error) {
-	dtotablecolumn, err = tablecolumnservice.Get(columnid)
+func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columntyperepository services.ColumnTypeRepository,
+	tablecolumnrepository services.TableColumnRepository, language string) (dtotablecolumn *models.DtoTableColumn, err error) {
+	dtotablecolumn, err = tablecolumnrepository.Get(columnid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -30,7 +32,7 @@ func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columnt
 		return nil, errors.New("Column is not active")
 	}
 	if dtotablecolumn.Column_Type_ID != 0 {
-		err = IsColumnTypeActive(r, columntypeservice, dtotablecolumn.Column_Type_ID, language)
+		err = IsColumnTypeActive(r, columntyperepository, dtotablecolumn.Column_Type_ID, language)
 		if err != nil {
 			return nil, err
 		}
@@ -45,8 +47,8 @@ func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columnt
 	return dtotablecolumn, nil
 }
 
-func CheckTableColumn(r render.Render, params martini.Params, columntypeservice *services.ColumnTypeService,
-	customertableservice *services.CustomerTableService, tablecolumnservice *services.TableColumnService,
+func CheckTableColumn(r render.Render, params martini.Params, columntyperepository services.ColumnTypeRepository,
+	customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
 	language string) (dtotablecolumn *models.DtoTableColumn, err error) {
 	var tableid int64
 	var columnid int64
@@ -59,17 +61,16 @@ func CheckTableColumn(r render.Render, params martini.Params, columntypeservice 
 	if err != nil {
 		return nil, err
 	}
-	_, err = IsTableAvailable(r, customertableservice, tableid, language)
+	_, err = IsTableAvailable(r, customertablerepository, tableid, language)
 	if err != nil {
 		return nil, err
 	}
 
-	return CheckColumnValidity(tableid, columnid, r, columntypeservice, tablecolumnservice, language)
+	return CheckColumnValidity(tableid, columnid, r, columntyperepository, tablecolumnrepository, language)
 }
 
-func IsColumnTypeActive(r render.Render, columntypeservice *services.ColumnTypeService, typeid int64, language string) (err error) {
-	var dtocolumntype *models.DtoColumnType
-	dtocolumntype, err = columntypeservice.Get(typeid)
+func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTypeRepository, typeid int64, language string) (err error) {
+	dtocolumntype, err := columntyperepository.Get(typeid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -85,11 +86,9 @@ func IsColumnTypeActive(r render.Render, columntypeservice *services.ColumnTypeS
 	return nil
 }
 
-func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnservice *services.TableColumnService,
+func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnrepository services.TableColumnRepository,
 	language string) (err error) {
-
-	var tablecolumns *[]models.ApiTableColumn
-	tablecolumns, err = tablecolumnservice.GetByTable(tableid)
+	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -129,4 +128,45 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumns
 	}
 
 	return nil
+}
+
+func FindFreeColumn(tableid int64, r render.Render, tablecolumnrepository services.TableColumnRepository,
+	language string) (fieldnum byte, err error) {
+	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return 0, err
+	}
+
+	allcolumns := make(map[int]bool)
+	for i := 0; i < MAX_COLUMN_NUMBER; i++ {
+		allcolumns[i] = true
+	}
+	for _, tablecolumn := range *tablecolumns {
+		allcolumns[int(tablecolumn.FieldNum)-1] = false
+	}
+
+	var keys []int
+	for i, avialable := range allcolumns {
+		if avialable {
+			keys = append(keys, i)
+		}
+	}
+	sort.Ints(keys)
+
+	found := false
+	for _, number := range keys {
+		fieldnum = byte(number) + 1
+		found = true
+		break
+	}
+	if !found {
+		log.Error("Can't find free column for table %v", tableid)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return 0, errors.New("No free column")
+	}
+
+	return fieldnum, nil
 }

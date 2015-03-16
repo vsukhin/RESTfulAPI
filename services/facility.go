@@ -4,6 +4,14 @@ import (
 	"application/models"
 )
 
+type FacilityRepository interface {
+	GetAll() (facilities *[]models.DtoFacility, err error)
+	Get(id int64) (facility *models.DtoFacility, err error)
+	Create(facility *models.DtoFacility) (err error)
+	Update(facility *models.DtoFacility) (err error)
+	Delete(id int64) (err error)
+}
+
 type FacilityService struct {
 	*Repository
 }
@@ -50,7 +58,7 @@ func (facilityservice *FacilityService) Create(facility *models.DtoFacility) (er
 func (facilityservice *FacilityService) Update(facility *models.DtoFacility) (err error) {
 	_, err = facilityservice.DbContext.Update(facility)
 	if err != nil {
-		log.Error("Error during updating facility object in database %v", err)
+		log.Error("Error during updating facility object in database %v with value %v", err, facility.ID)
 		return err
 	}
 

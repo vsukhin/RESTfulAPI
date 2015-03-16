@@ -1,11 +1,6 @@
-/*
-Mapping models on database.
-*/
-package models
+/* Models package provides data structures for both business logic and database layers */
 
-import (
-	logging "github.com/op/go-logging"
-)
+package models
 
 type IDs interface {
 	GetIDs() []int64
@@ -38,8 +33,4 @@ const (
 	USER_ROLE_ADMINISTRATOR
 	USER_ROLE_SUPPLIER
 	USER_ROLE_CUSTOMER
-)
-
-var (
-	log = logging.MustGetLogger("models")
 )

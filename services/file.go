@@ -12,6 +12,17 @@ import (
 	"time"
 )
 
+type FileRepository interface {
+	ClearExpiredFiles()
+	Get(fileid int64) (file *models.DtoFile, err error)
+	GetBriefly(fileid int64) (file *models.DtoFile, err error)
+	GetExpired(timeout time.Duration) (files *[]models.DtoFile, err error)
+	FindByType(filetype string) (file *models.DtoFile, err error)
+	Create(file *models.DtoFile, data *models.ViewFile) (err error)
+	Update(file *models.DtoFile) (err error)
+	Delete(file *models.DtoFile) (err error)
+}
+
 type FileService struct {
 	*Repository
 }
@@ -47,7 +58,7 @@ func (fileservice *FileService) Get(fileid int64) (file *models.DtoFile, err err
 
 	file.FileData, err = ioutil.ReadFile(filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
 	if err != nil {
-		log.Error("Error during getting file in filesystem %v", err)
+		log.Error("Error during getting file in filesystem %v with value %v", err, file.ID)
 		return nil, err
 	}
 
@@ -133,7 +144,7 @@ func (fileservice *FileService) Create(file *models.DtoFile, data *models.ViewFi
 func (fileservice *FileService) Update(file *models.DtoFile) (err error) {
 	_, err = fileservice.DbContext.Update(file)
 	if err != nil {
-		log.Error("Error during updating file object in database %v", err)
+		log.Error("Error during updating file object in database %v with value %v", err, file.ID)
 		return err
 	}
 

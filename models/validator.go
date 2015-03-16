@@ -3,11 +3,16 @@ package models
 import (
 	"application/config"
 	"github.com/martini-contrib/binding"
+	logging "github.com/op/go-logging"
 	"gopkg.in/validator.v2"
 	"net/http"
 	"strconv"
 	"strings"
 	"types"
+)
+
+var (
+	log = logging.MustGetLogger("models")
 )
 
 const (

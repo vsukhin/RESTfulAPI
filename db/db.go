@@ -1,3 +1,5 @@
+/* DB package provides methods and data structures responsible for exchanging data with sql server */
+
 package db
 
 import (
@@ -22,7 +24,7 @@ const (
 	TABLE_TABLE_TYPES      = "table_types"
 	TABLE_COLUMN_TYPES     = "column_types"
 	TABLE_TABLE_COLUMNS    = "table_columns"
-	TABLE_TABLE_ROWS       = "table_rows"
+	TABLE_TABLE_ROWS       = "table_data"
 	TABLE_TABLE_CELLS      = "table_cells"
 	TABLE_FACILITIES       = "services"
 	TABLE_PRICE_PROPERTIES = "price_properties"

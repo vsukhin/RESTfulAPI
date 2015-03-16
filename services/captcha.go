@@ -12,6 +12,14 @@ const (
 	HTTP_STATUS_CAPTCHA_REQUIRED = 449
 )
 
+type CaptchaRepository interface {
+	Check(hash string, value string, r render.Render) (err error)
+	Get(hash string) (captcha *models.DtoCaptcha, err error)
+	Create(captcha *models.DtoCaptcha) (err error)
+	Update(captcha *models.DtoCaptcha) (err error)
+	Delete(hash string) (err error)
+}
+
 type CaptchaService struct {
 	*Repository
 }
@@ -85,7 +93,7 @@ func (captchaservice *CaptchaService) Create(captcha *models.DtoCaptcha) (err er
 func (captchaservice *CaptchaService) Update(captcha *models.DtoCaptcha) (err error) {
 	_, err = captchaservice.DbContext.Update(captcha)
 	if err != nil {
-		log.Error("Error during updating captcha object in database %v", err)
+		log.Error("Error during updating captcha object in database %v with value %v", err, captcha.Hash)
 		return err
 	}
 

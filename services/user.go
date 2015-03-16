@@ -6,11 +6,24 @@ import (
 	"time"
 )
 
+type UserRepository interface {
+	GetUserArrays(user *models.DtoUser) (*models.DtoUser, error)
+	FindByLogin(login string) (user *models.DtoUser, err error)
+	FindByCode(code string) (user *models.DtoUser, err error)
+	Get(userid int64) (user *models.DtoUser, err error)
+	GetAll(filter string) (users *[]models.ApiUserShort, err error)
+	GetMeta() (usermeta *models.ApiUserMeta, err error)
+	InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error)
+	Create(user *models.DtoUser, inTrans bool) (err error)
+	Update(user *models.DtoUser, briefly bool, inTrans bool) (err error)
+	Delete(userid int64, inTrans bool) (err error)
+}
+
 type UserService struct {
-	SessionService *SessionService
-	EmailService   *EmailService
-	UnitService    *UnitService
-	GroupService   *GroupService
+	SessionRepository SessionRepository
+	EmailRepository   EmailRepository
+	UnitRepository    UnitRepository
+	GroupRepository   GroupRepository
 	*Repository
 }
 
@@ -20,14 +33,14 @@ func NewUserService(repository *Repository) *UserService {
 }
 
 func (userservice *UserService) GetUserArrays(user *models.DtoUser) (*models.DtoUser, error) {
-	roles, err := userservice.GroupService.GetByUser(user.ID)
+	roles, err := userservice.GroupRepository.GetByUser(user.ID)
 	if err != nil {
 		log.Error("Error during getting user roles object from database %v with value %v", err, user.ID)
 		return nil, err
 	}
 	user.Roles = *roles
 
-	emails, err := userservice.EmailService.GetByUser(user.ID)
+	emails, err := userservice.EmailRepository.GetByUser(user.ID)
 	if err != nil {
 		log.Error("Error during getting user roles object from database %v with value %v", err, user.ID)
 		return nil, err
@@ -100,7 +113,7 @@ func (userservice *UserService) InitUnit(trans *gorp.Transaction, inTrans bool) 
 	unit := new(models.DtoUnit)
 	unit.Name = "Default name for unit"
 	unit.Created = time.Now()
-	err = userservice.UnitService.Create(unit)
+	err = userservice.UnitRepository.Create(unit)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -142,20 +155,20 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 	for _, email := range *user.Emails {
 		email.UserID = user.ID
 		if !email.Exists {
-			err = userservice.EmailService.Create(&email)
+			err = userservice.EmailRepository.Create(&email)
 		} else {
-			err = userservice.EmailService.Update(&email)
+			err = userservice.EmailRepository.Update(&email)
 		}
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
 			}
-			log.Error("Error during creating user object in database %v", err)
+			log.Error("Error during creating user object in database %v with value %v", err, email.Email)
 			return err
 		}
 	}
 
-	err = userservice.GroupService.SetByUser(user.ID, &user.Roles, false)
+	err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -205,12 +218,12 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 
 	_, err = userservice.DbContext.Update(user)
 	if err != nil {
-		log.Error("Error during updating user object in database %v", err)
+		log.Error("Error during updating user object in database %v with value %v", err, user.ID)
 		return err
 	}
 
 	if !briefly {
-		err = userservice.GroupService.SetByUser(user.ID, &user.Roles, false)
+		err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, false)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -230,24 +243,24 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 
 			if !found {
 				if !updEmail.Exists {
-					err = userservice.EmailService.Create(&updEmail)
+					err = userservice.EmailRepository.Create(&updEmail)
 				} else {
-					err = userservice.EmailService.Update(&updEmail)
+					err = userservice.EmailRepository.Update(&updEmail)
 				}
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
 					}
-					log.Error("Error during updating user object in database %v", err)
+					log.Error("Error during updating user object in database %v with value %v", err, updEmail.Email)
 					return err
 				}
 			} else {
-				err = userservice.EmailService.Update(&updEmail)
+				err = userservice.EmailRepository.Update(&updEmail)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
 					}
-					log.Error("Error during updating user object in database %v", err)
+					log.Error("Error during updating user object in database %v with value %v", err, updEmail.Email)
 					return err
 				}
 			}
@@ -262,7 +275,7 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 				}
 			}
 			if !found {
-				err = userservice.EmailService.Delete(curEmail.Email)
+				err = userservice.EmailRepository.Delete(curEmail.Email)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
@@ -296,7 +309,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		}
 	}
 
-	err = userservice.SessionService.DeleteByUser(userid, false)
+	err = userservice.SessionRepository.DeleteByUser(userid, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -305,7 +318,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.EmailService.DeleteByUser(userid)
+	err = userservice.EmailRepository.DeleteByUser(userid)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -323,7 +336,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.GroupService.SetByUser(userid, &[]models.UserRole{}, false)
+	err = userservice.GroupRepository.SetByUser(userid, &[]models.UserRole{}, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()

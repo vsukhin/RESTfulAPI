@@ -9,8 +9,21 @@ import (
 	"strings"
 )
 
+type TableColumnRepository interface {
+	Get(id int64) (tablecolumn *models.DtoTableColumn, err error)
+	Check(field string) (valid bool, err error)
+	Extract(infield string, invalue string) (outfield string, outvalue string, errField error, errValue error)
+	GetAllFields(parameter interface{}) (fields *[]string)
+	GetByTable(tableid int64) (tablecolumns *[]models.DtoTableColumn, err error)
+	Create(tablecolumn *models.DtoTableColumn) (err error)
+	Update(newtablecolumn *models.DtoTableColumn, oldtablecolumn *models.DtoTableColumn, briefly bool, inTrans bool) (err error)
+	UpdateBriefly(tablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
+	Deactivate(tablecolumn *models.DtoTableColumn) (err error)
+	Delete(id int64) (err error)
+}
+
 type TableColumnService struct {
-	TableCellService *TableCellService
+	TableCellRepository TableCellRepository
 	*Repository
 }
 
@@ -85,10 +98,10 @@ func (tablecolumnservice *TableColumnService) GetAllFields(parameter interface{}
 	return fields
 }
 
-func (tablecolumnservice *TableColumnService) GetByTable(tableid int64) (tablecolumns *[]models.ApiTableColumn, err error) {
-	tablecolumns = new([]models.ApiTableColumn)
+func (tablecolumnservice *TableColumnService) GetByTable(tableid int64) (tablecolumns *[]models.DtoTableColumn, err error) {
+	tablecolumns = new([]models.DtoTableColumn)
 	_, err = tablecolumnservice.DbContext.Select(tablecolumns,
-		"select t.id, t.name, t.column_type_id, t.position from "+tablecolumnservice.Table+
+		"select t.* from "+tablecolumnservice.Table+
 			" t left join column_types c on t.column_type_id = c.id where t.active = 1 "+
 			"and (c.active = 1 or c.active is null) and t.customer_table_id = ? order by position asc",
 		tableid)
@@ -132,31 +145,18 @@ func (tablecolumnservice *TableColumnService) Update(newtablecolumn *models.DtoT
 			return err
 		}
 
-		_, err = tablecolumnservice.DbContext.Exec("update table_cells set table_column_id = ? where table_column_id = ?",
-			oldtablecolumn.ID, newtablecolumn.ID)
-		if err != nil {
-			if inTrans {
-				_ = trans.Rollback()
-			}
-			log.Error("Error during updating table column object in database %v with value %v", err, newtablecolumn.ID)
-			return err
-		}
-
 		if newtablecolumn.Column_Type_ID != oldtablecolumn.Column_Type_ID {
-			_, err = tablecolumnservice.DbContext.Exec("insert into table_cells (table_row_id, table_column_id, value, active, valid, checked, edition) "+
-				"select table_row_id, ?, value, 1, 0, 0, 0 from table_cells where table_column_id = ? and active = 1",
-				newtablecolumn.ID, oldtablecolumn.ID)
-		} else {
-			_, err = tablecolumnservice.DbContext.Exec("insert into table_cells (table_row_id, table_column_id, value, active, edition, valid, checked) "+
-				"select table_row_id, ?, value, 1, valid, checked, 0 from table_cells where table_column_id = ? and active = 1",
-				newtablecolumn.ID, oldtablecolumn.ID)
-		}
-		if err != nil {
-			if inTrans {
-				_ = trans.Rollback()
+			_, err = tablecolumnservice.DbContext.Exec("update table_data set checked"+fmt.Sprintf("%v", newtablecolumn.FieldNum)+
+				" = 0, valid"+fmt.Sprintf("%v", newtablecolumn.FieldNum)+" = 0 where customer_table_id = ?",
+				newtablecolumn.Customer_Table_ID)
+			if err != nil {
+				if inTrans {
+					_ = trans.Rollback()
+				}
+				log.Error("Error during updating table column object in database %v with value %v for %v",
+					err, newtablecolumn.FieldNum, newtablecolumn.Customer_Table_ID)
+				return err
 			}
-			log.Error("Error during updating table column object in database %v with value %v", err, oldtablecolumn.ID)
-			return err
 		}
 	}
 
@@ -216,45 +216,18 @@ func (tablecolumnservice *TableColumnService) UpdateBriefly(tablecolumns *[]mode
 func (tablecolumnservice *TableColumnService) Deactivate(tablecolumn *models.DtoTableColumn) (err error) {
 	_, err = tablecolumnservice.DbContext.Exec("update "+tablecolumnservice.Table+" set active = 0 where id = ?", tablecolumn.ID)
 	if err != nil {
-		log.Error("Error during deactivating column object from database %v with value %v", err, tablecolumn.ID)
+		log.Error("Error during deactivating table column object from database %v with value %v", err, tablecolumn.ID)
 		return err
 	}
 
 	return nil
 }
 
-func (tablecolumnservice *TableColumnService) Delete(id int64, inTrans bool) (err error) {
-	var trans *gorp.Transaction
-
-	if inTrans {
-		trans, err = tablecolumnservice.DbContext.Begin()
-		if err != nil {
-			log.Error("Error during deleting table column object in database %v", err)
-			return err
-		}
-	}
-
-	err = tablecolumnservice.TableCellService.DeleteByColumn(id)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
-		log.Error("Error during deleting column object in database %v with value %v", err, id)
-		return err
-	}
-
+func (tablecolumnservice *TableColumnService) Delete(id int64) (err error) {
 	_, err = tablecolumnservice.DbContext.Exec("delete from "+tablecolumnservice.Table+" where id = ?", id)
 	if err != nil {
 		log.Error("Error during deleting table column object in database %v with value %v", err, id)
 		return err
-	}
-
-	if inTrans {
-		err = trans.Commit()
-		if err != nil {
-			log.Error("Error during deleting table column object in database %v", err)
-			return err
-		}
 	}
 
 	return nil

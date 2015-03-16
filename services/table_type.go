@@ -4,6 +4,12 @@ import (
 	"application/models"
 )
 
+type TableTypeRepository interface {
+	Get(id int64) (tabletype *models.DtoTableType, err error)
+	GetAll() (tabletypes *[]string, err error)
+	FindByName(name string) (id int64, err error)
+}
+
 type TableTypeService struct {
 	*Repository
 }

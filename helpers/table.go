@@ -16,11 +16,10 @@ const (
 )
 
 func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam string, userid int64,
-	language string, userservice *services.UserService, unitservice *services.UnitService,
-	tabletypeservice *services.TableTypeService) (unitid int64, typeid int64, err error) {
+	language string, userrepository services.UserRepository, unitrepository services.UnitRepository,
+	tabletyperepository services.TableTypeRepository) (unitid int64, typeid int64, err error) {
 	if unitparam == 0 {
-		var user *models.DtoUser
-		user, err = userservice.Get(userid)
+		user, err := userrepository.Get(userid)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -28,8 +27,7 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 		}
 		unitid = user.UnitID
 	} else {
-		var unit *models.DtoUnit
-		unit, err = unitservice.Get(unitparam)
+		unit, err := unitrepository.Get(unitparam)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -38,7 +36,7 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 		unitid = unit.ID
 	}
 
-	typeid, err = tabletypeservice.FindByName(typeparam)
+	typeid, err = tabletyperepository.FindByName(typeparam)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -48,9 +46,9 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 	return unitid, typeid, nil
 }
 
-func IsTableActive(r render.Render, customertableservice *services.CustomerTableService, tableid int64,
+func IsTableActive(r render.Render, customertablerepository services.CustomerTableRepository, tableid int64,
 	language string) (dtocustomertable *models.DtoCustomerTable, err error) {
-	dtocustomertable, err = customertableservice.Get(tableid)
+	dtocustomertable, err = customertablerepository.Get(tableid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
@@ -67,9 +65,9 @@ func IsTableActive(r render.Render, customertableservice *services.CustomerTable
 	return dtocustomertable, nil
 }
 
-func IsTableAvailable(r render.Render, customertableservice *services.CustomerTableService, tableid int64,
+func IsTableAvailable(r render.Render, customertablerepository services.CustomerTableRepository, tableid int64,
 	language string) (dtocustomertable *models.DtoCustomerTable, err error) {
-	dtocustomertable, err = IsTableActive(r, customertableservice, tableid, language)
+	dtocustomertable, err = IsTableActive(r, customertablerepository, tableid, language)
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +81,14 @@ func IsTableAvailable(r render.Render, customertableservice *services.CustomerTa
 	return dtocustomertable, nil
 }
 
-func CheckTable(r render.Render, params martini.Params, customertableservice *services.CustomerTableService,
+func CheckTable(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
 	language string) (dtocustomertable *models.DtoCustomerTable, err error) {
 	var tableid int64
 	tableid, err = CheckParameterInt(r, params[PARAM_NAME_TABLE_ID], language)
 	if err != nil {
 		return nil, err
 	}
-	dtocustomertable, err = IsTableAvailable(r, customertableservice, tableid, language)
+	dtocustomertable, err = IsTableAvailable(r, customertablerepository, tableid, language)
 	if err != nil {
 		return nil, err
 	}

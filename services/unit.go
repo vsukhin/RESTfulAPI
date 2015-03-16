@@ -4,6 +4,14 @@ import (
 	"application/models"
 )
 
+type UnitRepository interface {
+	FindByUser(userid int64) (unit *models.DtoUnit, err error)
+	Get(unitid int64) (unit *models.DtoUnit, err error)
+	Create(unit *models.DtoUnit) (err error)
+	Update(unit *models.DtoUnit) (err error)
+	Delete(unitid int64) (err error)
+}
+
 type UnitService struct {
 	*Repository
 }
@@ -52,7 +60,7 @@ func (unitservice *UnitService) Create(unit *models.DtoUnit) (err error) {
 func (unitservice *UnitService) Update(unit *models.DtoUnit) (err error) {
 	_, err = unitservice.DbContext.Update(unit)
 	if err != nil {
-		log.Error("Error during updating unit object in database %v", err)
+		log.Error("Error during updating unit object in database %v with value %v", err, unit.ID)
 		return err
 	}
 

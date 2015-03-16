@@ -7,9 +7,25 @@ import (
 	"time"
 )
 
+type CustomerTableRepository interface {
+	ImportData(customertable *models.DtoCustomerTable,
+		dtotablecolumns *[]models.DtoTableColumn, dtotablerows *[]models.DtoTableRow, inTrans bool) (err error)
+	UpdateImportStructure(customertable *models.DtoCustomerTable,
+		dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
+	Get(id int64) (customertable *models.DtoCustomerTable, err error)
+	GetEx(id int64) (customertable *models.ApiLongCustomerTable, err error)
+	GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error)
+	GetByUnit(filter string, userid int64) (customertables *[]models.ApiLongCustomerTable, err error)
+	GetExpired(timeout time.Duration) (customertables *[]models.DtoCustomerTable, err error)
+	Create(customertable *models.DtoCustomerTable) (err error)
+	Update(customertable *models.DtoCustomerTable) (err error)
+	Deactivate(customertable *models.DtoCustomerTable) (err error)
+	Delete(id int64) (err error)
+}
+
 type CustomerTableService struct {
-	TableColumnService *TableColumnService
-	TableRowService    *TableRowService
+	TableColumnRepository TableColumnRepository
+	TableRowRepository    TableRowRepository
 	*Repository
 }
 
@@ -44,7 +60,7 @@ func (customertableservice *CustomerTableService) ImportData(customertable *mode
 	log.Info("Starting inserting table columns %v", time.Now())
 	for i, _ := range *dtotablecolumns {
 		(*dtotablecolumns)[i].Customer_Table_ID = customertable.ID
-		err = customertableservice.TableColumnService.Create(&(*dtotablecolumns)[i])
+		err = customertableservice.TableColumnRepository.Create(&(*dtotablecolumns)[i])
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -61,7 +77,7 @@ func (customertableservice *CustomerTableService) ImportData(customertable *mode
 		for j, _ := range *(*dtotablerows)[i].Cells {
 			(*(*dtotablerows)[i].Cells)[j].Table_Column_ID = (*dtotablecolumns)[j].ID
 		}
-		err = customertableservice.TableRowService.Create(&(*dtotablerows)[i], false)
+		err = customertableservice.TableRowRepository.Create(&(*dtotablerows)[i], false)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -104,11 +120,11 @@ func (customertableservice *CustomerTableService) UpdateImportStructure(customer
 		if inTrans {
 			_ = trans.Rollback()
 		}
-		log.Error("Error during updating imported customer table object in database %v", err)
+		log.Error("Error during updating imported customer table object in database %v with value %v", err, customertable.ID)
 		return err
 	}
 
-	err = customertableservice.TableColumnService.UpdateBriefly(dtotablecolumns, false)
+	err = customertableservice.TableColumnRepository.UpdateBriefly(dtotablecolumns, false)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -258,7 +274,7 @@ func (customertableservice *CustomerTableService) Create(customertable *models.D
 func (customertableservice *CustomerTableService) Update(customertable *models.DtoCustomerTable) (err error) {
 	_, err = customertableservice.DbContext.Update(customertable)
 	if err != nil {
-		log.Error("Error during updating customer table object in database %v", err)
+		log.Error("Error during updating customer table object in database %v with value %v", err, customertable.ID)
 		return err
 	}
 
