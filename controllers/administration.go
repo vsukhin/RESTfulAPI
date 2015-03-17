@@ -331,13 +331,13 @@ func DeleteUser(r render.Render, params martini.Params, userrepository services.
 }
 
 // options /api/v1.0/administration/users/
-func GetUserMetaData(r render.Render, userservice *services.UserService, session *models.DtoSession) {
+func GetUserMetaData(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
 	}
-	usermeta, err := userservice.GetMeta()
+	usermeta, err := userrepository.GetMeta()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -348,7 +348,7 @@ func GetUserMetaData(r render.Render, userservice *services.UserService, session
 }
 
 // get /api/v1.0/administration/users/:userId/
-func GetUserFullInfo(r render.Render, params martini.Params, userservice *services.UserService, session *models.DtoSession) {
+func GetUserFullInfo(r render.Render, params martini.Params, userrepository services.UserRepository, session *models.DtoSession) {
 	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
@@ -359,8 +359,7 @@ func GetUserFullInfo(r render.Render, params martini.Params, userservice *servic
 		return
 	}
 
-	var user *models.DtoUser
-	user, err = userservice.Get(userid)
+	user, err := userrepository.Get(userid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
