@@ -59,7 +59,7 @@ func GetAllSearchTags(object interface{}) (tags *[]string) {
 	return tags
 }
 
-func CheckDbTagValue(param string, object interface{}) (value interface{}, found bool) {
+func GetDbTagValue(param string, object interface{}) (value interface{}, found bool) {
 	found = false
 	value = nil
 	structAddr := reflect.ValueOf(object).Elem()
@@ -73,4 +73,30 @@ func CheckDbTagValue(param string, object interface{}) (value interface{}, found
 	}
 
 	return value, found
+}
+
+func SetDbTagValue(param string, object interface{}, value interface{}) (found bool) {
+	found = false
+	structAddr := reflect.ValueOf(object).Elem()
+	for i := 0; i < structAddr.NumField(); i++ {
+		fieldTag := structAddr.Type().Field(i).Tag.Get("db")
+		if param == fieldTag {
+			found = true
+			switch structAddr.Field(i).Type().String() {
+			case "bool":
+				data, ok := value.(bool)
+				if ok {
+					structAddr.Field(i).SetBool(data)
+				}
+			case "string":
+				data, ok := value.(string)
+				if ok {
+					structAddr.Field(i).SetString(data)
+				}
+			}
+			break
+		}
+	}
+
+	return found
 }

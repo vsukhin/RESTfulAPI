@@ -50,13 +50,18 @@ type TableSearch struct {
 }
 
 type DtoCustomerTable struct {
-	ID        int64     `db:"id"`        // Уникальный идентификатор пользовательской таблицы
-	Name      string    `db:"name"`      // Название
-	Created   time.Time `db:"created"`   // Время создания
-	TypeID    int64     `db:"type_id"`   // Идентификатор типа
-	UnitID    int64     `db:"unit_id"`   // Идентификатор объединения
-	Active    bool      `db:"active"`    // Активная
-	Permanent bool      `db:"permanent"` // Постоянная
+	ID                int64     `db:"id"`                // Уникальный идентификатор пользовательской таблицы
+	Name              string    `db:"name"`              // Название
+	Created           time.Time `db:"created"`           // Время создания
+	TypeID            int64     `db:"type_id"`           // Идентификатор типа
+	UnitID            int64     `db:"unit_id"`           // Идентификатор объединения
+	Active            bool      `db:"active"`            // Активная
+	Permanent         bool      `db:"permanent"`         // Постоянная
+	Import_Ready      bool      `db:"import_ready"`      // Готовность импорта
+	Import_Percentage byte      `db:"import_percentage"` // Процент импорта
+	Import_Columns    int64     `db:"import_columns"`    // Количество импортированных колонок
+	Import_Rows       int64     `db:"import_rows"`       // Количество импортированных строк
+	Import_WrongRows  int64     `db:"import_wrongrows"`  // Количество импортированных ошибочных строк
 }
 
 // Конструктор создания объекта пользовательской таблицы в api
@@ -103,15 +108,21 @@ func NewApiMetaCustomerTable(numofrows int64, numofcols int64, checked bool, qua
 }
 
 // Конструктор создания объекта пользовательской таблицы в бд
-func NewDtoCustomerTable(id int64, name string, created time.Time, typeid int64, unitid int64, active bool, permanent bool) *DtoCustomerTable {
+func NewDtoCustomerTable(id int64, name string, created time.Time, typeid int64, unitid int64, active bool, permanent bool,
+	import_ready bool, import_percentage byte, import_columns int64, import_rows int64, import_wrongrows int64) *DtoCustomerTable {
 	return &DtoCustomerTable{
-		ID:        id,
-		Name:      name,
-		Created:   created,
-		TypeID:    typeid,
-		UnitID:    unitid,
-		Active:    active,
-		Permanent: permanent,
+		ID:                id,
+		Name:              name,
+		Created:           created,
+		TypeID:            typeid,
+		UnitID:            unitid,
+		Active:            active,
+		Permanent:         permanent,
+		Import_Ready:      import_ready,
+		Import_Percentage: import_percentage,
+		Import_Columns:    import_columns,
+		Import_Rows:       import_rows,
+		Import_WrongRows:  import_wrongrows,
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
-	"application/server/middlewares"
 	"application/services"
 	"fmt"
 	"github.com/go-martini/martini"
@@ -16,12 +15,6 @@ import (
 
 // get /api/v1.0/files/:key/
 func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles,
-		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	fileid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_KEY], session.Language)
 	if err != nil {
 		return
@@ -43,21 +36,14 @@ func GetFile(w http.ResponseWriter, r render.Render, params martini.Params, file
 
 // post /api/v1.0/files/
 func UploadFile(data models.ViewFile, r render.Render, filerepository services.FileRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles,
-		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
-
 	file := new(models.DtoFile)
 	file.Created = time.Now()
 	file.Name = data.FileData.Filename
 	file.Path = "/" + fmt.Sprintf("%04d/%02d/%02d/", file.Created.Year(), file.Created.Month(), file.Created.Day())
 	file.Permanent = false
-	file.Ready = true
-	file.Percentage = 100
-	file.Object_ID = 0
+	file.Export_Ready = true
+	file.Export_Percentage = 100
+	file.Export_Object_ID = 0
 
 	err := filerepository.Create(file, &data)
 	if err != nil {
@@ -71,12 +57,6 @@ func UploadFile(data models.ViewFile, r render.Render, filerepository services.F
 
 // delete /api/v1.0/files/:key/
 func DeleteFile(r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles,
-		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	fileid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_KEY], session.Language)
 	if err != nil {
 		return
@@ -107,13 +87,6 @@ func DeleteFile(r render.Render, params martini.Params, filerepository services.
 
 // get /api/v1.0/images/:type/
 func GetImage(r render.Render, params martini.Params, filerepository services.FileRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles,
-		[]models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER, models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
-
 	filetype := params[helpers.PARAM_NAME_TYPE]
 	if filetype == "" || len(filetype) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", filetype)

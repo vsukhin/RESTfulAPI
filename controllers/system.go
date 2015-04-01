@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
-	"application/server/middlewares"
 	"application/services"
 	"bytes"
 	"encoding/base64"
@@ -141,25 +140,6 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 	}
 
 	r.JSON(http.StatusAccepted, types.ResponseOK{Message: config.Localization[user.Language].Messages.OK})
-}
-
-// options /api/v1.0/services/
-// options /api/v1.0/supplier/services/
-func GetFacilities(r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
-
-	facilities, err := facilityrepository.GetAll()
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
-	}
-
-	r.JSON(http.StatusOK, facilities)
 }
 
 // get /api/v1.0/

@@ -26,11 +26,15 @@ var tabletypeservice *services.TableTypeService
 var columntypeservice *services.ColumnTypeService
 var tablecolumnservice *services.TableColumnService
 var tablerowservice *services.TableRowService
-var tablecellservice *services.TableCellService
 var facilityservice *services.FacilityService
 var pricepropertiesservice *services.PricePropertiesService
 var dataformatservice *services.DataFormatService
 var virtualdirservice *services.VirtualDirService
+var importstepservice *services.ImportStepService
+var orderservice *services.OrderService
+var statusservice *services.StatusService
+var orderstatusservice *services.OrderStatusService
+var messageservice *services.MessageService
 
 func Start() {
 	var err error
@@ -57,22 +61,26 @@ func Start() {
 	tabletypeservice = services.NewTableTypeService(services.NewRepository(db.DbMap, db.TABLE_TABLE_TYPES))
 	columntypeservice = services.NewColumnTypeService(services.NewRepository(db.DbMap, db.TABLE_COLUMN_TYPES))
 	tablecolumnservice = services.NewTableColumnService(services.NewRepository(db.DbMap, db.TABLE_TABLE_COLUMNS))
-	tablerowservice = services.NewTableRowService(services.NewRepository(db.DbMap, db.TABLE_TABLE_ROWS))
-	tablecellservice = services.NewTableCellService(services.NewRepository(db.DbMap, db.TABLE_TABLE_CELLS))
+	tablerowservice = services.NewTableRowService(services.NewRepository(db.DbMap, db.TABLE_TABLE_DATA))
 	facilityservice = services.NewFacilityService(services.NewRepository(db.DbMap, db.TABLE_FACILITIES))
 	pricepropertiesservice = services.NewPricePropertiesService(services.NewRepository(db.DbMap, db.TABLE_PRICE_PROPERTIES))
 	dataformatservice = services.NewDataFormatService(services.NewRepository(db.DbMap, db.TABLE_DATA_FORMATS))
 	virtualdirservice = services.NewVirtualDirService(services.NewRepository(db.DbMap, db.TABLE_VIRTUAL_DIRS))
+	importstepservice = services.NewImportStepService(services.NewRepository(db.DbMap, db.TABLE_IMPORT_STEPS))
+	orderservice = services.NewOrderService(services.NewRepository(db.DbMap, db.TABLE_ORDERS))
+	statusservice = services.NewStatusService(services.NewRepository(db.DbMap, db.TABLE_STATUSES))
+	orderstatusservice = services.NewOrderStatusService(services.NewRepository(db.DbMap, db.TABLE_ORDER_STATUSES))
+	messageservice = services.NewMessageService(services.NewRepository(db.DbMap, db.TABLE_MESSAGES))
 
 	userservice.SessionRepository = sessionservice
 	userservice.EmailRepository = emailservice
 	userservice.GroupRepository = groupservice
 	userservice.UnitRepository = unitservice
+	userservice.MessageRepository = messageservice
 	sessionservice.GroupRepository = groupservice
 	customertableservice.TableColumnRepository = tablecolumnservice
 	customertableservice.TableRowRepository = tablerowservice
-	tablerowservice.TableCellRepository = tablecellservice
-	tablecolumnservice.TableCellRepository = tablecellservice
+	orderservice.OrderStatusRepository = orderstatusservice
 
 	go fileservice.ClearExpiredFiles()
 	go customertableservice.ClearExpiredTables()
@@ -133,10 +141,14 @@ func bootstrap() martini.Handler {
 		context.Map(columntypeservice)
 		context.Map(tablecolumnservice)
 		context.Map(tablerowservice)
-		context.Map(tablecellservice)
 		context.Map(facilityservice)
 		context.Map(pricepropertiesservice)
 		context.Map(dataformatservice)
 		context.Map(virtualdirservice)
+		context.Map(importstepservice)
+		context.Map(orderservice)
+		context.Map(statusservice)
+		context.Map(orderstatusservice)
+		context.Map(messageservice)
 	}
 }

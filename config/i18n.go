@@ -4,8 +4,6 @@ import (
 	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"
-	//	"code.google.com/p/ginta/setup"
-	//	"github.com/probkiizokna/ginta-yamlprovider"
 )
 
 type Resource struct {
@@ -48,6 +46,7 @@ type Resource struct {
 			Equipment_Info_Wrong    string `yaml:"Equipment_Info_Wrong"`    // Ошибка неверной информации об оборудовании
 			File_NotImage           string `yaml:"File_NotImage"`           // Ошибка файла неявляющегося картинкой
 			Email_InUse             string `yaml:"Email_InUse"`             // Ошибка уже используемого email
+			Data_Changes_Denied     string `yaml:"Data_Changes_Denied"`     // Ошибка изменения данных
 		} `yaml:"Api"` // Ошибки API
 
 	} `yaml:"Errors"` // Сообщения об ошибках
@@ -70,12 +69,3 @@ func configureI18n() {
 		}
 	}
 }
-
-//func configureI18n() {
-//	errorHandler := func(err error) {
-//		logger.Error(err.Error())
-//	}
-//	provider := yamlprovider.New(AppConfig.Paths.Translations, errorHandler)
-//
-//	setup.Setup(provider)
-//}

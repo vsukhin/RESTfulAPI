@@ -5,7 +5,19 @@ import (
 )
 
 //Структура для организации хранения сервисов
-type ApiFacility struct {
+type ViewFacility struct {
+	ID int64 `json:"id"` // Уникальный идентификатор сервиса
+}
+
+type ViewFacilities []ViewFacility
+
+type ApiShortFacility struct {
+	ID          int64  `json:"id" db:"id"`                   // Уникальный идентификатор сервиса
+	Name        string `json:"name" db:"name"`               // Название
+	Description string `json:"description" db:"description"` // Описание
+}
+
+type ApiLongFacility struct {
 	ID          int64  `json:"id" db:"id"`                   // Уникальный идентификатор сервиса
 	Name        string `json:"name" db:"name"`               // Название
 	Description string `json:"description" db:"description"` // Описание
@@ -21,8 +33,16 @@ type DtoFacility struct {
 }
 
 // Конструктор создания объекта сервиса в api
-func NewApiFacility(id int64, name string, description string, active bool) *ApiFacility {
-	return &ApiFacility{
+func NewApiShortFacility(id int64, name string, description string) *ApiShortFacility {
+	return &ApiShortFacility{
+		ID:          id,
+		Name:        name,
+		Description: description,
+	}
+}
+
+func NewApiLongFacility(id int64, name string, description string, active bool) *ApiLongFacility {
+	return &ApiLongFacility{
 		ID:          id,
 		Name:        name,
 		Description: description,

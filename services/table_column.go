@@ -23,7 +23,6 @@ type TableColumnRepository interface {
 }
 
 type TableColumnService struct {
-	TableCellRepository TableCellRepository
 	*Repository
 }
 
@@ -192,7 +191,7 @@ func (tablecolumnservice *TableColumnService) UpdateBriefly(tablecolumns *[]mode
 	}
 
 	for _, tablecolumn := range *tablecolumns {
-		_, err = tablecolumnservice.DbContext.Update(tablecolumn)
+		_, err = tablecolumnservice.DbContext.Update(&tablecolumn)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()

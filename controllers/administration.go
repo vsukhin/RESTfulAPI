@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
-	"application/server/middlewares"
 	"application/services"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -18,11 +17,6 @@ import (
 // get /api/v1.0/administration/users/
 func GetUsers(request *http.Request, r render.Render, params martini.Params,
 	userrepository services.UserRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	var err error
 	query := ""
 
@@ -80,11 +74,6 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository,
 	grouprepository services.GroupRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -175,11 +164,6 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -303,11 +287,6 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 
 // delete /api/v1.0/administration/users/:userId/
 func DeleteUser(r render.Render, params martini.Params, userrepository services.UserRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	userid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_USER_ID], session.Language)
 	if err != nil {
 		return
@@ -332,11 +311,6 @@ func DeleteUser(r render.Render, params martini.Params, userrepository services.
 
 // options /api/v1.0/administration/users/
 func GetUserMetaData(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	usermeta, err := userrepository.GetMeta()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -349,11 +323,6 @@ func GetUserMetaData(r render.Render, userrepository services.UserRepository, se
 
 // get /api/v1.0/administration/users/:userId/
 func GetUserFullInfo(r render.Render, params martini.Params, userrepository services.UserRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	userid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_USER_ID], session.Language)
 	if err != nil {
 		return

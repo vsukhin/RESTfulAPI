@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
-	"application/server/middlewares"
 	"application/services"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -17,11 +16,6 @@ import (
 
 // options /api/v1.0/tables/
 func GetTableTypes(r render.Render, tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	tabletypes, err := tabletyperepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -34,11 +28,6 @@ func GetTableTypes(r render.Render, tabletyperepository services.TableTypeReposi
 
 // get /api/v1.0/tables/
 func GetUnitTables(request *http.Request, r render.Render, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	var err error
 	query := ""
 
@@ -94,11 +83,6 @@ func GetUnitTables(request *http.Request, r render.Render, customertablereposito
 
 // get /api/v1.0/tables/:tid/
 func GetTable(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
 	if err != nil {
 		return
@@ -118,11 +102,6 @@ func GetTable(r render.Render, params martini.Params, customertablerepository se
 func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustomerTable, r render.Render,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
 	tabletyperepository services.TableTypeRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -155,11 +134,6 @@ func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustom
 func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustomerTable, r render.Render, params martini.Params,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository, unitrepository services.UnitRepository,
 	tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -200,11 +174,6 @@ func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustome
 
 // delete /api/v1.0/tables/:tid/
 func DeleteTable(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
 	if err != nil {
 		return
@@ -222,11 +191,6 @@ func DeleteTable(r render.Render, params martini.Params, customertablerepository
 
 // options /api/v1.0/tables/:tid/data/
 func GetTableMetaData(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
 	if err != nil {
 		return
@@ -246,11 +210,6 @@ func GetTableMetaData(r render.Render, params martini.Params, customertablerepos
 func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiPriceProperties, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, pricepropertiesrepository services.PricePropertiesRepository,
 	facilityrepository services.FacilityRepository, session *models.DtoSession) {
-	if !middlewares.IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
-		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
-			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
-		return
-	}
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -272,7 +231,7 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 		return
 	}
 
-	facility, err := facilityrepository.Get(viewpriceproperties.Service_ID)
+	facility, err := facilityrepository.Get(viewpriceproperties.Facility_ID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -296,7 +255,7 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 			return
 		}
-		if priceproperties.Service_ID != viewpriceproperties.Service_ID {
+		if priceproperties.Facility_ID != viewpriceproperties.Facility_ID {
 			log.Error("Service is not the same for after price %v", viewpriceproperties.After_ID)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -326,7 +285,7 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 		return
 	}
 
-	dtopriceproperties := models.NewDtoPriceProperties(dtocustomertable.ID, viewpriceproperties.Service_ID,
+	dtopriceproperties := models.NewDtoPriceProperties(dtocustomertable.ID, viewpriceproperties.Facility_ID,
 		viewpriceproperties.After_ID, viewpriceproperties.Begin, viewpriceproperties.End, time.Now())
 	err = pricepropertiesrepository.Create(dtopriceproperties, true)
 	if err != nil {

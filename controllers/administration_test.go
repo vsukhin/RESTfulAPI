@@ -126,7 +126,7 @@ func TestGetGroupsInfoOk(t *testing.T) {
 }
 
 func TestGetUserFullInfoParameterError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "None"}
 	var userrepository = new(TestUserRepository)
@@ -138,7 +138,7 @@ func TestGetUserFullInfoParameterError(t *testing.T) {
 }
 
 func TestGetUserFullInfoUserError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)
@@ -152,7 +152,7 @@ func TestGetUserFullInfoUserError(t *testing.T) {
 }
 
 func TestGetUserFullInfoUserOk(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)
@@ -166,7 +166,7 @@ func TestGetUserFullInfoUserOk(t *testing.T) {
 }
 
 func TestGetUserMetaDataError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var userrepository = new(TestUserRepository)
 	userrepository.GetErr = errors.New("User error")
@@ -179,7 +179,7 @@ func TestGetUserMetaDataError(t *testing.T) {
 }
 
 func TestGetUserMetaDataOk(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var userrepository = new(TestUserRepository)
 	userrepository.GetErr = nil
@@ -192,7 +192,7 @@ func TestGetUserMetaDataOk(t *testing.T) {
 }
 
 func TestDeleteUserParameterError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "None"}
 	var userrepository = new(TestUserRepository)
@@ -204,7 +204,7 @@ func TestDeleteUserParameterError(t *testing.T) {
 }
 
 func TestDeleteUserGetError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)
@@ -218,7 +218,7 @@ func TestDeleteUserGetError(t *testing.T) {
 }
 
 func TestDeleteUserDelError(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)
@@ -233,7 +233,7 @@ func TestDeleteUserDelError(t *testing.T) {
 }
 
 func TestDeleteUserOk(t *testing.T) {
-	var session = &(models.DtoSession{Language: "eng", Roles: []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}})
+	var session = &(models.DtoSession{Language: "eng"})
 	var r = new(Renderer)
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)

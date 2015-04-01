@@ -3,15 +3,22 @@ package services
 import (
 	"application/config"
 	"application/models"
+	"errors"
+	"fmt"
 	"github.com/coopernurse/gorp"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 type CustomerTableRepository interface {
-	ImportData(customertable *models.DtoCustomerTable,
-		dtotablecolumns *[]models.DtoTableColumn, dtotablerows *[]models.DtoTableRow, inTrans bool) (err error)
-	UpdateImportStructure(customertable *models.DtoCustomerTable,
-		dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
+	ImportDataStructure(dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
+	UpdateImportStructure(customertable *models.DtoCustomerTable, dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
+	ImportData(file *models.DtoFile, dtocustomertable *models.DtoCustomerTable, dataformat models.DataFormat,
+		hasheader bool, dtotablecolumns *[]models.DtoTableColumn, version string) (err error)
+	ExportData(viewexporttable *models.ViewExportTable, file *models.DtoFile, customertable *models.DtoCustomerTable,
+		tablecolumns *[]models.DtoTableColumn, hasheader bool, version string) (err error)
+	CheckUserAccess(user_id int64, id int64) (allowed bool, err error)
 	Get(id int64) (customertable *models.DtoCustomerTable, err error)
 	GetEx(id int64) (customertable *models.ApiLongCustomerTable, err error)
 	GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error)
@@ -34,8 +41,7 @@ func NewCustomerTableService(repository *Repository) *CustomerTableService {
 	return &CustomerTableService{Repository: repository}
 }
 
-func (customertableservice *CustomerTableService) ImportData(customertable *models.DtoCustomerTable,
-	dtotablecolumns *[]models.DtoTableColumn, dtotablerows *[]models.DtoTableRow, inTrans bool) (err error) {
+func (customertableservice *CustomerTableService) ImportDataStructure(dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -47,49 +53,18 @@ func (customertableservice *CustomerTableService) ImportData(customertable *mode
 		}
 	}
 
-	log.Info("Inserting table object %v", time.Now())
-	err = customertableservice.DbContext.Insert(customertable)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
-		log.Error("Error during importing customer table object in database %v", err)
-		return err
-	}
-
 	log.Info("Starting inserting table columns %v", time.Now())
-	for i, _ := range *dtotablecolumns {
-		(*dtotablecolumns)[i].Customer_Table_ID = customertable.ID
-		err = customertableservice.TableColumnRepository.Create(&(*dtotablecolumns)[i])
+	for _, dtotablecolumn := range *dtotablecolumns {
+		err = customertableservice.TableColumnRepository.Create(&dtotablecolumn)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
-				log.Info("Cancelling table columns insertion %v", time.Now())
+				log.Info("Cancelling inserting table columns %v", time.Now())
 			}
 			return err
 		}
 	}
 	log.Info("Ending inserting table columns %v", time.Now())
-
-	log.Info("Starting inserting table rows %v", time.Now())
-	for i, _ := range *dtotablerows {
-		(*dtotablerows)[i].Customer_Table_ID = customertable.ID
-		for j, _ := range *(*dtotablerows)[i].Cells {
-			(*(*dtotablerows)[i].Cells)[j].Table_Column_ID = (*dtotablecolumns)[j].ID
-		}
-		err = customertableservice.TableRowRepository.Create(&(*dtotablerows)[i], false)
-		if err != nil {
-			if inTrans {
-				_ = trans.Rollback()
-				log.Info("Cancelling table rows insertion %v", time.Now())
-			}
-			return err
-		}
-		if i%1000 == 0 {
-			log.Info("Continue inserting table rows %v at position %v", time.Now(), i)
-		}
-	}
-	log.Info("Ending inserting table rows %v", time.Now())
 
 	if inTrans {
 		log.Info("Ending transaction %v", time.Now())
@@ -143,6 +118,100 @@ func (customertableservice *CustomerTableService) UpdateImportStructure(customer
 	return nil
 }
 
+func (customertableservice *CustomerTableService) ImportData(file *models.DtoFile, dtocustomertable *models.DtoCustomerTable,
+	dataformat models.DataFormat, hasheader bool, dtotablecolumns *[]models.DtoTableColumn, version string) (err error) {
+	if len(*dtotablecolumns) == 0 {
+		log.Error("Can't find any data in customer table object %v for importing with value %v", err, dtocustomertable.ID)
+		return errors.New("Empty table")
+	}
+
+	query := "load data infile '" + filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)+version) +
+		"' into table table_data fields terminated by '" +
+		string(models.GetDataSeparator(models.DataFormat(dataformat))) +
+		"'  escaped by '' lines terminated by '\n'"
+	if hasheader {
+		query += " ignore 1 lines"
+	}
+	query += " ("
+	for _, tablecolumn := range *dtotablecolumns {
+		query += fmt.Sprintf(" field%v", tablecolumn.FieldNum) + ","
+	}
+	query += " position, wrong) set customer_table_id = " + fmt.Sprintf("%v", dtocustomertable.ID)
+
+	log.Info("Starting inserting table rows %v", time.Now())
+	_, err = customertableservice.DbContext.Exec(query)
+	if err != nil {
+		log.Error("Error during importing customer table object in database %v with value %v", err, dtocustomertable.ID)
+		return err
+	}
+	log.Info("Ending inserting table rows %v", time.Now())
+
+	return nil
+}
+
+func (customertableservice *CustomerTableService) ExportData(viewexporttable *models.ViewExportTable, file *models.DtoFile,
+	customertable *models.DtoCustomerTable, tablecolumns *[]models.DtoTableColumn, hasheader bool, version string) (err error) {
+	if len(*tablecolumns) == 0 {
+		log.Error("Can't find any data in customer table object %v for exporting with value %v", err, customertable.ID)
+		return errors.New("Empty table")
+	}
+
+	log.Info("Starting downloading table rows %v", time.Now())
+	query := ""
+	if hasheader {
+		query = "select"
+		for i, tablecolumn := range *tablecolumns {
+			columnname := ""
+			if !strings.Contains(tablecolumn.Name, "'") {
+				columnname = tablecolumn.Name
+			}
+			query += " '" + columnname + "'"
+			if i != len(*tablecolumns)-1 {
+				query += ","
+			}
+		}
+		query += " union all "
+	}
+	query += "( select"
+	for i, tablecolumn := range *tablecolumns {
+		query += fmt.Sprintf(" field%v", tablecolumn.FieldNum)
+		if i != len(*tablecolumns)-1 {
+			query += ","
+		}
+	}
+	query += " from table_data where active = 1 and customer_table_id = " + fmt.Sprintf("%v", customertable.ID)
+	if viewexporttable.Type != models.EXPORT_DATA_ALL {
+		query += " and ("
+		for i, tablecolumn := range *tablecolumns {
+			if viewexporttable.Type == models.EXPORT_DATA_VALID {
+				query += " " + fmt.Sprintf(" valid%v", tablecolumn.FieldNum) + " = 1"
+				if i != len(*tablecolumns)-1 {
+					query += " and"
+				}
+			}
+			if viewexporttable.Type == models.EXPORT_DATA_INVALID {
+				query += " " + fmt.Sprintf(" valid%v", tablecolumn.FieldNum) + " = 0"
+				if i != len(*tablecolumns)-1 {
+					query += " or"
+				}
+			}
+		}
+		query += ")"
+	}
+	query += " into outfile '" + filepath.Join(config.Configuration.TempDirectory, fmt.Sprintf("%08d", file.ID)+version) + "' fields terminated by '" +
+		string(models.GetDataSeparator(models.DataFormat(viewexporttable.Data_Format_ID))) + "' lines terminated by '\n'"
+	query += ")"
+
+	_, err = customertableservice.DbContext.Exec(query)
+	if err != nil {
+		log.Error("Error during exporting customer table object in database %v with value %v", err, customertable.ID)
+		return err
+	}
+	log.Info("Ending downloading table rows %v", time.Now())
+
+	return nil
+}
+
 func (customertableservice *CustomerTableService) ClearExpiredTables() {
 	for {
 		tables, err := customertableservice.GetExpired(config.Configuration.Server.TableTimeout)
@@ -153,6 +222,17 @@ func (customertableservice *CustomerTableService) ClearExpiredTables() {
 		}
 		time.Sleep(time.Minute)
 	}
+}
+
+func (customertableservice *CustomerTableService) CheckUserAccess(user_id int64, id int64) (allowed bool, err error) {
+	count, err := customertableservice.DbContext.SelectInt("select count(*) from "+customertableservice.Table+
+		" where id = ? and unit_id = (select unit_id from users where id = ? and active = 1 and confirmed = 1)", id, user_id)
+	if err != nil {
+		log.Error("Error during checking customer table object from database %v with value %v, %v", err, user_id, id)
+		return false, err
+	}
+
+	return count != 0, nil
 }
 
 func (customertableservice *CustomerTableService) Get(id int64) (customertable *models.DtoCustomerTable, err error) {
@@ -181,52 +261,73 @@ func (customertableservice *CustomerTableService) GetEx(id int64) (customertable
 func (customertableservice *CustomerTableService) GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error) {
 	customertable = new(models.ApiMetaCustomerTable)
 	customertable.NumOfRows, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_rows where active = 1 and customer_table_id = ?", id)
+		"select count(*) from table_data where active = 1 and customer_table_id = ?", id)
 	if err != nil {
 		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
 		return nil, err
 	}
 
-	customertable.NumOfCols, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_columns where active = 1 and customer_table_id = ? "+
-			"and (column_type_id = 0 or column_type_id in (select id from column_types where active = 1))", id)
+	tablecolumns, err := customertableservice.TableColumnRepository.GetByTable(id)
 	if err != nil {
-		log.Error("Error during getting meta customer table object from database %v with value %v with value %v", err, id)
 		return nil, err
 	}
+	customertable.NumOfCols = int64(len(*tablecolumns))
 
+	query := ""
+	for i, tablecolumn := range *tablecolumns {
+		query += fmt.Sprintf(" checked%v", tablecolumn.FieldNum) + " = 0"
+		if i != len(*tablecolumns)-1 {
+			query += " or "
+		}
+	}
+	if query != "" {
+		query = "(" + query + ") and"
+	}
 	var notchecked int64
 	notchecked, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_cells where active = 1 and checked = 0 and table_column_id in "+
-			"(select id from table_columns where customer_table_id = ? and active = 1"+
-			" and (column_type_id = 0 or column_type_id in (select id from column_types where active = 1)))"+
-			"and table_row_id in (select id from table_rows where active = 1 and customer_table_id = ?)", id, id)
+		"select count(*) from table_data where "+query+" active = 1 and customer_table_id = ?", id)
 	if err != nil {
 		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
 		return nil, err
 	}
 	customertable.Checked = notchecked == 0
 
+	query = ""
+	for i, tablecolumn := range *tablecolumns {
+		query += fmt.Sprintf(" valid%v", tablecolumn.FieldNum)
+		if i != len(*tablecolumns)-1 {
+			query += " + "
+		}
+	}
+	if query != "" {
+		query = " sum(" + query + ")"
+	} else {
+		query = "0"
+	}
 	var numofvalid int64
 	numofvalid, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_cells where active = 1 and valid = 1 and table_column_id in "+
-			"(select id from table_columns where customer_table_id = ? and active = 1"+
-			" and (column_type_id = 0 or column_type_id in (select id from column_types where active = 1)))"+
-			"and table_row_id in (select id from table_rows where active = 1 and customer_table_id = ?)", id, id)
+		"select "+query+" from table_data where active = 1 and customer_table_id = ?", id)
 	if err != nil {
 		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
 		return nil, err
 	}
-	customertable.QaulityPer = 100
+	customertable.QaulityPer = 0
 	if customertable.NumOfRows != 0 && customertable.NumOfCols != 0 {
 		customertable.QaulityPer = byte(100 * numofvalid / (customertable.NumOfRows * customertable.NumOfCols))
 	}
 
+	query = ""
+	for i, tablecolumn := range *tablecolumns {
+		query += fmt.Sprintf(" valid%v", tablecolumn.FieldNum) + " = 0"
+		if i != len(*tablecolumns)-1 {
+			query += " or "
+		}
+	}
+	if query != "" {
+		query = "(" + query + ") and"
+	}
 	customertable.NumOfWrongRows, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_rows where active = 1 and customer_table_id = ? and id in "+
-			"(select table_row_id from table_cells where active = 1 and valid = 0 and table_column_id in "+
-			"(select id from table_columns where active = 1 and customer_table_id = ?"+
-			" and (column_type_id = 0 or column_type_id in (select id from column_types where active = 1))))", id, id)
+		"select count(*) from table_data where "+query+" active = 1 and customer_table_id = ?", id)
 	if err != nil {
 		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
 		return nil, err
@@ -240,7 +341,7 @@ func (customertableservice *CustomerTableService) GetByUnit(filter string, useri
 	_, err = customertableservice.DbContext.Select(customertables,
 		"select c.id, c.name, t.name as type, c.unit_id from "+customertableservice.Table+
 			" c left join table_types t on c.type_id = t.id where c.active = 1 and c.permanent = 1 and"+
-			" c.unit_id = (select unit_id from users where id = ?)"+filter, userid)
+			" c.unit_id = (select unit_id from users where id = ? and active = 1 and confirmed = 1)"+filter, userid)
 	if err != nil {
 		log.Error("Error during getting unit customer table object from database %v with value %v", err, userid)
 		return nil, err

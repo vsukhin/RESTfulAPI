@@ -14,7 +14,6 @@ import (
 
 const (
 	PARAM_NAME_COLUMN_ID = "cid"
-	MAX_COLUMN_NUMBER    = 85
 )
 
 func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columntyperepository services.ColumnTypeRepository,
@@ -87,12 +86,12 @@ func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTyp
 }
 
 func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnrepository services.TableColumnRepository,
-	language string) (err error) {
-	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
+	language string) (tablecolumns *[]models.DtoTableColumn, err error) {
+	tablecolumns, err = tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return err
+		return nil, err
 	}
 
 	for _, tablecolumn := range *tablecolumns {
@@ -107,7 +106,7 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnr
 			log.Error("Can't found column %v", tablecolumn.ID)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
-			return errors.New("Column not found")
+			return nil, errors.New("Column not found")
 		}
 	}
 
@@ -123,11 +122,11 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnr
 			log.Error("Can't found column %v for table", id)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
-			return errors.New("Column not found")
+			return nil, errors.New("Column not found")
 		}
 	}
 
-	return nil
+	return tablecolumns, nil
 }
 
 func FindFreeColumn(tableid int64, r render.Render, tablecolumnrepository services.TableColumnRepository,
@@ -140,7 +139,7 @@ func FindFreeColumn(tableid int64, r render.Render, tablecolumnrepository servic
 	}
 
 	allcolumns := make(map[int]bool)
-	for i := 0; i < MAX_COLUMN_NUMBER; i++ {
+	for i := 0; i < models.MAX_COLUMN_NUMBER; i++ {
 		allcolumns[i] = true
 	}
 	for _, tablecolumn := range *tablecolumns {

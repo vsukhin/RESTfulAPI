@@ -4,6 +4,7 @@ import (
 	logging "github.com/op/go-logging"
 	/*	gelf "github.com/probkiizokna/go-gelf"
 		logging_gelf "github.com/probkiizokna/go-logging-gelf"*/
+	"log"
 	"os"
 	"path"
 	"syscall"
@@ -32,7 +33,7 @@ func configureLogging() {
 		if modelevel != "" {
 			level, err = logging.LogLevel(modelevel)
 			if err != nil {
-				panic(err)
+				log.Fatalln("Can't recognize mode level %v", err)
 			}
 		}
 		switch mode {
@@ -45,7 +46,7 @@ func configureLogging() {
 		case LOGGING_SYSLOG:
 			syslogbackend, err := logging.NewSyslogBackend(CONFIG_APPLICATION)
 			if err != nil {
-				panic(err)
+				log.Fatalln("Can't initiate syslog backend %v", err)
 			}
 			leveledsyslog := logging.AddModuleLevel(syslogbackend)
 			leveledsyslog.SetLevel(level, "")
@@ -53,7 +54,7 @@ func configureLogging() {
 		case LOGGING_FILE:
 			file, err := os.OpenFile(Configuration.Logger.File, syscall.O_APPEND|syscall.O_CREAT|syscall.O_WRONLY, 0666)
 			if err != nil {
-				panic(err)
+				log.Fatalln("Can't initiate filelog backend%v", err)
 			}
 			Filebackend = NewFileBackend(file)
 			leveledfile := logging.AddModuleLevel(Filebackend)
@@ -71,7 +72,7 @@ func configureLogging() {
 						leveledgelf.SetLevel(level, "")
 						backends = append(backends, leveledgelf)*/
 		default:
-			panic("Uknown logging mode")
+			log.Fatalln("Uknown logging mode")
 		}
 		logging.SetBackend(backends...)
 		logFormatter := logging.MustStringFormatter(Configuration.Logger.Format)
@@ -84,7 +85,7 @@ func configureLogLevels() {
 	for module, levelStr := range Configuration.Logger.Levels {
 		level, levelErr := logging.LogLevel(string(levelStr))
 		if nil != levelErr {
-			panic(levelErr)
+			log.Fatalln("Can't get logging level %v", levelErr)
 		}
 		logging.SetLevel(level, string(module))
 	}
@@ -94,7 +95,9 @@ func mustHostname() string {
 	if hostname, err := os.Hostname(); nil == err {
 		return hostname
 	} else {
-		panic(err)
+		log.Fatalln("Can't recognize host name %v", err)
+		return ""
+
 	}
 }
 
@@ -106,6 +109,7 @@ func mustApplicationName(short bool) string {
 			return applicationName
 		}
 	} else {
-		panic("Application name is not detected")
+		log.Fatalln("Can't detect application name")
+		return ""
 	}
 }

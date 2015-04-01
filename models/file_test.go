@@ -31,13 +31,13 @@ func TestNewDtoFile(t *testing.T) {
 	var path = "/some/where/in"
 	var created = time.Now()
 	var permanent = true
-	var ready = true
-	var percentage byte = 50
-	var object_id int64 = 1
+	var export_ready = true
+	var export_percentage byte = 50
+	var export_object_id int64 = 1
 	var filedata = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
 	var dtoFile *DtoFile
 
-	dtoFile = NewDtoFile(id, name, path, created, permanent, ready, percentage, object_id, filedata)
+	dtoFile = NewDtoFile(id, name, path, created, permanent, export_ready, export_percentage, export_object_id, filedata)
 	if dtoFile.ID != id {
 		t.Error("ID field is not properly initialized")
 	}
@@ -53,13 +53,13 @@ func TestNewDtoFile(t *testing.T) {
 	if dtoFile.Permanent != permanent {
 		t.Error("Permanent field is not properly initialized")
 	}
-	if dtoFile.Ready != ready {
+	if dtoFile.Export_Ready != export_ready {
 		t.Error("Ready field is not properly initialized")
 	}
-	if dtoFile.Percentage != percentage {
+	if dtoFile.Export_Percentage != export_percentage {
 		t.Error("Percentage field is not properly initialized")
 	}
-	if dtoFile.Object_ID != object_id {
+	if dtoFile.Export_Object_ID != export_object_id {
 		t.Error("Object_ID field is not properly initialized")
 	}
 	if len(dtoFile.FileData) != len(filedata) {

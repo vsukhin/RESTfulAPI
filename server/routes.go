@@ -25,11 +25,12 @@ func routes() martini.Router {
 
 	route.Group("/api/v1.0/files", func(a martini.Router) {
 		// Загрузка файла на сервер +
-		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, binding.MultipartForm(models.ViewFile{}), controllers.UploadFile)
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights,
+			binding.MultipartForm(models.ViewFile{}), controllers.UploadFile)
 		// Отображение картинки по ключу +
-		a.Get("/:key/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetFile)
+		a.Get("/:key/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetFile)
 		// Удаление файла на сервере +
-		a.Delete("/:key/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteFile)
+		a.Delete("/:key/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.DeleteFile)
 	})
 
 	route.Group("/api/v1.0", func(a martini.Router) {
@@ -43,7 +44,7 @@ func routes() martini.Router {
 		// Подтверждение email пользователя +
 		a.Post("/emails/confirm/", binding.Json(models.EmailConfirm{}), controllers.ConfirmEmail)
 		// Загрузка картинок ?
-		a.Get("/images/:type/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetImage)
+		a.Get("/images/:type/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetImage)
 	})
 
 	route.Group("/api/v1.0/user", func(a martini.Router) {
@@ -76,94 +77,154 @@ func routes() martini.Router {
 
 	route.Group("/api/v1.0/administration", func(a martini.Router) {
 		// Получение списка всех групп доступа +
-		a.Get("/groups/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetGroupsInfo)
+		a.Get("/groups/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, controllers.GetGroupsInfo)
 		// Получение информации о данных списка пользователей +
-		a.Options("/users/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetUserMetaData)
+		a.Options("/users/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, controllers.GetUserMetaData)
 		// Получить список пользователей +
-		a.Get("/users/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetUsers) //массив ошибок
+		a.Get("/users/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, controllers.GetUsers) //массив ошибок
 		// Добавление нового пользователя +
-		a.Post("/users/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiUserFull{}), controllers.CreateUser)
+		a.Post("/users/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights,
+			binding.Json(models.ViewApiUserFull{}), controllers.CreateUser)
 		// Получение подробной информации о пользователе +
-		a.Get("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetUserFullInfo)
+		a.Get("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, controllers.GetUserFullInfo)
 		// Изменение пользователя +
-		a.Put("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiUserFull{}), controllers.UpdateUser)
+		a.Put("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights,
+			binding.Json(models.ViewApiUserFull{}), controllers.UpdateUser)
 		// Удаление пользователя +
-		a.Delete("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteUser)
+		a.Delete("/users/:userid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, controllers.DeleteUser)
 	})
 
 	route.Group("/api/v1.0/services", func(a martini.Router) {
 		// Получение списка услуг поставщиков +
-		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetFacilities)
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetFacilities)
 	})
 
-	route.Group("/api/v1.0/supplier", func(a martini.Router) {
+	route.Group("/api/v1.0/suppliers", func(a martini.Router) {
 		// Получение списка услуг поставщиков +
-		a.Options("/services/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetFacilities)
+		a.Options("/services/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetFacilities)
+		// Получение текущего списка услуг оказываемых поставщиком услуг +
+		a.Get("/services/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetSupplierFacilities)
+		// Изменение списка оказываемых услуг поставщиком услуг +
+		a.Put("/services/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights,
+			binding.Json(models.ViewFacilities{}), controllers.UpdateSupplierFacilities)
+		// Получение общей информации о заказах +
+		a.Options("/orders/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetMetaOrders)
+		// Получение списка заказов +
+		a.Get("/orders/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetOrders)
+		// Получение полной информации о заказе +
+		a.Get("/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireOrderRights, controllers.GetOrder)
+		// Изменение информации о заказе +
+		a.Put("/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireOrderRights,
+			binding.Json(models.ViewOrder{}), controllers.UpdateOrder)
+		// Отклонение заказа +
+		a.Delete("/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireOrderRights, controllers.DeleteOrder)
+		// Получение расширенной информации о заказе по оказываемому сервису
+		a.Get("/orders/:oid/services/:sid/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.GetOrderInfo)
+		// Внесение изменений в информацию о заказе по оказываемому сервису
+		a.Put("/orders/:oid/services/:sid/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.UpdateOrderInfo)
 	})
 
 	route.Group("/api/v1.0/tables", func(a martini.Router) {
 		// Получение списка типов таблиц +
-		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableTypes)
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetTableTypes)
 		// Создание таблицы +
-		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewShortCustomerTable{}), controllers.CreateTable)
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights,
+			binding.Json(models.ViewShortCustomerTable{}), controllers.CreateTable)
 		// Получение списка таблиц +
-		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetUnitTables)
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetUnitTables)
 		// Получение списка типов колонок +
-		a.Get("/fieldtypes/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetColumnTypes)
-		// Импорт таблицы ? !!
-		a.Post("/import/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewImportTable{}), controllers.ImportDataFromFile)
-		// Получение списка колонок импортируемой таблицы ? !!
-		a.Get("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetImportDataColumns)
-		// Сохранение списка импортируемых колонок и присвоение типа колонкам ? !!
-		a.Put("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewImportColumns{}), controllers.UpdateImportDataColumns)
+		a.Get("/fieldtypes/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetColumnTypes)
+		// Импорт таблицы +
+		a.Post("/import/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights,
+			binding.Json(models.ViewImportTable{}), controllers.ImportDataFromFile)
+		// Проверка статуса импорта таблицы +
+		a.Options("/import/:tmpid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			controllers.GetImportDataStatus)
+		// Получение списка колонок импортируемой таблицы +
+		a.Get("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			controllers.GetImportDataColumns)
+		// Сохранение списка импортируемых колонок и присвоение типа колонкам +
+		a.Put("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewImportColumns{}), controllers.UpdateImportDataColumns)
 		// Получение информации об экспорте данных +
-		a.Options("/export/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetExportDataMeta)
+		a.Options("/export/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetExportDataMeta)
 		//  Получение экспортируемых данных данных +
 		a.Get("/export/:token/:fid/", controllers.GetExportData)
 		// Получение таблицы +
-		a.Get("/:tid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTable)
+		a.Get("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTable)
 		// Изменение таблицы +
-		a.Put("/:tid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewLongCustomerTable{}), controllers.UpdateTable)
+		a.Put("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewLongCustomerTable{}), controllers.UpdateTable)
 		// Удаление таблицы +
-		a.Delete("/:tid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTable)
+		a.Delete("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTable)
 		// Создание колонки в таблице +
-		a.Post("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableColumn{}), controllers.CreateTableColumn)
+		a.Post("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiTableColumn{}), controllers.CreateTableColumn)
 		// Получение списка колонок таблицы в порядке отображения +
-		a.Get("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableColumns)
+		a.Get("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableColumns)
 		// Получение колонки таблицы +
-		a.Get("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableColumn)
+		a.Get("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableColumn)
 		// Изменение колонки в таблице +
-		a.Put("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableColumn{}), controllers.UpdateTableColumn)
+		a.Put("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiTableColumn{}), controllers.UpdateTableColumn)
 		// Удаление колонки в таблице +
-		a.Delete("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableColumn)
+		a.Delete("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableColumn)
 		// Изменение порядка отображения колонки +
-		a.Put("/:tid/sequence/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiOrderTableColumns{}), controllers.UpdateOrderTableColumn)
-		// Получение информации о данных в таблице + !!
-		a.Options("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableMetaData)
-		// Получение данных таблицы + !
-		a.Get("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableData)
-		// Получение строки данных таблицы + !
-		a.Get("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableRow)
-		// Внесение строки данных в таблицу + !
-		a.Post("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableRow{}), controllers.CreateTableRow)
-		// Изменение строки данных в таблице + !
-		a.Put("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiTableRow{}), controllers.UpdateTableRow)
+		a.Put("/:tid/sequence/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiOrderTableColumns{}), controllers.UpdateOrderTableColumn)
+		// Получение информации о данных в таблице +
+		a.Options("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableMetaData)
+		// Получение данных таблицы +
+		a.Get("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableData)
+		// Получение строки данных таблицы +
+		a.Get("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableRow)
+		// Внесение строки данных в таблицу +
+		a.Post("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiTableRow{}), controllers.CreateTableRow)
+		// Изменение строки данных в таблице +
+		a.Put("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiTableRow{}), controllers.UpdateTableRow)
 		// Удаление строки данных из таблицы +
-		a.Delete("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableRow)
-		// Получение информации о данных в ячейке таблицы + !!
-		a.Options("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableMetaCell)
-		// Получение данных ячейки таблицы + !
-		a.Get("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetTableCell)
-		// Изменение данных ячейки таблицы + !
-		a.Put("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewTableCell{}), controllers.UpdateTableCell)
-		// Удаление данных ячейки таблицы + !
-		a.Delete("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, controllers.DeleteTableCell)
-		// Экспорт таблицы ? !
-		a.Get("/:tid/export/", middlewares.RequireSessionKeepWithoutRoute, controllers.ExportDataToFile)
+		a.Delete("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableRow)
+		// Получение информации о данных в ячейке таблицы +
+		a.Options("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableMetaCell)
+		// Получение данных ячейки таблицы +
+		a.Get("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableCell)
+		// Изменение данных ячейки таблицы +
+		a.Put("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewTableCell{}), controllers.UpdateTableCell)
+		// Удаление данных ячейки таблицы +
+		a.Delete("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableCell)
+		// Экспорт таблицы +
+		a.Get("/:tid/export/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.ExportDataToFile) //массив ошибок
 		// Проверка статуса готовности экспортируемого файла +
-		a.Options("/:tid/export/:fid/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetExportDataStatus)
+		a.Options("/:tid/export/:fid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetExportDataStatus)
 		// Изменение настроек для таблицы являющейся прайс-листом  +
-		a.Put("/:tid/price/", middlewares.RequireSessionKeepWithoutRoute, binding.Json(models.ViewApiPriceProperties{}), controllers.UpdatePriceTable)
+		a.Put("/:tid/price/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			binding.Json(models.ViewApiPriceProperties{}), controllers.UpdatePriceTable)
+	})
+
+	route.Group("/api/v1.0/messages/orders", func(a martini.Router) {
+		// Получение общей информации о переписке в рамках заказа +
+		a.Options("/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.GetMetaMessages)
+		// Получение списка сообщений в рамках заказа +
+		a.Get("/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.GetMessages)
+		// Создание сообщения в рамках заказа +
+		a.Post("/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights,
+			binding.Json(models.ViewMessage{}), controllers.CreateMessage)
+		// Получение сообщения в рамках заказа +
+		a.Get("/:oid/message/:mid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.GetMessage)
+		// Пометка сообщения как просмотренное +
+		a.Patch("/:oid/message/:mid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.MarkMessage)
+		// Пометка всех сообщений заказа как просмотренных +
+		a.Patch("/:oid/messages/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.MarkMessages)
+		// Изменение сообщения в рамках заказа +
+		a.Put("/:oid/message/:mid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights,
+			binding.Json(models.ViewMessage{}), controllers.UpdateMessage)
+		// Удаление сообщения в рамках заказа +
+		a.Delete("/:oid/message/:mid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireMessageRights, controllers.DeleteMessage)
 	})
 
 	route.NotFound(middlewares.Default)

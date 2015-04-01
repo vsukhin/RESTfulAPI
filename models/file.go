@@ -19,15 +19,15 @@ type ApiImage struct {
 }
 
 type DtoFile struct {
-	ID         int64     `db:"id"`         // Уникальный идентификатор файла
-	Name       string    `db:"name"`       // Оригинальное имя файла
-	Path       string    `db:"path"`       // Путь к файлу
-	Created    time.Time `db:"created"`    // Время создания файла
-	Permanent  bool      `db:"permanent"`  // Постоянный файл
-	Ready      bool      `db:"ready"`      // Готовность
-	Percentage byte      `db:"percentage"` // Процент готовности
-	Object_ID  int64     `db:"object_id"`  // Идентификатор связанного объекта БД
-	FileData   []byte    `db:"-"`          // Содержание файла
+	ID                int64     `db:"id"`                // Уникальный идентификатор файла
+	Name              string    `db:"name"`              // Оригинальное имя файла
+	Path              string    `db:"path"`              // Путь к файлу
+	Created           time.Time `db:"created"`           // Время создания файла
+	Permanent         bool      `db:"permanent"`         // Постоянный файл
+	Export_Ready      bool      `db:"export_ready"`      // Готовность экспорта
+	Export_Percentage byte      `db:"export_percentage"` // Процент готовности экспорта
+	Export_Object_ID  int64     `db:"export_object_id"`  // Идентификатор связанного объекта БД для экспорта
+	FileData          []byte    `db:"-"`                 // Содержание файла
 }
 
 func NewApiFile(id int64) *ApiFile {
@@ -43,17 +43,17 @@ func NewApiImage(id int64) *ApiImage {
 }
 
 // Конструктор создания объекта файла в бд
-func NewDtoFile(id int64, name string, path string, created time.Time, permanent bool, ready bool, percentage byte,
-	object_id int64, filedata []byte) *DtoFile {
+func NewDtoFile(id int64, name string, path string, created time.Time, permanent bool, export_ready bool, export_percentage byte,
+	export_object_id int64, filedata []byte) *DtoFile {
 	return &DtoFile{
-		ID:         id,
-		Name:       name,
-		Path:       path,
-		Created:    created,
-		Permanent:  permanent,
-		Ready:      ready,
-		Percentage: percentage,
-		Object_ID:  object_id,
-		FileData:   filedata,
+		ID:                id,
+		Name:              name,
+		Path:              path,
+		Created:           created,
+		Permanent:         permanent,
+		Export_Ready:      export_ready,
+		Export_Percentage: export_percentage,
+		Export_Object_ID:  export_object_id,
+		FileData:          filedata,
 	}
 }

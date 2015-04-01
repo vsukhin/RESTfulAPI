@@ -35,7 +35,8 @@ type MysqlConfiguration struct {
 }
 
 var Configuration struct {
-	WorkingDirectory string `yaml:"WorkingDirectory"` // Рабочая директория сервера, сразу после запуска приложение меняет текущую директирию
+	WorkingDirectory string `yaml:"WorkingDirectory"` // Рабочая директория сервера, сразу после запуска приложение меняет текущую директорию
+	TempDirectory    string `yaml:"TempDirectory"`    // Путь к временной директории сервера
 	Server           struct {
 		Host               string        `yaml:"Host"` // IP адрес или имя хоста на котором поднимается сервер, можно указывать 0.0.0.0 для всех ip адресов
 		Port               uint32        `yaml:"Port"` // tcp/ip порт занимаемый сервером
@@ -56,6 +57,7 @@ var Configuration struct {
 		FileTimeout        time.Duration `yaml:"FileTimeout"`        // Время в милисекундах истечения жизни файла
 		ResourceStorage    string        `yaml:"ResourceStorage"`    // Путь к хранилищу строк локализациим
 		TableTimeout       time.Duration `yaml:"TableTimeout"`       // Время в милисекундах истечения жизни временной таблицы
+		MessageTimeout     time.Duration `yaml:"MessageTimeout"`     // Время в милисекундах возможности изменения сообщения
 	} `yaml:"Server"`
 
 	Logger struct { // Система логирования
@@ -97,7 +99,6 @@ var Configuration struct {
 func init() {
 	loadAppConfig()
 	configureLogging()
-	configureMailer()
 	configureI18n()
 }
 

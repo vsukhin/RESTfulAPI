@@ -24,6 +24,7 @@ type UserService struct {
 	EmailRepository   EmailRepository
 	UnitRepository    UnitRepository
 	GroupRepository   GroupRepository
+	MessageRepository MessageRepository
 	*Repository
 }
 
@@ -307,6 +308,15 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 			log.Error("Error during deleting user object in database %v", err)
 			return err
 		}
+	}
+
+	err = userservice.MessageRepository.DeleteByUser(userid, false)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during deleting user object from database %v with value %v", err, userid)
+		return err
 	}
 
 	err = userservice.SessionRepository.DeleteByUser(userid, false)

@@ -24,12 +24,16 @@ const (
 	TABLE_TABLE_TYPES      = "table_types"
 	TABLE_COLUMN_TYPES     = "column_types"
 	TABLE_TABLE_COLUMNS    = "table_columns"
-	TABLE_TABLE_ROWS       = "table_data"
-	TABLE_TABLE_CELLS      = "table_cells"
+	TABLE_TABLE_DATA       = "table_data"
 	TABLE_FACILITIES       = "services"
 	TABLE_PRICE_PROPERTIES = "price_properties"
 	TABLE_DATA_FORMATS     = "data_formats"
 	TABLE_VIRTUAL_DIRS     = "virtual_dirs"
+	TABLE_IMPORT_STEPS     = "import_steps"
+	TABLE_ORDERS           = "orders"
+	TABLE_MESSAGES         = "messages"
+	TABLE_ORDER_STATUSES   = "order_statuses"
+	TABLE_STATUSES         = "statuses"
 )
 
 var (

@@ -1,21 +1,122 @@
 package middlewares
 
 import (
-	//"encoding/hex"
-	"net/http"
-	//"strings"
-
-	// "code.google.com/p/go.crypto/bcrypt"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
-
 	"application/config"
+	"application/helpers"
 	"application/models"
 	"application/services"
-	// "application/server/memory"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/render"
+	"net/http"
+	"strconv"
 	"time"
 	"types"
 )
+
+func RequireAdminRights(r render.Render, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+		return
+	}
+}
+
+func RequireSupplierRights(r render.Render, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER,
+		models.USER_ROLE_SUPPLIER}) {
+		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+		return
+	}
+}
+
+func RequireUserRights(r render.Render, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER,
+		models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
+		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+		return
+	}
+}
+
+func RequireTableRights(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+	session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		var allowed bool = false
+		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
+			names := []string{helpers.PARAM_NAME_TABLE_ID, helpers.PARAM_NAME_TEMPORABLE_TABLE_ID}
+			for _, name := range names {
+				param := params[name]
+				if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+					tableid, err := strconv.ParseInt(param, 0, 64)
+					if err == nil {
+						allowed, err = customertablerepository.CheckUserAccess(session.UserID, tableid)
+						if err == nil {
+							if allowed {
+								return
+							}
+						}
+					}
+				}
+			}
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
+func RequireOrderRights(r render.Render, params martini.Params, orderrepository services.OrderRepository, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		var allowed bool = false
+		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_SUPPLIER}) {
+			param := params[helpers.PARAM_NAME_ORDER]
+			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+				orderid, err := strconv.ParseInt(param, 0, 64)
+				if err == nil {
+					allowed, err = orderrepository.CheckSupplierAccess(session.UserID, orderid)
+					if err == nil {
+						if allowed {
+							return
+						}
+					}
+				}
+			}
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
+func RequireMessageRights(r render.Render, params martini.Params, orderrepository services.OrderRepository, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		var allowed bool = false
+		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
+			param := params[helpers.PARAM_NAME_ORDER]
+			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+				orderid, err := strconv.ParseInt(param, 0, 64)
+				if err == nil {
+					allowed, err = orderrepository.CheckUserAccess(session.UserID, orderid)
+					if err == nil {
+						if allowed {
+							return
+						}
+					}
+				}
+			}
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
 
 func IsUserRoleAllowed(existingRoles []models.UserRole, requiredRoles []models.UserRole) bool {
 	for _, requiredRole := range requiredRoles {

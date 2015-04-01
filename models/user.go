@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+type UserRole int
+
+const (
+	USER_ROLE_DEVELOPER UserRole = iota + 1
+	USER_ROLE_ADMINISTRATOR
+	USER_ROLE_SUPPLIER
+	USER_ROLE_CUSTOMER
+)
+
 // Структура для хранения данных пользователя
 type ViewUser struct {
 	Login        string `json:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Логин пользователя
