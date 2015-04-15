@@ -40,8 +40,8 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -56,7 +56,7 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 				value, err := strconv.ParseInt(field, 0, 64)
 				if err != nil {
 					log.Error("Can't convert to number %v filter column with value %v", err, field)
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 						Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 					return
 				}
@@ -68,7 +68,7 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 			}
 			if !found {
 				log.Error("Filter column %v doesn't belong table %v", field, tableid)
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return
 			}
@@ -83,7 +83,7 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 			value, err := strconv.ParseInt(sort.Field, 0, 64)
 			if err != nil {
 				log.Error("Can't convert to number %v order column with value %v", err, sort.Field)
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return
 			}
@@ -95,7 +95,7 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 		}
 		if !found {
 			log.Error("Order column %v doesn't belong table %v", sort.Field, tableid)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 			return
 		}
@@ -111,8 +111,8 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 
 	tablerows, err := tablerowrepository.GetAll(startquery, endquery, tableid, tablecolumns)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -129,15 +129,15 @@ func GetTableRow(r render.Render, params martini.Params, customertablerepository
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(dtotablerow.Customer_Table_ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
 	tablecells, err := dtotablerow.TableRowToDtoTableCells(tablecolumns)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -196,8 +196,8 @@ func CreateTableRow(request *http.Request, errors binding.Errors, r render.Rende
 	} else {
 		dtotablerow.Position, err = tablerowrepository.GetDefaultPosition(tableid)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 	}
@@ -221,8 +221,8 @@ func CreateTableRow(request *http.Request, errors binding.Errors, r render.Rende
 		*cells = append(*cells, *dtotablecell)
 	}
 	if dtotablerow.TableCellsToTableRow(cells, tablecolumns) != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -284,8 +284,8 @@ func UpdateTableRow(errors binding.Errors, r render.Render, viewtablecells model
 		*cells = append(*cells, *dtotablecell)
 	}
 	if newtablerow.TableCellsToTableRow(cells, tablecolumns) != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 

@@ -1,16 +1,14 @@
 package server
 
 import (
-	"net/http"
-	"os"
-	"runtime"
-
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
-
 	"application/config"
 	"application/db"
 	"application/services"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/render"
+	"net/http"
+	"os"
+	"runtime"
 )
 
 var userservice *services.UserService
@@ -35,6 +33,9 @@ var orderservice *services.OrderService
 var statusservice *services.StatusService
 var orderstatusservice *services.OrderStatusService
 var messageservice *services.MessageService
+var projectservice *services.ProjectService
+var classifierservice *services.ClassifierService
+var mobilephoneservice *services.MobilePhoneService
 
 func Start() {
 	var err error
@@ -42,11 +43,25 @@ func Start() {
 	// Setting to use the maximum number of sockets and cores
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	if config.InitConfig() != nil {
+		return
+	}
+	if config.InitLogging() != nil {
+		return
+	}
+	if config.InitI18n() != nil {
+		return
+	}
+	if db.InitDB() != nil {
+		return
+	}
+
 	// Change working directory
-	logger.Info("Working directory is: '%s'", config.Configuration.WorkingDirectory)
+	log.Info("Working directory is: '%s'", config.Configuration.WorkingDirectory)
 	err = os.Chdir(config.Configuration.WorkingDirectory)
 	if err != nil {
-		logger.Fatalf("Can't change working directory: %v", err)
+		log.Fatalf("Can't change working directory: %v", err)
+		return
 	}
 
 	userservice = services.NewUserService(services.NewRepository(db.DbMap, db.TABLE_USERS))
@@ -71,12 +86,16 @@ func Start() {
 	statusservice = services.NewStatusService(services.NewRepository(db.DbMap, db.TABLE_STATUSES))
 	orderstatusservice = services.NewOrderStatusService(services.NewRepository(db.DbMap, db.TABLE_ORDER_STATUSES))
 	messageservice = services.NewMessageService(services.NewRepository(db.DbMap, db.TABLE_MESSAGES))
+	projectservice = services.NewProjectService(services.NewRepository(db.DbMap, db.TABLE_PROJECTS))
+	classifierservice = services.NewClassifierService(services.NewRepository(db.DbMap, db.TABLE_CLASSIFIERS))
+	mobilephoneservice = services.NewMobilePhoneService(services.NewRepository(db.DbMap, db.TABLE_MOBILE_PHONES))
 
 	userservice.SessionRepository = sessionservice
 	userservice.EmailRepository = emailservice
 	userservice.GroupRepository = groupservice
 	userservice.UnitRepository = unitservice
 	userservice.MessageRepository = messageservice
+	userservice.MobilePhoneRepository = mobilephoneservice
 	sessionservice.GroupRepository = groupservice
 	customertableservice.TableColumnRepository = tablecolumnservice
 	customertableservice.TableRowRepository = tablerowservice
@@ -85,45 +104,35 @@ func Start() {
 	go fileservice.ClearExpiredFiles()
 	go customertableservice.ClearExpiredTables()
 
-	route := routes()
+	routes := Routes()
 	mrt := martini.New()
 
 	mrt.Handlers(
-		logRequest,
-		// martini.Static(config.Configuration.Server.DocumentRoot),
+		LogRequest,
 		bootstrap(),
 		martini.Recovery(),
 		render.Renderer(render.Options{}),
 	)
 
 	// File server
-	logger.Info("Server DocumentRoot is: '%s'", config.Configuration.Server.DocumentRoot)
+	log.Info("Server DocumentRoot is: '%s'", config.Configuration.Server.DocumentRoot)
 	mrt.Use(martini.Static(config.Configuration.Server.DocumentRoot,
 		martini.StaticOptions{
 			Exclude: "/api/",
 		}))
 
-	mrt.MapTo(route, (*martini.Routes)(nil))
+	mrt.MapTo(routes, (*martini.Routes)(nil))
+	mrt.Action(routes.Handle)
 
-	mrt.Action(route.Handle)
 	if err = http.ListenAndServe(config.Configuration.Server.Address, mrt); err != nil {
-		logger.Fatalf("Can't launch http server %v", err)
+		log.Fatalf("Can't launch http server %v", err)
+		return
 	}
 }
 
 func Stop() {
-	if db.DbMap != nil {
-		err := db.DbMap.Db.Close()
-		if err != nil {
-			logger.Error("MySQL close connection error: %v", err)
-		}
-	}
-	if config.Filebackend.File != nil {
-		err := config.Filebackend.File.Close()
-		if err != nil {
-			logger.Error("Log file close: %v", err)
-		}
-	}
+	db.ShutdownDB()
+	config.ShutdownLogging()
 }
 
 func bootstrap() martini.Handler {
@@ -150,5 +159,8 @@ func bootstrap() martini.Handler {
 		context.Map(statusservice)
 		context.Map(orderstatusservice)
 		context.Map(messageservice)
+		context.Map(projectservice)
+		context.Map(classifierservice)
+		context.Map(mobilephoneservice)
 	}
 }

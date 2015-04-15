@@ -8,11 +8,11 @@ import (
 
 //Структура для организации сессии
 type ViewSession struct {
-	Login        string `json:"login" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Логин пользователя
-	Password     string `json:"password" validate:"nonzero,min=1,max=255"`             // Пароль пользователя
-	CaptchaValue string `json:"captchaValue" validate:"max=255"`                       // Значение капчи
-	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                        // Хэш капчи
-	Language     string `json:"language" validate:"max=10"`                            // Язык пользователя
+	Login        string `json:"login" validate:"nonzero,min=1,max=255,regexp=^((.+@.+)|([0-9]*))$"` // Логин пользователя
+	Password     string `json:"password" validate:"nonzero,min=1,max=255"`                          // Пароль пользователя
+	CaptchaValue string `json:"captchaValue" validate:"max=255"`                                    // Значение капчи
+	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                                     // Хэш капчи
+	Language     string `json:"language" validate:"max=10"`                                         // Язык пользователя
 }
 
 type ApiSession struct {

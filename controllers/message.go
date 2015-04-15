@@ -25,8 +25,8 @@ func GetMetaMessages(r render.Render, params martini.Params, orderrepository ser
 
 	apimessage, err := messagerepository.GetMetaByOrder(dtoorder.ID, session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -90,8 +90,8 @@ func GetMessages(request *http.Request, r render.Render, params martini.Params, 
 
 	messages, err := messagerepository.GetByOrder(dtoorder.ID, session.UserID, query)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -134,8 +134,8 @@ func GetMessage(r render.Render, params martini.Params, orderrepository services
 
 	read, err := messagerepository.IsReadByUser(session.UserID, dtomessage.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -200,8 +200,8 @@ func UpdateMessage(errors binding.Errors, viewmessage models.ViewMessage, r rend
 
 	read, err := messagerepository.IsReadByUser(session.UserID, dtomessage.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 

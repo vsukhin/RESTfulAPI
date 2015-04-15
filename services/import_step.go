@@ -9,6 +9,7 @@ type ImportStepRepository interface {
 	GetByTable(tableid int64) (importsteps *[]models.ApiImportStep, err error)
 	Create(importstep *models.DtoImportStep) (err error)
 	Update(importstep *models.DtoImportStep) (err error)
+	Save(importstep *models.DtoImportStep) (err error)
 }
 
 type ImportStepService struct {
@@ -62,4 +63,20 @@ func (importstepservice *ImportStepService) Update(importstep *models.DtoImportS
 	}
 
 	return nil
+}
+
+func (importstepservice *ImportStepService) Save(importstep *models.DtoImportStep) (err error) {
+	count, err := importstepservice.DbContext.SelectInt("select count(*) from "+importstepservice.Table+
+		" where customer_table_id = ? and step = ?", importstep.Customer_Table_ID, importstep.Step)
+	if err != nil {
+		log.Error("Error during saving import step object in database %v with value %v, %v", err, importstep.Customer_Table_ID, importstep.Step)
+		return err
+	}
+	if count == 0 {
+		err = importstepservice.Create(importstep)
+	} else {
+		err = importstepservice.Update(importstep)
+	}
+
+	return err
 }

@@ -27,6 +27,12 @@ type ApiShortCustomerTable struct {
 	UnitID int64  `json:"unitId" db:"unit_id"` // Идентификатор объединения
 }
 
+type ApiMiddleCustomerTable struct {
+	ID   int64  `json:"id" db:"id"`     // Уникальный идентификатор пользовательской таблицы
+	Name string `json:"name" db:"name"` // Название пользовательской таблицы
+	Type string `json:"type" db:"type"` // Тип
+}
+
 type ApiLongCustomerTable struct {
 	ID     int64  `json:"id" db:"id"`          // Уникальный идентификатор пользовательской таблицы
 	Name   string `json:"name" db:"name"`      // Название пользовательской таблицы
@@ -85,6 +91,14 @@ func NewApiShortCustomerTable(name string, typevalue string, unitid int64) *ApiS
 		Name:   name,
 		Type:   typevalue,
 		UnitID: unitid,
+	}
+}
+
+func NewApiMiddleCustomerTable(id int64, name string, typevalue string) *ApiMiddleCustomerTable {
+	return &ApiMiddleCustomerTable{
+		ID:   id,
+		Name: name,
+		Type: typevalue,
 	}
 }
 

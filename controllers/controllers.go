@@ -3,9 +3,14 @@
 package controllers
 
 import (
+	"application/config"
 	logging "github.com/op/go-logging"
 )
 
 var (
-	log *logging.Logger = logging.MustGetLogger("controllers")
+	log config.Logger = logging.MustGetLogger("controllers")
 )
+
+func InitLogger(logger config.Logger) {
+	log = logger
+}

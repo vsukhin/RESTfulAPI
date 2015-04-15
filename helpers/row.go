@@ -20,19 +20,19 @@ func CheckRowValidity(tableid int64, rowid int64, r render.Render, tablerowrepos
 	language string) (dtotablerow *models.DtoTableRow, err error) {
 	dtotablerow, err = tablerowrepository.Get(rowid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 	if !dtotablerow.Active {
 		log.Error("Table row is not active %v", rowid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Row is not active")
 	}
 	if dtotablerow.Customer_Table_ID != tableid {
 		log.Error("Row %v doesn't belong table %v", rowid, tableid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Non matched table and row")
 	}

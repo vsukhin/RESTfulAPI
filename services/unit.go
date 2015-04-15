@@ -7,9 +7,11 @@ import (
 type UnitRepository interface {
 	FindByUser(userid int64) (unit *models.DtoUnit, err error)
 	Get(unitid int64) (unit *models.DtoUnit, err error)
+	GetMeta() (unit *models.ApiShortMetaUnit, err error)
+	GetAll(filter string) (units *[]models.ApiShortUnit, err error)
 	Create(unit *models.DtoUnit) (err error)
 	Update(unit *models.DtoUnit) (err error)
-	Delete(unitid int64) (err error)
+	Deactivate(*models.DtoUnit) (err error)
 }
 
 type UnitService struct {
@@ -47,7 +49,33 @@ func (unitservice *UnitService) Get(unitid int64) (unit *models.DtoUnit, err err
 	return unit, nil
 }
 
+func (unitservice *UnitService) GetMeta() (unit *models.ApiShortMetaUnit, err error) {
+	unit = new(models.ApiShortMetaUnit)
+	unit.Total, err = unitservice.DbContext.SelectInt("select count(*) from " + unitservice.Table)
+	if err != nil {
+		log.Error("Error during getting unit meta object from database %v", err)
+		return nil, err
+	}
+
+	return unit, nil
+}
+
+func (unitservice *UnitService) GetAll(filter string) (units *[]models.ApiShortUnit, err error) {
+	units = new([]models.ApiShortUnit)
+	_, err = unitservice.DbContext.Select(units, "select id, name from "+unitservice.Table+filter)
+	if err != nil {
+		log.Error("Error during getting all unit object from database %v", err)
+		return nil, err
+	}
+
+	return units, nil
+}
+
 func (unitservice *UnitService) Create(unit *models.DtoUnit) (err error) {
+	if unit.Name == "" {
+		unit.Name = models.UNIT_NAME_DEFAULT
+	}
+
 	err = unitservice.DbContext.Insert(unit)
 	if err != nil {
 		log.Error("Error during creating unit object in database %v", err)
@@ -58,6 +86,10 @@ func (unitservice *UnitService) Create(unit *models.DtoUnit) (err error) {
 }
 
 func (unitservice *UnitService) Update(unit *models.DtoUnit) (err error) {
+	if unit.Name == "" {
+		unit.Name = models.UNIT_NAME_DEFAULT
+	}
+
 	_, err = unitservice.DbContext.Update(unit)
 	if err != nil {
 		log.Error("Error during updating unit object in database %v with value %v", err, unit.ID)
@@ -67,10 +99,10 @@ func (unitservice *UnitService) Update(unit *models.DtoUnit) (err error) {
 	return nil
 }
 
-func (unitservice *UnitService) Delete(unitid int64) (err error) {
-	_, err = unitservice.DbContext.Exec("delete from "+unitservice.Table+" where id = ?", unitid)
+func (unitservice *UnitService) Deactivate(unit *models.DtoUnit) (err error) {
+	_, err = unitservice.DbContext.Exec("update "+unitservice.Table+" set active = 0 where id = ?", unit.ID)
 	if err != nil {
-		log.Error("Error during deleting unit object in database %v with value %v", err, unitid)
+		log.Error("Error during deactivating unit object in database %v with value %v", err, unit.ID)
 		return err
 	}
 

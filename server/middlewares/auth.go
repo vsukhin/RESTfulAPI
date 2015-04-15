@@ -15,6 +15,7 @@ import (
 
 func RequireAdminRights(r render.Render, session *models.DtoSession) {
 	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		log.Error("There is no required role for user %v", session.UserID)
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
@@ -24,6 +25,7 @@ func RequireAdminRights(r render.Render, session *models.DtoSession) {
 func RequireSupplierRights(r render.Render, session *models.DtoSession) {
 	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER,
 		models.USER_ROLE_SUPPLIER}) {
+		log.Error("There is no required role for user %v", session.UserID)
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
@@ -33,6 +35,7 @@ func RequireSupplierRights(r render.Render, session *models.DtoSession) {
 func RequireUserRights(r render.Render, session *models.DtoSession) {
 	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER,
 		models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
+		log.Error("There is no required role for user %v", session.UserID)
 		r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
 			Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
 		return
@@ -54,11 +57,19 @@ func RequireTableRights(r render.Render, params martini.Params, customertablerep
 						if err == nil {
 							if allowed {
 								return
+							} else {
+								log.Error("Table %v is not accessible for user %v", tableid, session.UserID)
 							}
 						}
+					} else {
+						log.Error("Can't convert parameter %v with value %v", err, param)
 					}
+				} else {
+					log.Error("Parameter value is wrong %v", param)
 				}
 			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
 		}
 		if !allowed {
 			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -72,7 +83,7 @@ func RequireOrderRights(r render.Render, params martini.Params, orderrepository 
 	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		var allowed bool = false
 		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_SUPPLIER}) {
-			param := params[helpers.PARAM_NAME_ORDER]
+			param := params[helpers.PARAM_NAME_ORDER_ID]
 			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
 				orderid, err := strconv.ParseInt(param, 0, 64)
 				if err == nil {
@@ -80,10 +91,18 @@ func RequireOrderRights(r render.Render, params martini.Params, orderrepository 
 					if err == nil {
 						if allowed {
 							return
+						} else {
+							log.Error("Order %v is not accessible for supplier %v", orderid, session.UserID)
 						}
 					}
+				} else {
+					log.Error("Can't convert parameter %v with value %v", err, param)
 				}
+			} else {
+				log.Error("Parameter value is wrong %v", param)
 			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
 		}
 		if !allowed {
 			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
@@ -97,7 +116,7 @@ func RequireMessageRights(r render.Render, params martini.Params, orderrepositor
 	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
 		var allowed bool = false
 		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_SUPPLIER, models.USER_ROLE_CUSTOMER}) {
-			param := params[helpers.PARAM_NAME_ORDER]
+			param := params[helpers.PARAM_NAME_ORDER_ID]
 			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
 				orderid, err := strconv.ParseInt(param, 0, 64)
 				if err == nil {
@@ -105,10 +124,51 @@ func RequireMessageRights(r render.Render, params martini.Params, orderrepositor
 					if err == nil {
 						if allowed {
 							return
+						} else {
+							log.Error("Order %v is not accessible for user %v", orderid, session.UserID)
 						}
 					}
+				} else {
+					log.Error("Can't convert parameter %v with value %v", err, param)
 				}
+			} else {
+				log.Error("Parameter value is wrong %v", param)
 			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
+func RequireProjectRights(r render.Render, params martini.Params, projectrepository services.ProjectRepository, session *models.DtoSession) {
+	if !IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_ADMINISTRATOR, models.USER_ROLE_DEVELOPER}) {
+		var allowed bool = false
+		if IsUserRoleAllowed(session.Roles, []models.UserRole{models.USER_ROLE_CUSTOMER}) {
+			param := params[helpers.PARAM_NAME_PROJECT_ID]
+			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+				projectid, err := strconv.ParseInt(param, 0, 64)
+				if err == nil {
+					allowed, err = projectrepository.CheckCustomerAccess(session.UserID, projectid)
+					if err == nil {
+						if allowed {
+							return
+						} else {
+							log.Error("Project %v is not accessible for customer %v", projectid, session.UserID)
+						}
+					}
+				} else {
+					log.Error("Can't convert parameter %v with value %v", err, param)
+				}
+			} else {
+				log.Error("Parameter value is wrong %v", param)
+			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
 		}
 		if !allowed {
 			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,

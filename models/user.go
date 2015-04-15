@@ -31,34 +31,45 @@ type ApiUserTiny struct {
 }
 
 type ApiUserShort struct {
-	ID        int64     `json:"id" db:"id"`                   // Уникальный id пользователя
-	Login     string    `json:"login" db:"login"`             // Логин пользователя
-	Blocked   bool      `json:"blocked" db:"blocked"`         // Пользователь активен
-	Confirmed bool      `json:"confirmed" db:"confirmed"`     // Пользователь подтвержден
-	LastLogin time.Time `json:"lastLoginAt" db:"lastLoginAt"` // Время последнего логина
-	Name      string    `json:"name" db:"name"`               // Имя пользователя
+	ID         int64     `json:"id" db:"id"`                   // Уникальный id пользователя
+	Login      string    `json:"login" db:"login"`             // Логин пользователя
+	Blocked    bool      `json:"blocked" db:"blocked"`         // Пользователь активен
+	Confirmed  bool      `json:"confirmed" db:"confirmed"`     // Пользователь подтвержден
+	LastLogin  time.Time `json:"lastLoginAt" db:"lastLoginAt"` // Время последнего логина
+	Surname    string    `json:"surname" db:"surname"`         // Фамилия пользователя
+	Name       string    `json:"name" db:"name"`               // Имя пользователя
+	MiddleName string    `json:"middleName" db:"middleName"`   // Отчество пользователя
 }
 
 type ApiUserLong struct {
-	ID        int64  `json:"id" db:"id"`               // Уникальный id пользователя
-	UnitID    int64  `json:"unitId" db:"unit_id"`      // Уникальный id объединения
-	UnitAdmin bool   `json:"unitAdmin" db:"unitAdmin"` // Администратор объединения
-	Active    bool   `json:"active" db:"active"`       // Пользователь активен
-	Confirmed bool   `json:"confirmed" db:"confirmed"` // Пользователь подтвержден
-	Name      string `json:"name" db:"name"`           // Имя пользователя
-	Language  string `json:"language" db:"language"`   // Язык пользователя по умолчанию
+	ID         int64  `json:"id" db:"id"`                 // Уникальный id пользователя
+	UnitID     int64  `json:"unitId" db:"unit_id"`        // Уникальный id объединения
+	UnitAdmin  bool   `json:"unitAdmin" db:"unitAdmin"`   // Администратор объединения
+	Active     bool   `json:"active" db:"active"`         // Пользователь активен
+	Confirmed  bool   `json:"confirmed" db:"confirmed"`   // Пользователь подтвержден
+	Surname    string `json:"surname" db:"surname"`       // Фамилия пользователя
+	Name       string `json:"name" db:"name"`             // Имя пользователя
+	MiddleName string `json:"middleName" db:"middleName"` // Отчество пользователя
+	WorkPhone  string `json:"workPhone" db:"workPhone"`   // Рабочий телефон
+	JobTitle   string `json:"jobTitle" db:"jobTitle"`     // Должность
+	Language   string `json:"language" db:"language"`     // Язык пользователя по умолчанию
 }
 
 type ViewApiUserFull struct {
-	Creator_ID int64          `json:"userId" db:"user_id"`                                    // Уникальный id создателя
-	Unit_ID    int64          `json:"unitId" db:"unit_id"`                                    // Уникальный id объединения
-	UnitAdmin  bool           `json:"unitAdmin" db:"unitAdmin"`                               // Администратор объединения
-	Active     bool           `json:"active" db:"active"`                                     // Пользователь активен
-	Confirmed  bool           `json:"confirmed" db:"confirmed"`                               // Пользователь подтвержден
-	Name       string         `json:"name" db:"name" validate:"nonzero,min=1,max=255"`        // Имя пользователя
-	Language   string         `json:"language" db:"language" validate:"nonzero,min=1,max=10"` // Язык пользователя по умолчанию
-	Roles      []UserRole     `json:"groups,omitempty" db:"-"`                                // Массив значений уровней доступа пользователя
-	Emails     []ViewApiEmail `json:"emails,omitempty" db:"-"`                                // Массив email
+	Creator_ID   int64                `json:"userId" db:"user_id"`                                    // Уникальный id создателя
+	Unit_ID      int64                `json:"unitId" db:"unit_id"`                                    // Уникальный id объединения
+	UnitAdmin    bool                 `json:"unitAdmin" db:"unitAdmin"`                               // Администратор объединения
+	Active       bool                 `json:"active" db:"active"`                                     // Пользователь активен
+	Confirmed    bool                 `json:"confirmed" db:"confirmed"`                               // Пользователь подтвержден
+	Surname      string               `json:"surname" db:"surname" validate:"nonzero,min=1,max=255"`  // Фамилия пользователя
+	Name         string               `json:"name" db:"name" validate:"nonzero,min=1,max=255"`        // Имя пользователя
+	MiddleName   string               `json:"middleName" db:"middleName" validate:"max=255"`          // Отчество пользователя
+	WorkPhone    string               `json:"workPhone" db:"workPhone" validate:"max=25"`             // Рабочий телефон
+	JobTitle     string               `json:"jobTitle" db:"jobTitle" validate:"max=255"`              // Должность
+	Language     string               `json:"language" db:"language" validate:"nonzero,min=1,max=10"` // Язык пользователя по умолчанию
+	Roles        []UserRole           `json:"groups,omitempty" db:"-"`                                // Массив значений уровней доступа пользователя
+	Emails       []ApiEmail           `json:"emails,omitempty" db:"-"`                                // Массив email
+	MobilePhones []ViewApiMobilePhone `json:"mobilePhones,omitempty" db:"-"`                          // Массив мобильных телефонов
 }
 
 type ApiUserMeta struct {
@@ -66,34 +77,45 @@ type ApiUserMeta struct {
 }
 
 type ChangeUser struct {
-	Name     string `json:"name" validate:"nonzero,min=1,max=255"` // Логин пользователя
-	Language string `json:"language" validate:"max=10"`            // Язык пользователя по умолчанию
+	Surname    string `json:"surname" validate:"nonzero,min=1,max=255"` // Фамилия пользователя
+	Name       string `json:"name" validate:"nonzero,min=1,max=255"`    // Логин пользователя
+	MiddleName string `json:"middleName"  validate:"max=255"`           // Отчество пользователя
+	WorkPhone  string `json:"workPhone" validate:"max=25"`              // Рабочий телефон
+	JobTitle   string `json:"jobTitle" validate:"max=255"`              // Должность
+	Language   string `json:"language" validate:"max=10"`               // Язык пользователя по умолчанию
 }
 
 type UserSearch struct {
-	ID        int64  `query:"id" search:"u.id"`                 // id пользователя
-	Login     string `query:"login" search:"e.email"`           // Логин пользователя
-	Blocked   bool   `query:"blocked" search:"u.active"`        // Пользователь заблокирован
-	Confirmed bool   `query:"confirmed" search:"u.confirmed"`   // Пользователь подтвержден
-	LastLogin string `query:"lastLoginAt" search:"u.lastLogin"` // Последний заход
-	Name      string `query:"name" search:"u.name"`             // Имя пользователя
+	ID         int64  `query:"id" search:"u.id"`                 // id пользователя
+	Login      string `query:"login" search:"login"`             // Логин пользователя
+	Blocked    bool   `query:"blocked" search:"(not u.active)"`  // Пользователь заблокирован
+	Confirmed  bool   `query:"confirmed" search:"u.confirmed"`   // Пользователь подтвержден
+	LastLogin  string `query:"lastLoginAt" search:"u.lastLogin"` // Последний заход
+	Surname    string `query:"surname" search:"u.surname"`       // Фамилия пользователя
+	Name       string `query:"name" search:"u.name"`             // Имя пользователя
+	MiddleName string `query:"middleName" search:"u.middleName"` // Отчество пользователя
 }
 
 type DtoUser struct {
-	ID         int64       `db:"id"`        // Уникальный id пользователя
-	Creator_ID int64       `db:"user_id"`   // Уникальный id создателя
-	UnitID     int64       `db:"unit_id"`   // Уникальный id объединения
-	Roles      []UserRole  `db:"-"`         // Массив значений уровней доступа пользователя
-	UnitAdmin  bool        `db:"unitAdmin"` // Администратор объединения
-	Active     bool        `db:"active"`    // Пользователь активен
-	Confirmed  bool        `db:"confirmed"` // Пользователь подтвержден
-	Created    time.Time   `db:"created"`   // Время создания пользователя
-	LastLogin  time.Time   `db:"lastLogin"` // Время последнего логина
-	Password   string      `db:"password"`  // Хэш пароля
-	Name       string      `db:"name"`      // Имя пользователя
-	Code       string      `db:"code"`      // Koд подтверждения пользователя
-	Language   string      `db:"language"`  // Язык пользователя по умолчанию
-	Emails     *[]DtoEmail `db:"-"`         // Массив email
+	ID           int64             `db:"id"`         // Уникальный id пользователя
+	Creator_ID   int64             `db:"user_id"`    // Уникальный id создателя
+	UnitID       int64             `db:"unit_id"`    // Уникальный id объединения
+	Roles        []UserRole        `db:"-"`          // Массив значений уровней доступа пользователя
+	UnitAdmin    bool              `db:"unitAdmin"`  // Администратор объединения
+	Active       bool              `db:"active"`     // Пользователь активен
+	Confirmed    bool              `db:"confirmed"`  // Пользователь подтвержден
+	Created      time.Time         `db:"created"`    // Время создания пользователя
+	LastLogin    time.Time         `db:"lastLogin"`  // Время последнего логина
+	Password     string            `db:"password"`   // Хэш пароля
+	Surname      string            `db:"surname"`    // Фамилия пользователя
+	Name         string            `db:"name"`       // Имя пользователя
+	MiddleName   string            `db:"middleName"` // Отчество пользователя
+	WorkPhone    string            `db:"workPhone"`  // Рабочий телефон
+	JobTitle     string            `db:"jobTitle"`   // Должность
+	Code         string            `db:"code"`       // Koд подтверждения пользователя
+	Language     string            `db:"language"`   // Язык пользователя по умолчанию
+	Emails       *[]DtoEmail       `db:"-"`          // Массив email
+	MobilePhones *[]DtoMobilePhone `db:"-"`          // Массив мобильных телефонов
 }
 
 // Конструктор создания объекта пользователя в api
@@ -104,42 +126,54 @@ func NewApiUserTiny(id int64) *ApiUserTiny {
 }
 
 func NewApiUserShort(id int64, login string, blocked bool, confirmed bool, created time.Time,
-	lastlogin time.Time, name string) *ApiUserShort {
+	lastlogin time.Time, surname string, name string, middlename string) *ApiUserShort {
 	return &ApiUserShort{
-		ID:        id,
-		Login:     login,
-		Blocked:   blocked,
-		Confirmed: confirmed,
-		LastLogin: lastlogin,
-		Name:      name,
+		ID:         id,
+		Login:      login,
+		Blocked:    blocked,
+		Confirmed:  confirmed,
+		LastLogin:  lastlogin,
+		Surname:    surname,
+		Name:       name,
+		MiddleName: middlename,
 	}
 }
 
-func NewApiUserLong(id int64, unitid int64, unitadmin bool, active bool, confirmed bool,
-	name string, language string) *ApiUserLong {
+func NewApiUserLong(id int64, unitid int64, unitadmin bool, active bool, confirmed bool, surname string,
+	name string, middleName string, workphone string, jobtitle string, language string) *ApiUserLong {
 	return &ApiUserLong{
-		ID:        id,
-		UnitID:    unitid,
-		UnitAdmin: unitadmin,
-		Active:    active,
-		Confirmed: confirmed,
-		Name:      name,
-		Language:  language,
+		ID:         id,
+		UnitID:     unitid,
+		UnitAdmin:  unitadmin,
+		Active:     active,
+		Confirmed:  confirmed,
+		Surname:    surname,
+		Name:       name,
+		MiddleName: middleName,
+		WorkPhone:  workphone,
+		JobTitle:   jobtitle,
+		Language:   language,
 	}
 }
 
 func NewViewApiUserFull(creator_id int64, unit_id int64, unitadmin bool, active bool, confirmed bool,
-	name string, language string, roles []UserRole, emails []ViewApiEmail) *ViewApiUserFull {
+	surname string, name string, middlename string, workphone string, jobtitle string, language string,
+	roles []UserRole, emails []ApiEmail, mobilephones []ViewApiMobilePhone) *ViewApiUserFull {
 	return &ViewApiUserFull{
-		Creator_ID: creator_id,
-		Unit_ID:    unit_id,
-		UnitAdmin:  unitadmin,
-		Active:     active,
-		Confirmed:  confirmed,
-		Name:       name,
-		Language:   language,
-		Roles:      roles,
-		Emails:     emails,
+		Creator_ID:   creator_id,
+		Unit_ID:      unit_id,
+		UnitAdmin:    unitadmin,
+		Active:       active,
+		Confirmed:    confirmed,
+		Surname:      surname,
+		Name:         name,
+		MiddleName:   middlename,
+		WorkPhone:    workphone,
+		JobTitle:     jobtitle,
+		Language:     language,
+		Roles:        roles,
+		Emails:       emails,
+		MobilePhones: mobilephones,
 	}
 }
 
@@ -152,22 +186,28 @@ func NewApiUserMeta(numofrows int64) *ApiUserMeta {
 // Конструктор создания объекта пользователя в бд
 func NewDtoUser(id int64, creator_id int64, unitid int64, roles []UserRole,
 	unitadmin bool, active bool, confirmed bool, created time.Time, lastlogin time.Time,
-	password string, name string, code string, language string, emails *[]DtoEmail) *DtoUser {
+	password string, surname string, name string, middlename string, workphone string, jobtitle string,
+	code string, language string, emails *[]DtoEmail, mobilephones *[]DtoMobilePhone) *DtoUser {
 	return &DtoUser{
-		ID:         id,
-		Creator_ID: creator_id,
-		UnitID:     unitid,
-		Roles:      roles,
-		UnitAdmin:  unitadmin,
-		Active:     active,
-		Confirmed:  confirmed,
-		Created:    created,
-		LastLogin:  lastlogin,
-		Password:   password,
-		Name:       name,
-		Code:       code,
-		Language:   language,
-		Emails:     emails,
+		ID:           id,
+		Creator_ID:   creator_id,
+		UnitID:       unitid,
+		Roles:        roles,
+		UnitAdmin:    unitadmin,
+		Active:       active,
+		Confirmed:    confirmed,
+		Created:      created,
+		LastLogin:    lastlogin,
+		Password:     password,
+		Surname:      surname,
+		Name:         name,
+		MiddleName:   middlename,
+		WorkPhone:    workphone,
+		JobTitle:     jobtitle,
+		Code:         code,
+		Language:     language,
+		Emails:       emails,
+		MobilePhones: mobilephones,
 	}
 }
 
@@ -178,6 +218,9 @@ func (user *ViewUser) Validate(errors binding.Errors, req *http.Request) binding
 func (user *ViewApiUserFull) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	for _, apiEmail := range user.Emails {
 		errors = ValidateWithLanguage(&apiEmail, errors, req, apiEmail.Language)
+	}
+	for _, apiMobilePhone := range user.MobilePhones {
+		errors = ValidateWithLanguage(&apiMobilePhone, errors, req, apiMobilePhone.Language)
 	}
 	return ValidateWithLanguage(user, errors, req, user.Language)
 }
@@ -207,7 +250,11 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 	case "login":
 		invalue = strings.ToLower(invalue)
 		fallthrough
+	case "surname":
+		fallthrough
 	case "name":
+		fallthrough
+	case "middleName":
 		fallthrough
 	case "lastLoginAt":
 		if strings.Contains(invalue, "'") {
@@ -222,9 +269,6 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 		if errConv != nil {
 			errValue = errConv
 			break
-		}
-		if infield == "blocked" {
-			val = !val
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:

@@ -9,6 +9,8 @@ import (
 type FacilityRepository interface {
 	Get(id int64) (facility *models.DtoFacility, err error)
 	GetAll() (facilities *[]models.DtoFacility, err error)
+	GetAllAvailable() (facilities *[]models.ApiShortFacility, err error)
+	GetByUnit(unitid int64) (facilities *[]models.ApiLongFacility, err error)
 	GetByUser(user_id int64) (facilities *[]models.ApiShortFacility, err error)
 	SetByUser(user_id int64, facilities *[]int64, inTrans bool) (err error)
 	Create(facility *models.DtoFacility) (err error)
@@ -49,11 +51,37 @@ func (facilityservice *FacilityService) GetAll() (facilities *[]models.DtoFacili
 	return facilities, nil
 }
 
+func (facilityservice *FacilityService) GetAllAvailable() (facilities *[]models.ApiShortFacility, err error) {
+	facilities = new([]models.ApiShortFacility)
+	_, err = facilityservice.DbContext.Select(facilities, "select id, name, description from "+facilityservice.Table+
+		" where active = 1 and id in (select service_id from supplier_services) and"+
+		" id in (select service_id from price_properties where customer_table_id in"+
+		" (select id from customer_tables where active = 1 and permanent = 1))")
+	if err != nil {
+		log.Error("Error during getting all facility object from database %v", err)
+		return nil, err
+	}
+
+	return facilities, nil
+}
+
+func (facilityservice *FacilityService) GetByUnit(unitid int64) (facilities *[]models.ApiLongFacility, err error) {
+	facilities = new([]models.ApiLongFacility)
+	_, err = facilityservice.DbContext.Select(facilities, "select id, name, description, active from "+facilityservice.Table+
+		" where id in (select service_id from supplier_services where supplier_id = ?)", unitid)
+	if err != nil {
+		log.Error("Error during getting all facility object from database %v with value %v", err, unitid)
+		return nil, err
+	}
+
+	return facilities, nil
+}
+
 func (facilityservice *FacilityService) GetByUser(user_id int64) (facilities *[]models.ApiShortFacility, err error) {
 	facilities = new([]models.ApiShortFacility)
 	_, err = facilityservice.DbContext.Select(facilities, "select id, name, description from "+facilityservice.Table+
-		" where id in (select service_id from supplier_services where supplier_id = "+
-		"(select unit_id from users where id = ? and active = 1 and confirmed = 1)) and active = 1", user_id)
+		" where active = 1 and id in (select service_id from supplier_services where supplier_id = "+
+		"(select unit_id from users where id = ?))", user_id)
 	if err != nil {
 		log.Error("Error during getting all facility object from database %v with value %v", err, user_id)
 		return nil, err
@@ -74,7 +102,7 @@ func (facilityservice *FacilityService) SetByUser(user_id int64, facilities *[]i
 	}
 
 	_, err = facilityservice.DbContext.Exec("delete from supplier_services where supplier_id = "+
-		"(select unit_id from users where id = ? and active = 1 and confirmed = 1)", user_id)
+		"(select unit_id from users where id = ?)", user_id)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -89,7 +117,7 @@ func (facilityservice *FacilityService) SetByUser(user_id int64, facilities *[]i
 			if statement != "" {
 				statement += " union"
 			}
-			statement += fmt.Sprintf(" select (select unit_id from users where id = %v and active = 1 and confirmed = 1), %v", user_id, value)
+			statement += fmt.Sprintf(" select (select unit_id from users where id = %v), %v", user_id, value)
 		}
 		_, err = facilityservice.DbContext.Exec("insert into supplier_services (supplier_id, service_id)" + statement)
 		if err != nil {

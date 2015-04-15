@@ -35,15 +35,15 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	viewuser.Login = strings.ToLower(viewuser.Login)
 	emailExists, err := emailrepository.Exists(viewuser.Login)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 	if emailExists {
 		email, err := emailrepository.Get(viewuser.Login)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 			return
 		}
 		if !email.Confirmed {
@@ -67,8 +67,8 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 
 	roles, err := grouprepository.GetDefault()
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -87,8 +87,8 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 
 		unit, err := unitrepository.FindByUser(session.UserID)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 			return
 		}
 		dtouser.UnitID = unit.ID
@@ -176,8 +176,8 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 	viewuser.Login = strings.ToLower(viewuser.Login)
 	dtouser, err := userrepository.FindByLogin(viewuser.Login)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -220,7 +220,7 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 	code := params[helpers.PARAMETER_NAME_CODE]
 	if len(code) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", code)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
@@ -229,12 +229,12 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 		for _, field := range errBind.FieldNames {
 			if field == helpers.PARAMETER_NAME_CODE {
 				if (code == "") || (len(code) > helpers.PARAM_LENGTH_MAX) {
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 						Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 					return
 				}
 			} else {
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 				return
 			}
@@ -247,15 +247,16 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, r ren
 	}
 
 	if len(password.Value) < PASSWORD_LENGTH_MIN {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_PASSWORD_TOOSIMPLE,
+		log.Error("Password is too simple %v", password.Value)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PASSWORD_TOOSIMPLE,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Password_Too_Simple})
 		return
 	}
 
 	user, err := userrepository.FindByCode(password.Code)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -309,7 +310,7 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userreposit
 	code := params[helpers.PARAMETER_NAME_CODE]
 	if code == "" || len(code) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", code)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Confirmation_Code_Wrong})
 		return
 	}
@@ -344,8 +345,8 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userreposit
 func GetGroups(r render.Render, grouprepository services.GroupRepository, session *models.DtoSession) {
 	groups, err := grouprepository.GetByUserExt(session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -356,16 +357,16 @@ func GetGroups(r render.Render, grouprepository services.GroupRepository, sessio
 func GetUserInfo(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
 	r.JSON(http.StatusOK, models.NewApiUserLong(user.ID, user.UnitID, user.UnitAdmin, user.Active,
-		user.Confirmed, user.Name, user.Language))
+		user.Confirmed, user.Surname, user.Name, user.MiddleName, user.WorkPhone, user.JobTitle, user.Language))
 }
 
-// put /api/v1.0/user/
+// patch /api/v1.0/user/
 func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r render.Render,
 	userrepository services.UserRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
@@ -373,14 +374,18 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 	}
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
+	user.Surname = changeuser.Surname
 	user.Name = changeuser.Name
+	user.MiddleName = changeuser.MiddleName
+	user.WorkPhone = changeuser.WorkPhone
+	user.JobTitle = changeuser.JobTitle
 	if changeuser.Language != "" {
-		user.Language = changeuser.Language
+		user.Language = strings.ToLower(changeuser.Language)
 	} else {
 		user.Language = session.Language
 	}
@@ -393,21 +398,22 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 	}
 
 	r.JSON(http.StatusOK, models.NewApiUserLong(user.ID, user.UnitID, user.UnitAdmin, user.Active,
-		user.Confirmed, user.Name, user.Language))
+		user.Confirmed, user.Surname, user.Name, user.MiddleName, user.WorkPhone, user.JobTitle, user.Language))
 }
 
 // get /api/v1.0/user/emails/
 func GetUserEmails(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	emails := new([]models.ViewApiEmail)
+	emails := new([]models.ApiEmail)
 	for _, email := range *user.Emails {
-		*emails = append(*emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription, email.Language))
+		*emails = append(*emails, *models.NewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
+			email.Language, email.Classifier_ID))
 	}
 
 	r.JSON(http.StatusOK, emails)
@@ -416,7 +422,7 @@ func GetUserEmails(r render.Render, userrepository services.UserRepository, sess
 // put /api/v1.0/user/emails/
 func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render,
 	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, userrepository services.UserRepository,
-	templaterepository services.TemplateRepository, session *models.DtoSession) {
+	templaterepository services.TemplateRepository, classifierrepository services.ClassifierRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -428,15 +434,15 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 	}
 	if count != 1 {
 		log.Error("Only one primary email is allowed")
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -456,6 +462,18 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 				break
 			}
 		}
+		classifier, err := classifierrepository.Get(updEmail.Classifier_ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		if !classifier.Active {
+			log.Error("Classifier is not active %v", classifier.ID)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
 
 		if !found {
 			var emailExists bool
@@ -465,28 +483,31 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 			}
 
 			*arrEmails = append(*arrEmails, models.DtoEmail{
-				Email:        updEmail.Email,
-				UserID:       user.ID,
-				Created:      time.Now(),
-				Primary:      updEmail.Primary,
-				Confirmed:    updEmail.Confirmed,
-				Subscription: updEmail.Subscription,
-				Code:         "",
-				Language:     updEmail.Language,
-				Exists:       emailExists,
+				Email:         updEmail.Email,
+				UserID:        user.ID,
+				Classifier_ID: classifier.ID,
+				Created:       time.Now(),
+				Primary:       updEmail.Primary,
+				Confirmed:     updEmail.Confirmed,
+				Subscription:  updEmail.Subscription,
+				Code:          "",
+				Language:      strings.ToLower(updEmail.Language),
+				Exists:        emailExists,
 			})
 		} else {
 			updEmail.Confirmed = curEmail.Confirmed
 			if updEmail.Primary != curEmail.Primary ||
 				updEmail.Subscription != curEmail.Subscription ||
-				updEmail.Language != curEmail.Language {
+				updEmail.Language != curEmail.Language ||
+				classifier.ID != curEmail.Classifier_ID {
 				updEmail.Confirmed = false
 			}
 
 			curEmail.Primary = updEmail.Primary
 			curEmail.Confirmed = updEmail.Confirmed
 			curEmail.Subscription = updEmail.Subscription
-			curEmail.Language = updEmail.Language
+			curEmail.Language = strings.ToLower(updEmail.Language)
+			curEmail.Classifier_ID = classifier.ID
 
 			*arrEmails = append(*arrEmails, curEmail)
 		}
@@ -523,10 +544,182 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 		return
 	}
 
-	emails := new([]models.ViewApiEmail)
+	emails := new([]models.ApiEmail)
 	for _, email := range *user.Emails {
-		*emails = append(*emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription, email.Language))
+		*emails = append(*emails, *models.NewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
+			email.Language, email.Classifier_ID))
 	}
 
 	r.JSON(http.StatusOK, emails)
+}
+
+// patch /api/v1.0/user/password/
+func ChangePassword(errors binding.Errors, changepassword models.ChangePassword, r render.Render,
+	userrepository services.UserRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	if changepassword.NewPassword != changepassword.ConfirmPassword {
+		log.Error("New %v and confirm %v passwords don't match each other", changepassword.NewPassword, changepassword.ConfirmPassword)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		return
+	}
+	if len(changepassword.NewPassword) < PASSWORD_LENGTH_MIN {
+		log.Error("Password is too simple %v", changepassword.NewPassword)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PASSWORD_TOOSIMPLE,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Password_Too_Simple})
+		return
+	}
+
+	user, err := userrepository.Get(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(changepassword.OldPassword)) != nil {
+		log.Error("Can't compare password hashes")
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_LOGIN_OR_PASSWORD_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Login_Or_Password_Wrong})
+		return
+	}
+
+	var hash []byte
+	hash, err = bcrypt.GenerateFromPassword([]byte(changepassword.NewPassword), PASSWORD_LEVEL_ENCRYPTION)
+	if err != nil {
+		log.Error("Password generating error %v", err)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	user.Password = string(hash[:])
+	err = userrepository.Update(user, true, false)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[user.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
+}
+
+// get /api/v1.0/user/mobilephones/
+func GetUserMobilePhones(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	user, err := userrepository.Get(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	phones := new([]models.ViewApiMobilePhone)
+	for _, phone := range *user.MobilePhones {
+		*phones = append(*phones, *models.NewViewApiMobilePhone(phone.Phone, phone.Primary, phone.Confirmed, phone.Subscription,
+			phone.Language, phone.Classifier_ID))
+	}
+
+	r.JSON(http.StatusOK, phones)
+}
+
+// put /api/v1.0/user/mobilephones/
+func UpdateUserMobilePhones(errors binding.Errors, updatephones models.UpdateMobilePhones, request *http.Request, r render.Render,
+	mobilephonerepository services.MobilePhoneRepository, userrepository services.UserRepository,
+	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	count := 0
+	for _, checkMobilePhone := range updatephones {
+		if checkMobilePhone.Primary {
+			count++
+		}
+	}
+	if count != 1 {
+		log.Error("Only one primary mobile phone is allowed")
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	user, err := userrepository.Get(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	arrMobilePhones := new([]models.DtoMobilePhone)
+
+	var updMobilePhone models.ViewApiMobilePhone
+	var curMobilePhone models.DtoMobilePhone
+
+	for _, updMobilePhone = range updatephones {
+		found := false
+		for _, curMobilePhone = range *user.MobilePhones {
+			if updMobilePhone.Phone == curMobilePhone.Phone {
+				found = true
+				break
+			}
+		}
+		classifier, err := classifierrepository.Get(updMobilePhone.Classifier_ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		if !classifier.Active {
+			log.Error("Classifier is not active %v", classifier.ID)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+
+		if !found {
+			var phoneExists bool
+			phoneExists, err = helpers.CheckMobilePhoneAvailability(updMobilePhone.Phone, session.Language, r, mobilephonerepository)
+			if err != nil {
+				return
+			}
+
+			*arrMobilePhones = append(*arrMobilePhones, models.DtoMobilePhone{
+				Phone:         updMobilePhone.Phone,
+				UserID:        user.ID,
+				Classifier_ID: classifier.ID,
+				Created:       time.Now(),
+				Primary:       updMobilePhone.Primary,
+				Confirmed:     updMobilePhone.Confirmed,
+				Subscription:  updMobilePhone.Subscription,
+				Code:          "",
+				Language:      strings.ToLower(updMobilePhone.Language),
+				Exists:        phoneExists,
+			})
+		} else {
+			curMobilePhone.Confirmed = updMobilePhone.Confirmed
+			curMobilePhone.Primary = updMobilePhone.Primary
+			curMobilePhone.Confirmed = updMobilePhone.Confirmed
+			curMobilePhone.Subscription = updMobilePhone.Subscription
+			curMobilePhone.Language = strings.ToLower(updMobilePhone.Language)
+			curMobilePhone.Classifier_ID = classifier.ID
+
+			*arrMobilePhones = append(*arrMobilePhones, curMobilePhone)
+		}
+	}
+
+	user.MobilePhones = arrMobilePhones
+	err = userrepository.Update(user, false, true)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	phones := new([]models.ViewApiMobilePhone)
+	for _, phone := range *user.MobilePhones {
+		*phones = append(*phones, *models.NewViewApiMobilePhone(phone.Phone, phone.Primary, phone.Confirmed, phone.Subscription,
+			phone.Language, phone.Classifier_ID))
+	}
+
+	r.JSON(http.StatusOK, phones)
 }

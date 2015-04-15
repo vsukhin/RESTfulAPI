@@ -60,12 +60,33 @@ func (testCaptchaDBMap *TestCaptchaDBMap) SelectOne(holder interface{}, query st
 	return testCaptchaDBMap.Err
 }
 
+type TestLogger struct {
+}
+
+func (testLogger *TestLogger) Info(query string, args ...interface{}) {
+
+}
+
+func (testLogger *TestLogger) Warning(query string, args ...interface{}) {
+
+}
+
+func (testLogger *TestLogger) Error(query string, args ...interface{}) {
+
+}
+
+func (testLogger *TestLogger) Fatalf(query string, args ...interface{}) {
+
+}
+
 func TestCreateError(t *testing.T) {
 	dbmap := new(TestCaptchaDBMap)
 	dbmap.Err = errors.New("Captcha error")
 	captcha := new(models.DtoCaptcha)
 	captchaService := new(CaptchaService)
 	captchaService.Repository = NewRepository(dbmap, db.TABLE_CAPTCHAS)
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := captchaService.Create(captcha)
 	if err == nil {
@@ -92,6 +113,8 @@ func TestUpdateError(t *testing.T) {
 	captcha := new(models.DtoCaptcha)
 	captchaService := new(CaptchaService)
 	captchaService.Repository = NewRepository(dbmap, db.TABLE_CAPTCHAS)
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := captchaService.Update(captcha)
 	if err == nil {
@@ -118,6 +141,8 @@ func TestDeleteError(t *testing.T) {
 	hash := "12345"
 	captchaService := new(CaptchaService)
 	captchaService.Repository = NewRepository(dbmap, db.TABLE_CAPTCHAS)
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := captchaService.Delete(hash)
 	if err == nil {
@@ -146,6 +171,8 @@ func TestGetError(t *testing.T) {
 	dbmap.Captcha.Hash = hash
 	captchaService := new(CaptchaService)
 	captchaService.Repository = NewRepository(dbmap, db.TABLE_CAPTCHAS)
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	_, err := captchaService.Get(hash)
 	if err == nil {

@@ -20,8 +20,8 @@ func ValidateCell(value string, dtotablecolumn *models.DtoTableColumn, r render.
 	if dtotablecolumn.Column_Type_ID != 0 {
 		dtocolumntype, err := columntyperepository.Get(dtotablecolumn.Column_Type_ID)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return false, err
 		}
 
@@ -61,15 +61,15 @@ func CheckTableCell(r render.Render, params martini.Params, customertablereposit
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(dtotablerow.Customer_Table_ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, nil, nil, err
 	}
 
 	tablecells, err := dtotablerow.TableRowToDtoTableCells(tablecolumns)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, nil, nil, err
 	}
 
@@ -83,8 +83,8 @@ func CheckTableCell(r render.Render, params martini.Params, customertablereposit
 	}
 	if !found {
 		log.Error("Can't find cell for table row %v column %v", dtotablerow.ID, dtotablecolumn.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, nil, nil, errors.New("Cell not found")
 	}
 
@@ -102,15 +102,15 @@ func SaveTableCell(value string, r render.Render, params martini.Params, custome
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(oldtablerow.Customer_Table_ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 
 	tablecells, err := oldtablerow.TableRowToDtoTableCells(tablecolumns)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 
@@ -138,8 +138,8 @@ func SaveTableCell(value string, r render.Render, params martini.Params, custome
 	}
 	err = newtablerow.TableCellsToTableRow(tablecells, tablecolumns)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 

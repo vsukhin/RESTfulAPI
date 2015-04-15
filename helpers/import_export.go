@@ -56,7 +56,7 @@ func DetectDataFormat(fullpath string) (dataformat models.DataFormat, err error)
 func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dtocustomertable *models.DtoCustomerTable,
 	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository) {
 	dtoimportstep := models.NewDtoImportStep(dtocustomertable.ID, 2, false, 0, time.Now(), time.Now())
-	err := importsteprepository.Create(dtoimportstep)
+	err := importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}
@@ -167,7 +167,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	dtoimportstep.Ready = true
 	dtoimportstep.Percentage = 100
 	dtoimportstep.Completed = time.Now()
-	err = importsteprepository.Update(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}
@@ -186,7 +186,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	dtoimportstep.Percentage = 0
 	dtoimportstep.Started = time.Now()
 	dtoimportstep.Completed = time.Now()
-	err = importsteprepository.Create(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}
@@ -222,7 +222,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	dtoimportstep.Ready = true
 	dtoimportstep.Percentage = 100
 	dtoimportstep.Completed = time.Now()
-	err = importsteprepository.Update(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}
@@ -273,7 +273,7 @@ func CheckTableCells(dtocustomertable *models.DtoCustomerTable, tablecolumnrepos
 	}
 
 	dtoimportstep := models.NewDtoImportStep(dtocustomertable.ID, 5, false, 0, time.Now(), time.Now())
-	err = importsteprepository.Create(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}
@@ -342,7 +342,7 @@ func CheckTableCells(dtocustomertable *models.DtoCustomerTable, tablecolumnrepos
 	dtoimportstep.Ready = true
 	dtoimportstep.Percentage = 100
 	dtoimportstep.Completed = time.Now()
-	err = importsteprepository.Update(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		return
 	}

@@ -70,7 +70,7 @@ func (orderstatusservice *OrderStatusService) Save(orderstatus *models.DtoOrderS
 	count, err := orderstatusservice.DbContext.SelectInt("select count(*) from "+orderstatusservice.Table+
 		" where order_id = ? and status_id = ?", orderstatus.Order_ID, orderstatus.Status_ID)
 	if err != nil {
-		log.Error("Error during saving order status object from database %v with value %v, %v", err, orderstatus.Order_ID, orderstatus.Status_ID)
+		log.Error("Error during saving order status object in database %v with value %v, %v", err, orderstatus.Order_ID, orderstatus.Status_ID)
 		return err
 	}
 	if count == 0 {

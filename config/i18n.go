@@ -47,25 +47,32 @@ type Resource struct {
 			File_NotImage           string `yaml:"File_NotImage"`           // Ошибка файла неявляющегося картинкой
 			Email_InUse             string `yaml:"Email_InUse"`             // Ошибка уже используемого email
 			Data_Changes_Denied     string `yaml:"Data_Changes_Denied"`     // Ошибка изменения данных
+			Data_Delete_Denied      string `yaml:"Data_Delete_Denied"`      // Ошибка удаления данных
 		} `yaml:"Api"` // Ошибки API
 
 	} `yaml:"Errors"` // Сообщения об ошибках
 }
 
-var Localization map[string]Resource
+var (
+	Localization map[string]Resource
+)
 
-func configureI18n() {
+func InitI18n() (err error) {
 	Localization = make(map[string]Resource)
 	for _, lang := range Configuration.Server.AvailableLanguages {
 		resourcefile, err := ioutil.ReadFile(filepath.Join(Configuration.Server.ResourceStorage, lang+".yml"))
-		if nil != err {
+		if err != nil {
 			logger.Fatalf("Can't read data from resource file: %v", err)
+			return err
 		}
 		resourcedata := new(Resource)
-		if err = yaml.Unmarshal(resourcefile, resourcedata); nil != err {
+		if err = yaml.Unmarshal(resourcefile, resourcedata); err != nil {
 			logger.Fatalf("Can't unmarshal data from yaml to resource structure: %v", err)
+			return err
 		} else {
 			Localization[lang] = *resourcedata
 		}
 	}
+
+	return nil
 }

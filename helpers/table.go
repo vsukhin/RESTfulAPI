@@ -21,16 +21,16 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 	if unitparam == 0 {
 		user, err := userrepository.Get(userid)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return 0, 0, err
 		}
 		unitid = user.UnitID
 	} else {
 		unit, err := unitrepository.Get(unitparam)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return 0, 0, err
 		}
 		unitid = unit.ID
@@ -38,8 +38,8 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 
 	typeid, err = tabletyperepository.FindByName(typeparam)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return 0, 0, err
 	}
 
@@ -50,14 +50,14 @@ func IsTableActive(r render.Render, customertablerepository services.CustomerTab
 	language string) (dtocustomertable *models.DtoCustomerTable, err error) {
 	dtocustomertable, err = customertablerepository.Get(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Table is not found")
 	}
 
 	if !dtocustomertable.Active {
 		log.Error("Customer table is not active %v", tableid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Table is not active")
 	}
@@ -73,7 +73,7 @@ func IsTableAvailable(r render.Render, customertablerepository services.Customer
 	}
 	if !dtocustomertable.Permanent {
 		log.Error("Customer table is not permanent %v", tableid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Table is not permanent")
 	}

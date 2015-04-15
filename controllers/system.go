@@ -19,7 +19,7 @@ import (
 
 const (
 	CAPTCHA_LENGTH  = 6
-	CAPTCHA_WIDTH   = 240
+	CAPTCHA_WIDTH   = 180
 	CAPTCHA_HEIGHT  = 80
 	CAPTCHA_QUALITY = 10
 )
@@ -79,8 +79,8 @@ func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *h
 
 	user, err := userrepository.Get(email.UserID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_CONFIRMATION_CODE_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Confirmation_Code_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 

@@ -17,8 +17,8 @@ import (
 func GetColumnTypes(r render.Render, columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
 	columntypes, err := columntyperepository.GetAll()
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -87,8 +87,8 @@ func GetTableColumns(r render.Render, params martini.Params, tablecolumnreposito
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -124,8 +124,8 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	}
 	if oldtablecolumn.Prebuilt {
 		log.Error("Can't update prebuilt column %v", oldtablecolumn.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -168,8 +168,8 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertablerepo
 	}
 	if dtotablecolumn.Prebuilt {
 		log.Error("Can't delete prebuilt column %v", dtotablecolumn.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 

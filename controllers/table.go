@@ -18,8 +18,8 @@ import (
 func GetTableTypes(r render.Render, tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
 	tabletypes, err := tabletyperepository.GetAll()
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -71,10 +71,10 @@ func GetUnitTables(request *http.Request, r render.Render, customertablereposito
 	}
 	query += limit
 
-	customertables, err := customertablerepository.GetByUnit(query, session.UserID)
+	customertables, err := customertablerepository.GetByUser(session.UserID, query)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -90,8 +90,8 @@ func GetTable(r render.Render, params martini.Params, customertablerepository se
 
 	customertablemeta, err := customertablerepository.GetEx(dtocustomertable.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -151,8 +151,8 @@ func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustome
 	if dtocustomertable.TypeID != typeid {
 		if viewcustomertable.Type != models.TABLE_TYPE_DEFAULT {
 			log.Error("Can change table type to %v", viewcustomertable.Type)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 	}
@@ -198,8 +198,8 @@ func GetTableMetaData(r render.Render, params martini.Params, customertablerepos
 
 	customertablemeta, err := customertablerepository.GetMeta(dtocustomertable.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -220,27 +220,27 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 
 	found, err := pricepropertiesrepository.Exists(dtocustomertable.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 	if found {
 		log.Error("Customer table is already linked to price table %v", dtocustomertable.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
 	facility, err := facilityrepository.Get(viewpriceproperties.Facility_ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 	if !facility.Active {
 		log.Error("Facility is not active %v", facility.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -251,28 +251,28 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 		}
 		priceproperties, err := pricepropertiesrepository.Get(viewpriceproperties.After_ID)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 		if priceproperties.Facility_ID != viewpriceproperties.Facility_ID {
 			log.Error("Service is not the same for after price %v", viewpriceproperties.After_ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 	}
 
 	if !viewpriceproperties.Begin.IsZero() && viewpriceproperties.Begin.Sub(time.Now()) < 0 {
 		log.Error("Begin date is in the past %v", viewpriceproperties.Begin)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
 	if !viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()) < 0 {
 		log.Error("End date is in the past %v", viewpriceproperties.End)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
@@ -280,7 +280,7 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 	if !viewpriceproperties.Begin.IsZero() && !viewpriceproperties.End.IsZero() &&
 		viewpriceproperties.Begin.Sub(viewpriceproperties.End) > 0 {
 		log.Error("Begin date can't be bigger than end date %v", viewpriceproperties.Begin, viewpriceproperties.End)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}

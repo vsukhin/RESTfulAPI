@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	log = logging.MustGetLogger("models")
+	log config.Logger = logging.MustGetLogger("models")
 )
 
 const (
@@ -22,6 +22,10 @@ const (
 	VALIDATE_LANGUAGE_WRONG
 	VALIDATE_FIELD_REGEXP
 )
+
+func InitLogger(logger config.Logger) {
+	log = logger
+}
 
 func Validate(object interface{}, errors binding.Errors, req *http.Request) binding.Errors {
 	err := validator.Validate(object)

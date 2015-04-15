@@ -12,6 +12,7 @@ type UserRepository interface {
 	FindByCode(code string) (user *models.DtoUser, err error)
 	Get(userid int64) (user *models.DtoUser, err error)
 	GetAll(filter string) (users *[]models.ApiUserShort, err error)
+	GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error)
 	GetMeta() (usermeta *models.ApiUserMeta, err error)
 	InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error)
 	Create(user *models.DtoUser, inTrans bool) (err error)
@@ -20,11 +21,12 @@ type UserRepository interface {
 }
 
 type UserService struct {
-	SessionRepository SessionRepository
-	EmailRepository   EmailRepository
-	UnitRepository    UnitRepository
-	GroupRepository   GroupRepository
-	MessageRepository MessageRepository
+	SessionRepository     SessionRepository
+	EmailRepository       EmailRepository
+	UnitRepository        UnitRepository
+	GroupRepository       GroupRepository
+	MessageRepository     MessageRepository
+	MobilePhoneRepository MobilePhoneRepository
 	*Repository
 }
 
@@ -43,10 +45,17 @@ func (userservice *UserService) GetUserArrays(user *models.DtoUser) (*models.Dto
 
 	emails, err := userservice.EmailRepository.GetByUser(user.ID)
 	if err != nil {
-		log.Error("Error during getting user roles object from database %v with value %v", err, user.ID)
+		log.Error("Error during getting user email object from database %v with value %v", err, user.ID)
 		return nil, err
 	}
 	user.Emails = emails
+
+	phones, err := userservice.MobilePhoneRepository.GetByUser(user.ID)
+	if err != nil {
+		log.Error("Error during getting user mobile phone object from database %v with value %v", err, user.ID)
+		return nil, err
+	}
+	user.MobilePhones = phones
 
 	return user, nil
 }
@@ -54,8 +63,8 @@ func (userservice *UserService) GetUserArrays(user *models.DtoUser) (*models.Dto
 func (userservice *UserService) FindByLogin(login string) (user *models.DtoUser, err error) {
 	user = new(models.DtoUser)
 	err = userservice.DbContext.SelectOne(user,
-		"select u.* from "+userservice.Table+" u inner join emails e on u.id = e.user_id where e.primary = 1 and e.email = ?",
-		login)
+		"select * from "+userservice.Table+" where id in (select user_id from emails where `primary` = 1 and email = ?) or"+
+			" id in (select user_id from mobile_phones where `primary` = 1 and phone = ?)", login, login)
 	if err != nil {
 		log.Error("Error during finding user object in database %v with value %v", err, login)
 		return nil, err
@@ -88,11 +97,24 @@ func (userservice *UserService) Get(userid int64) (user *models.DtoUser, err err
 
 func (userservice *UserService) GetAll(filter string) (users *[]models.ApiUserShort, err error) {
 	users = new([]models.ApiUserShort)
-	_, err = userservice.DbContext.Select(users,
-		"select u.id, coalesce(e.email, '') as login, not u.active as blocked, u.confirmed, u.lastLogin as lastLoginAt, u.name from "+
-			userservice.Table+" u left join emails e on u.id = e.user_id where (e.primary = true or e.primary is null)"+filter)
+	_, err = userservice.DbContext.Select(users, "select u.id, "+
+		"case when e.primary = 1 then e.email else case when m.primary = 1 then m.phone else '' end end as login,"+
+		" not u.active as blocked, u.confirmed, u.lastLogin as lastLoginAt, u.surname, u.name, u.middleName from "+userservice.Table+
+		" u left join emails e on u.id = e.user_id left join mobile_phones m on u.id = m.user_id"+
+		" where (e.primary = 1 or e.primary is null) or (m.primary = 1 or m.primary is null)"+filter)
 	if err != nil {
 		log.Error("Error during getting user objects from database %v", err)
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (userservice *UserService) GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error) {
+	users = new([]models.ApiUserTiny)
+	_, err = userservice.DbContext.Select(users, "select id from "+userservice.Table+" where unit_id = ?", unitid)
+	if err != nil {
+		log.Error("Error during getting all user objects from database %v with value%v", err, unitid)
 		return nil, err
 	}
 
@@ -112,8 +134,8 @@ func (userservice *UserService) GetMeta() (usermeta *models.ApiUserMeta, err err
 
 func (userservice *UserService) InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error) {
 	unit := new(models.DtoUnit)
-	unit.Name = "Default name for unit"
 	unit.Created = time.Now()
+	unit.Active = true
 	err = userservice.UnitRepository.Create(unit)
 	if err != nil {
 		if inTrans {
@@ -165,6 +187,22 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 				_ = trans.Rollback()
 			}
 			log.Error("Error during creating user object in database %v with value %v", err, email.Email)
+			return err
+		}
+	}
+
+	for _, phone := range *user.MobilePhones {
+		phone.UserID = user.ID
+		if !phone.Exists {
+			err = userservice.MobilePhoneRepository.Create(&phone)
+		} else {
+			err = userservice.MobilePhoneRepository.Update(&phone)
+		}
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			log.Error("Error during creating user object in database %v with value %v", err, phone.Phone)
 			return err
 		}
 	}
@@ -286,6 +324,60 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 				}
 			}
 		}
+
+		for _, updPhone := range *user.MobilePhones {
+			found := false
+			for _, curPhone := range *current.MobilePhones {
+				if curPhone.Phone == updPhone.Phone {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				if !updPhone.Exists {
+					err = userservice.MobilePhoneRepository.Create(&updPhone)
+				} else {
+					err = userservice.MobilePhoneRepository.Update(&updPhone)
+				}
+				if err != nil {
+					if inTrans {
+						_ = trans.Rollback()
+					}
+					log.Error("Error during updating user object in database %v with value %v", err, updPhone.Phone)
+					return err
+				}
+			} else {
+				err = userservice.MobilePhoneRepository.Update(&updPhone)
+				if err != nil {
+					if inTrans {
+						_ = trans.Rollback()
+					}
+					log.Error("Error during updating user object in database %v with value %v", err, updPhone.Phone)
+					return err
+				}
+			}
+		}
+
+		for _, curPhone := range *current.MobilePhones {
+			found := false
+			for _, updPhone := range *user.MobilePhones {
+				if curPhone.Phone == updPhone.Phone {
+					found = true
+					break
+				}
+			}
+			if !found {
+				err = userservice.MobilePhoneRepository.Delete(curPhone.Phone)
+				if err != nil {
+					if inTrans {
+						_ = trans.Rollback()
+					}
+					log.Error("Error during updating user object in database %v with value %v", err, curPhone.Phone)
+					return err
+				}
+			}
+		}
 	}
 
 	if inTrans {
@@ -308,6 +400,24 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 			log.Error("Error during deleting user object in database %v", err)
 			return err
 		}
+	}
+
+	_, err = userservice.DbContext.Exec("update orders set user_id = 0 where user_id = ?", userid)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during deleting user object from database %v with value %v", err, userid)
+		return err
+	}
+
+	err = userservice.MobilePhoneRepository.DeleteByUser(userid)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during deleting user object in database %v with value %v", err, userid)
+		return err
 	}
 
 	err = userservice.MessageRepository.DeleteByUser(userid, false)

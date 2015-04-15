@@ -31,8 +31,8 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 	fileid, err := strconv.ParseInt(viewimporttable.File_ID, 0, 64)
 	if err != nil {
 		log.Error("Can't convert to number %v with value %v", err, viewimporttable.File_ID)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
@@ -67,7 +67,7 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 	}
 	// 1
 	dtoimportstep := models.NewDtoImportStep(dtocustomertable.ID, 1, true, 100, time.Now(), time.Now())
-	err = importsteprepository.Create(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -92,15 +92,15 @@ func GetImportDataColumns(r render.Render, params martini.Params, customertabler
 	}
 	if dtocustomertable.Permanent {
 		log.Error("Can't inquire permanent table %v", tableid)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
 	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 	importcolumns := new([]models.ApiImportColumn)
@@ -129,8 +129,8 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	}
 	if dtocustomertable.Permanent {
 		log.Error("Can't update permanent table %v", tableid)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 	_, err = helpers.CheckColumnSet(viewimportcolumns, tableid, r, tablecolumnrepository, session.Language)
@@ -139,7 +139,7 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	}
 
 	dtoimportstep := models.NewDtoImportStep(tableid, 4, false, 0, time.Now(), time.Now())
-	err = importsteprepository.Create(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -150,14 +150,14 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	for _, viewimportcolumn := range viewimportcolumns {
 		dtotablecolumn, err := tablecolumnrepository.Get(viewimportcolumn.ID)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 		if dtotablecolumn.Prebuilt {
 			log.Error("Can't update prebuilt column %v", dtotablecolumn.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 
@@ -192,7 +192,7 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	dtoimportstep.Ready = true
 	dtoimportstep.Percentage = 100
 	dtoimportstep.Completed = time.Now()
-	err = importsteprepository.Update(dtoimportstep)
+	err = importsteprepository.Save(dtoimportstep)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -219,8 +219,8 @@ func GetImportDataStatus(r render.Render, params martini.Params, filerepository 
 
 	importsteps, err := importsteprepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -233,8 +233,8 @@ func GetExportDataMeta(request *http.Request, r render.Render, dataformatreposit
 	virtualdirrepository services.VirtualDirRepository, sessionrepository services.SessionRepository, session *models.DtoSession) {
 	dataformats, err := dataformatrepository.GetAll()
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -266,13 +266,13 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	}
 	tablecolumns, err := tablecolumnrepository.GetByTable(dtocustomertable.ID)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 	if len(*tablecolumns) == 0 {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		log.Error("Can't find any data in table %v", dtocustomertable.ID)
 		return
 	}
@@ -296,7 +296,7 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	rowtype := request.URL.Query().Get(helpers.PARAM_QUERY_TYPE)
 	if rowtype != models.EXPORT_DATA_ALL && rowtype != models.EXPORT_DATA_VALID && rowtype != models.EXPORT_DATA_INVALID {
 		log.Error("Error during looking up for existing export type %v", rowtype)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
@@ -347,8 +347,8 @@ func GetExportDataStatus(r render.Render, params martini.Params, filerepository 
 
 	if dtocustomertable.ID != file.Export_Object_ID {
 		log.Error("Linked file object %v and exported table %v don't match", file.Export_Object_ID, dtocustomertable.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -361,21 +361,21 @@ func GetExportData(w http.ResponseWriter, r render.Render, params martini.Params
 	filerepository services.FileRepository) {
 	if params[helpers.PARAM_NAME_TOKEN] == "" || len(params[helpers.PARAM_NAME_TOKEN]) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Parameter is too long or too short %v", params[helpers.PARAM_NAME_TOKEN])
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
 
 	virtualdir, err := virtualdirrepository.Get(params[helpers.PARAM_NAME_TOKEN])
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 	if time.Now().Sub(virtualdir.Created) > config.Configuration.Server.FileTimeout {
 		log.Error("File token has been expired %v with value %v", virtualdir.Created, virtualdir.Token)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 

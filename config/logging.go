@@ -2,13 +2,22 @@ package config
 
 import (
 	logging "github.com/op/go-logging"
-	/*	gelf "github.com/probkiizokna/go-gelf"
-		logging_gelf "github.com/probkiizokna/go-logging-gelf"*/
-	"log"
+	/*
+		gelf "github.com/probkiizokna/go-gelf"
+		logging_gelf "github.com/probkiizokna/go-logging-gelf"
+	*/
+	"errors"
 	"os"
 	"path"
 	"syscall"
 )
+
+type Logger interface {
+	Info(query string, args ...interface{})
+	Warning(query string, args ...interface{})
+	Error(query string, args ...interface{})
+	Fatalf(query string, args ...interface{})
+}
 
 const (
 	LOGGING_CONSOLE = "console"
@@ -18,22 +27,20 @@ const (
 )
 
 var (
-	logger      = logging.MustGetLogger("config")
 	Filebackend *FileBackend
+	logger      Logger = logging.MustGetLogger("config")
 )
 
-func configureLogging() {
+func InitLogging() (err error) {
 	var backends []logging.Backend
-
 	for _, mode := range Configuration.Logger.Mode {
-		var err error
-
 		level := logging.DEBUG
 		modelevel := string(Configuration.Logger.Levels[ModeName(mode)])
 		if modelevel != "" {
 			level, err = logging.LogLevel(modelevel)
 			if err != nil {
-				log.Fatalln("Can't recognize mode level %v", err)
+				logger.Fatalf("Can't recognize mode level %v", err)
+				return err
 			}
 		}
 		switch mode {
@@ -46,7 +53,8 @@ func configureLogging() {
 		case LOGGING_SYSLOG:
 			syslogbackend, err := logging.NewSyslogBackend(CONFIG_APPLICATION)
 			if err != nil {
-				log.Fatalln("Can't initiate syslog backend %v", err)
+				logger.Fatalf("Can't initiate syslog backend %v", err)
+				return err
 			}
 			leveledsyslog := logging.AddModuleLevel(syslogbackend)
 			leveledsyslog.SetLevel(level, "")
@@ -54,62 +62,65 @@ func configureLogging() {
 		case LOGGING_FILE:
 			file, err := os.OpenFile(Configuration.Logger.File, syscall.O_APPEND|syscall.O_CREAT|syscall.O_WRONLY, 0666)
 			if err != nil {
-				log.Fatalln("Can't initiate filelog backend%v", err)
+				logger.Fatalf("Can't initiate filelog backend%v", err)
+				return err
 			}
 			Filebackend = NewFileBackend(file)
 			leveledfile := logging.AddModuleLevel(Filebackend)
 			leveledfile.SetLevel(level, "")
 			backends = append(backends, leveledfile)
 		case LOGGING_GRAYLOG:
-			/*			gelfClient := gelf.MustUdpClient(
-							Configuration.Logger.Graylog.Host,
-							Configuration.Logger.Graylog.Port,
-							Configuration.Logger.Graylog.ChunkSize,
-							Configuration.Logger.Graylog.Compression,
-						)
-						gelfBacked := logging_gelf.NewGelfBackend(gelfClient, mustHostname(), mustApplicationName(true))
-						leveledgelf = logging.AddModuleLevel(gelfbackend)
-						leveledgelf.SetLevel(level, "")
-						backends = append(backends, leveledgelf)*/
+			/*
+				gelfClient := gelf.MustUdpClient(
+					Configuration.Logger.Graylog.Host,
+					Configuration.Logger.Graylog.Port,
+					Configuration.Logger.Graylog.ChunkSize,
+					Configuration.Logger.Graylog.Compression,
+				)
+				gelfBacked := logging_gelf.NewGelfBackend(gelfClient, mustHostname(), mustApplicationName(true))
+				leveledgelf = logging.AddModuleLevel(gelfbackend)
+				leveledgelf.SetLevel(level, "")
+				backends = append(backends, leveledgelf)
+			*/
 		default:
-			log.Fatalln("Uknown logging mode")
+			logger.Fatalf("Uknown logging mode %v", mode)
+			return errors.New("Uknown logging mode")
 		}
 		logging.SetBackend(backends...)
 		logFormatter := logging.MustStringFormatter(Configuration.Logger.Format)
 		logging.SetFormatter(logFormatter)
 	}
-	//	configureLogLevels()
+
+	return nil
 }
 
-func configureLogLevels() {
-	for module, levelStr := range Configuration.Logger.Levels {
-		level, levelErr := logging.LogLevel(string(levelStr))
-		if nil != levelErr {
-			log.Fatalln("Can't get logging level %v", levelErr)
+func ShutdownLogging() {
+	if Filebackend.File != nil {
+		err := Filebackend.File.Close()
+		if err != nil {
+			logger.Error("Log file close: %v", err)
 		}
-		logging.SetLevel(level, string(module))
 	}
 }
 
 func mustHostname() string {
-	if hostname, err := os.Hostname(); nil == err {
+	if hostname, err := os.Hostname(); err == nil {
 		return hostname
 	} else {
-		log.Fatalln("Can't recognize host name %v", err)
+		logger.Fatalf("Can't recognize host name %v", err)
 		return ""
-
 	}
 }
 
 func mustApplicationName(short bool) string {
-	if applicationName := os.Args[0]; "" != applicationName {
+	if applicationName := os.Args[0]; applicationName != "" {
 		if short {
 			return path.Base(applicationName)
 		} else {
 			return applicationName
 		}
 	} else {
-		log.Fatalln("Can't detect application name")
+		logger.Fatalf("Can't detect application name")
 		return ""
 	}
 }

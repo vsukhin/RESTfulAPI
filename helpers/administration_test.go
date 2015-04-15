@@ -67,15 +67,23 @@ func (testUserRepository *TestUserRepository) FindByLogin(login string) (user *m
 func (testUserRepository *TestUserRepository) FindByCode(code string) (user *models.DtoUser, err error) {
 	return nil, nil
 }
+
 func (testUserRepository *TestUserRepository) Get(userid int64) (user *models.DtoUser, err error) {
 	return testUserRepository.User, testUserRepository.Err
 }
+
 func (testUserRepository *TestUserRepository) GetAll(filter string) (users *[]models.ApiUserShort, err error) {
 	return nil, nil
 }
+
+func (testUserRepository *TestUserRepository) GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error) {
+	return nil, nil
+}
+
 func (testUserRepository *TestUserRepository) GetMeta() (usermeta *models.ApiUserMeta, err error) {
 	return nil, nil
 }
+
 func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error) {
 	return 0, nil
 }
@@ -105,14 +113,23 @@ func (testUnitRepository *TestUnitRepository) Get(unitid int64) (unit *models.Dt
 	return testUnitRepository.Unit, testUnitRepository.Err
 }
 
+func (testUnitRepository *TestUnitRepository) GetMeta() (unit *models.ApiShortMetaUnit, err error) {
+	return nil, nil
+}
+
+func (testUnitRepository *TestUnitRepository) GetAll(filter string) (units *[]models.ApiShortUnit, err error) {
+	return nil, nil
+}
+
 func (testUnitRepository *TestUnitRepository) Create(unit *models.DtoUnit) (err error) {
 	return nil
 }
+
 func (testUnitRepository *TestUnitRepository) Update(unit *models.DtoUnit) (err error) {
 	return nil
 }
 
-func (testUnitRepository *TestUnitRepository) Delete(unitid int64) (err error) {
+func (testUnitRepository *TestUnitRepository) Deactivate(*models.DtoUnit) (err error) {
 	return nil
 }
 
@@ -174,6 +191,21 @@ func (testTemplateRepository *TestTemplateRepository) GenerateHTML(name string, 
 	return nil
 }
 
+type TestLogger struct {
+}
+
+func (testLogger *TestLogger) Info(query string, args ...interface{}) {
+}
+
+func (testLogger *TestLogger) Warning(query string, args ...interface{}) {
+}
+
+func (testLogger *TestLogger) Error(query string, args ...interface{}) {
+}
+
+func (testLogger *TestLogger) Fatalf(query string, args ...interface{}) {
+}
+
 func TestCheckUserRolesMatching(t *testing.T) {
 	var roles = []models.UserRole{models.USER_ROLE_DEVELOPER, models.USER_ROLE_ADMINISTRATOR}
 	var language = "eng"
@@ -195,6 +227,8 @@ func TestCheckUserRolesNonMatching(t *testing.T) {
 	var grouprepository = new(TestGroupRepository)
 	grouprepository.Groups = &([]models.ApiGroup{{3, "Supplier"}, {4, "Customer"}})
 	grouprepository.Err = nil
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := CheckUserRoles(roles, language, r, grouprepository)
 	if err == nil {
@@ -213,7 +247,10 @@ func TestCheckUserNotFound(t *testing.T) {
 	userrepository.User = nil
 	userrepository.Err = errors.New("User not found")
 
-	err := CheckUser(userid, language, r, userrepository)
+	dtouser, err := CheckUser(userid, language, r, userrepository)
+	if dtouser != nil {
+		t.Error("Check user should not return data")
+	}
 	if err == nil {
 		t.Error("Check user should return error")
 	}
@@ -229,8 +266,13 @@ func TestCheckUserNotActive(t *testing.T) {
 	var userrepository = new(TestUserRepository)
 	userrepository.User = &(models.DtoUser{Active: false, Confirmed: true})
 	userrepository.Err = nil
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
-	err := CheckUser(userid, language, r, userrepository)
+	dtouser, err := CheckUser(userid, language, r, userrepository)
+	if dtouser != nil {
+		t.Error("Check user should not return data")
+	}
 	if err == nil {
 		t.Error("Check user should return error")
 	}
@@ -246,8 +288,13 @@ func TestCheckUserNotConfirmed(t *testing.T) {
 	var userrepository = new(TestUserRepository)
 	userrepository.User = &(models.DtoUser{Active: true, Confirmed: false})
 	userrepository.Err = nil
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
-	err := CheckUser(userid, language, r, userrepository)
+	dtouser, err := CheckUser(userid, language, r, userrepository)
+	if dtouser != nil {
+		t.Error("Check user should not return data")
+	}
 	if err == nil {
 		t.Error("Check user should return error")
 	}
@@ -261,12 +308,20 @@ func TestCheckUserFound(t *testing.T) {
 	var language = "eng"
 	var r = new(Renderer)
 	var userrepository = new(TestUserRepository)
-	userrepository.User = &(models.DtoUser{Active: true, Confirmed: true})
+	userrepository.User = &(models.DtoUser{ID: userid, Active: true, Confirmed: true})
 	userrepository.Err = nil
 
-	err := CheckUser(userid, language, r, userrepository)
+	dtouser, err := CheckUser(userid, language, r, userrepository)
+	if dtouser == nil {
+		t.Error("Check user should return data")
+	}
 	if err != nil {
 		t.Error("Check user should not return error")
+	}
+	if dtouser != nil {
+		if dtouser.ID != userid {
+			t.Error("Check user wrong return data")
+		}
 	}
 }
 
@@ -278,7 +333,7 @@ func TestCheckUnitNotFound(t *testing.T) {
 	unitrepository.Unit = nil
 	unitrepository.Err = errors.New("Unit not found")
 
-	err := CheckUnit(unitid, language, r, unitrepository)
+	err := CheckUnitValidity(unitid, language, r, unitrepository)
 	if err == nil {
 		t.Error("Check unit should return error")
 	}
@@ -295,7 +350,7 @@ func TestCheckUnitFound(t *testing.T) {
 	unitrepository.Unit = &(models.DtoUnit{})
 	unitrepository.Err = nil
 
-	err := CheckUnit(unitid, language, r, unitrepository)
+	err := CheckUnitValidity(unitid, language, r, unitrepository)
 	if err != nil {
 		t.Error("Check unit should not return error")
 	}
@@ -305,6 +360,8 @@ func TestCheckPrimaryEmailZero(t *testing.T) {
 	var language = "eng"
 	var r = new(Renderer)
 	var user = new(models.ViewApiUserFull)
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := CheckPrimaryEmail(user, language, r)
 	if err == nil {
@@ -320,6 +377,8 @@ func TestCheckPrimaryEmailMany(t *testing.T) {
 	var r = new(Renderer)
 	var user = new(models.ViewApiUserFull)
 	user.Emails = []models.ViewApiEmail{{Primary: true}, {Primary: true}}
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := CheckPrimaryEmail(user, language, r)
 	if err == nil {
@@ -336,6 +395,8 @@ func TestCheckPrimaryEmailUserNotConfirmed(t *testing.T) {
 	var user = new(models.ViewApiUserFull)
 	user.Confirmed = false
 	user.Emails = []models.ViewApiEmail{{Primary: true, Confirmed: true}}
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := CheckPrimaryEmail(user, language, r)
 	if err == nil {
@@ -352,6 +413,8 @@ func TestCheckPrimaryEmailEmailNotConfirmed(t *testing.T) {
 	var user = new(models.ViewApiUserFull)
 	user.Confirmed = true
 	user.Emails = []models.ViewApiEmail{{Primary: true, Confirmed: false}}
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	err := CheckPrimaryEmail(user, language, r)
 	if err == nil {
@@ -382,6 +445,8 @@ func TestCheckEmailAvailabilityExistsError(t *testing.T) {
 	var emailrepository = new(TestEmailRepository)
 	emailrepository.Found = false
 	emailrepository.ExistsErr = errors.New("Email error")
+	var testlogger = new(TestLogger)
+	InitLogger(testlogger)
 
 	_, err := CheckEmailAvailability(value, language, r, emailrepository)
 	if err == nil {

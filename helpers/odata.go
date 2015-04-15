@@ -49,7 +49,7 @@ func GetLimitQuery(request *http.Request, r render.Render, language string) (que
 		limits := strings.Split(limit, ":")
 		if len(limits) != PARAM_LIMIT_NUMBER {
 			log.Error("Wrong number of limit parameter elements %v", len(limits))
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return "", errors.New("Wrong number of parameters")
 		}
@@ -57,22 +57,22 @@ func GetLimitQuery(request *http.Request, r render.Render, language string) (que
 		offset, err = strconv.ParseInt(limits[PARAM_LIMIT_LOW], 0, 64)
 		if err != nil {
 			log.Error("Wrong limit offset %v", limits[PARAM_LIMIT_LOW])
-			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return "", err
 		}
 		if offset < 0 {
 			log.Error("Wrong limit offset %v", limits[PARAM_LIMIT_LOW])
-			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return "", errors.New("Wrong offset")
 		}
 
 		count, err = strconv.ParseInt(limits[PARAM_LIMIT_HIGH], 0, 64)
 		if err != nil {
 			log.Error("Wrong limit count %v", limits[PARAM_LIMIT_HIGH])
-			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return "", err
 		}
 
@@ -95,7 +95,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 			elements := strings.Split(element, ":")
 			if len(elements) != PARAM_SORT_NUMBER {
 				log.Error("Wrong number of sort parameter elements %v", len(elements))
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
 				return nil, errors.New("Wrong parameter number")
 			}
@@ -104,7 +104,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 			valid, err = checker.Check(elements[PARAM_SORT_FIELD])
 			if !valid || err != nil {
 				log.Error("Unknown field name %v", elements[PARAM_SORT_FIELD])
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
 				return nil, errors.New("Uknown field")
 			}
@@ -112,7 +112,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 			if strings.ToLower(elements[PARAM_SORT_ORDER]) != PARAM_SORT_ASC &&
 				strings.ToLower(elements[PARAM_SORT_ORDER]) != PARAM_SORT_DESC {
 				log.Error("Unknown sort operation %v", elements[PARAM_SORT_ORDER])
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
 				return nil, errors.New("Uknown sort")
 			}
@@ -120,7 +120,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 		}
 		if len(*sorts) == 0 {
 			log.Error("Sort is not found")
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return nil, errors.New("Sort not found")
 		}
@@ -139,7 +139,7 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 			elements := strings.Split(element, ":")
 			if len(elements) != PARAM_QUERY_NUMBER {
 				log.Error("Wrong number of filter parameter elements %v", len(elements))
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
 				return nil, errors.New("Wrong parameter number")
 			}
@@ -155,7 +155,7 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 			if allfields {
 				if strings.Contains(elements[PARAM_FILTER_VALUE], "'") {
 					log.Error("Wrong field value %v for %v", elements[PARAM_FILTER_VALUE], elements[PARAM_FILTER_FIELD])
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 						Message: config.Localization[language].Errors.Api.Data_Wrong})
 					return nil, errors.New("Wrong value")
 				}
@@ -168,13 +168,13 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 				field, value, errField, errValue = extractor.Extract(elements[PARAM_FILTER_FIELD], elements[PARAM_FILTER_VALUE])
 				if errField != nil {
 					log.Error("Unknown field name %v", elements[PARAM_FILTER_FIELD])
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 						Message: config.Localization[language].Errors.Api.Data_Wrong})
 					return nil, errField
 				}
 				if errValue != nil {
 					log.Error("Wrong field value %v for %v", elements[PARAM_FILTER_VALUE], elements[PARAM_FILTER_FIELD])
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 						Message: config.Localization[language].Errors.Api.Data_Wrong})
 					return nil, errValue
 				}
@@ -199,7 +199,7 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 				value = strings.Replace(value, "*", "%", -1)
 			default:
 				log.Error("Unknown filter operation %v", elements[PARAM_FILTER_OP])
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
 				return nil, errors.New("Uknown filter")
 			}
@@ -216,7 +216,7 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 		}
 		if len(*filters) == 0 {
 			log.Error("Filter is not found")
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong})
 			return nil, errors.New("Filter not found")
 		}

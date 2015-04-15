@@ -1,27 +1,31 @@
 package server
 
 import (
+	"application/config"
 	"fmt"
-	"net/http"
-
 	"github.com/go-martini/martini"
 	logging "github.com/op/go-logging"
+	"net/http"
 )
 
 var (
-	logger = logging.MustGetLogger("server")
+	log config.Logger = logging.MustGetLogger("server")
 )
 
-func logRequest(context martini.Context, request *http.Request, response http.ResponseWriter) {
+func InitLogger(logger config.Logger) {
+	log = logger
+}
+
+func LogRequest(context martini.Context, request *http.Request, response http.ResponseWriter) {
 	responseWriter := response.(martini.ResponseWriter)
-	logger.Info("Request: %s %s", request.Method, request.URL.String())
+	log.Info("Request: %s %s", request.Method, request.URL.String())
 	context.Next()
 	responseInfo := fmt.Sprintf("Response: %d %s", responseWriter.Status(), http.StatusText(responseWriter.Status()))
 	if responseWriter.Status() < 400 {
-		logger.Info(responseInfo)
+		log.Info(responseInfo)
 	} else if responseWriter.Status() < 500 {
-		logger.Warning(responseInfo)
+		log.Warning(responseInfo)
 	} else {
-		logger.Error(responseInfo)
+		log.Error(responseInfo)
 	}
 }

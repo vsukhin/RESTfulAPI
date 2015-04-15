@@ -70,8 +70,8 @@ func DeleteFile(r render.Render, params martini.Params, filerepository services.
 	}
 
 	if file.Permanent {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -90,8 +90,8 @@ func GetImage(r render.Render, params martini.Params, filerepository services.Fi
 	filetype := params[helpers.PARAM_NAME_TYPE]
 	if filetype == "" || len(filetype) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", filetype)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 

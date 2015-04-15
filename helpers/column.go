@@ -20,13 +20,13 @@ func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columnt
 	tablecolumnrepository services.TableColumnRepository, language string) (dtotablecolumn *models.DtoTableColumn, err error) {
 	dtotablecolumn, err = tablecolumnrepository.Get(columnid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 	if !dtotablecolumn.Active {
 		log.Error("Table column is not active %v", columnid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Column is not active")
 	}
@@ -38,7 +38,7 @@ func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columnt
 	}
 	if dtotablecolumn.Customer_Table_ID != tableid {
 		log.Error("Column %v doesn't belong table %v", columnid, tableid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Non matched table and column")
 	}
@@ -71,13 +71,13 @@ func CheckTableColumn(r render.Render, params martini.Params, columntypereposito
 func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTypeRepository, typeid int64, language string) (err error) {
 	dtocolumntype, err := columntyperepository.Get(typeid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return errors.New("Column is not found")
 	}
 	if !dtocolumntype.Active {
 		log.Error("Column type is not active %v", typeid)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return errors.New("Colimn is not active")
 	}
@@ -89,8 +89,8 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnr
 	language string) (tablecolumns *[]models.DtoTableColumn, err error) {
 	tablecolumns, err = tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 
@@ -104,8 +104,8 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnr
 		}
 		if !found {
 			log.Error("Can't found column %v", tablecolumn.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return nil, errors.New("Column not found")
 		}
 	}
@@ -120,8 +120,8 @@ func CheckColumnSet(ids models.IDs, tableid int64, r render.Render, tablecolumnr
 		}
 		if !found {
 			log.Error("Can't found column %v for table", id)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return nil, errors.New("Column not found")
 		}
 	}
@@ -133,8 +133,8 @@ func FindFreeColumn(tableid int64, r render.Render, tablecolumnrepository servic
 	language string) (fieldnum byte, err error) {
 	tablecolumns, err := tablecolumnrepository.GetByTable(tableid)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return 0, err
 	}
 
@@ -162,8 +162,8 @@ func FindFreeColumn(tableid int64, r render.Render, tablecolumnrepository servic
 	}
 	if !found {
 		log.Error("Can't find free column for table %v", tableid)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return 0, errors.New("No free column")
 	}
 

@@ -3,6 +3,7 @@
 package services
 
 import (
+	"application/config"
 	"database/sql"
 	"github.com/coopernurse/gorp"
 	logging "github.com/op/go-logging"
@@ -28,8 +29,12 @@ type Repository struct {
 }
 
 var (
-	log *logging.Logger = logging.MustGetLogger("services")
+	log config.Logger = logging.MustGetLogger("services")
 )
+
+func InitLogger(logger config.Logger) {
+	log = logger
+}
 
 // Конструктор создания объекта репозитория
 func NewRepository(dbmap DbMap, table string) *Repository {
