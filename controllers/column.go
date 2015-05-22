@@ -14,7 +14,7 @@ import (
 )
 
 // get /api/v1.0/tables/fieldtypes/
-func GetColumnTypes(r render.Render, columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
+func GetColumnTypes(w http.ResponseWriter, r render.Render, columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
 	columntypes, err := columntyperepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -22,7 +22,7 @@ func GetColumnTypes(r render.Render, columntyperepository services.ColumnTypeRep
 		return
 	}
 
-	r.JSON(http.StatusOK, columntypes)
+	helpers.RenderJSONArray(columntypes, len(*columntypes), w, r)
 }
 
 // post /api/v1.0/tables/:tid/field/
@@ -40,20 +40,15 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	if err != nil {
 		return
 	}
-
-	var typeid int64 = 0
-	if viewtablecolumn.TypeID != 0 {
-		if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
-			return
-		}
-		typeid = viewtablecolumn.TypeID
+	if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
+		return
 	}
 
 	dtotablecolumn := new(models.DtoTableColumn)
 	dtotablecolumn.Name = viewtablecolumn.Name
 	dtotablecolumn.Created = time.Now()
 	dtotablecolumn.Position = viewtablecolumn.Position
-	dtotablecolumn.Column_Type_ID = typeid
+	dtotablecolumn.Column_Type_ID = viewtablecolumn.TypeID
 	dtotablecolumn.Customer_Table_ID = tableid
 	dtotablecolumn.Prebuilt = false
 	dtotablecolumn.FieldNum, err = helpers.FindFreeColumn(tableid, r, tablecolumnrepository, session.Language)
@@ -63,7 +58,7 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	dtotablecolumn.Active = true
 	dtotablecolumn.Edition = 0
 
-	err = tablecolumnrepository.Create(dtotablecolumn)
+	err = tablecolumnrepository.Create(dtotablecolumn, nil)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -74,7 +69,7 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 }
 
 // get /api/v1.0/tables/:tid/field/
-func GetTableColumns(r render.Render, params martini.Params, tablecolumnrepository services.TableColumnRepository,
+func GetTableColumns(w http.ResponseWriter, r render.Render, params martini.Params, tablecolumnrepository services.TableColumnRepository,
 	customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
 	if err != nil {
@@ -97,7 +92,7 @@ func GetTableColumns(r render.Render, params martini.Params, tablecolumnreposito
 		*apicolumns = append(*apicolumns, *models.NewApiTableColumn(tablecolumn.ID, tablecolumn.Name, tablecolumn.Column_Type_ID, tablecolumn.Position))
 	}
 
-	r.JSON(http.StatusOK, apicolumns)
+	helpers.RenderJSONArray(apicolumns, len(*apicolumns), w, r)
 }
 
 // get /api/v1.0/tables/:tid/field/:cid/
@@ -128,20 +123,16 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
-
-	var typeid int64 = 0
-	if viewtablecolumn.TypeID != 0 {
-		if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
-			return
-		}
-		typeid = viewtablecolumn.TypeID
+	if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
+		return
 	}
+
 	newtablecolumn := new(models.DtoTableColumn)
 	*newtablecolumn = *oldtablecolumn
 
 	newtablecolumn.Name = viewtablecolumn.Name
 	newtablecolumn.Position = viewtablecolumn.Position
-	newtablecolumn.Column_Type_ID = typeid
+	newtablecolumn.Column_Type_ID = viewtablecolumn.TypeID
 	newtablecolumn.Created = time.Now()
 	newtablecolumn.Edition += 1
 
@@ -184,8 +175,9 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertablerepo
 }
 
 // put /api/v1.0/tables/:tid/sequence/
-func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.ViewApiOrderTableColumns, r render.Render, params martini.Params,
-	customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
+func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.ViewApiOrderTableColumns, w http.ResponseWriter, r render.Render,
+	params martini.Params, customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
+	session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -210,12 +202,12 @@ func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.
 		}
 	}
 
-	err = tablecolumnrepository.UpdateBriefly(dtotablecolumns, true)
+	err = tablecolumnrepository.UpdateAll(dtotablecolumns)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	r.JSON(http.StatusOK, viewordertablecolumns)
+	helpers.RenderJSONArray(viewordertablecolumns, len(viewordertablecolumns), w, r)
 }

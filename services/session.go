@@ -21,7 +21,7 @@ type SessionRepository interface {
 	Create(session *models.DtoSession, inTrans bool) (err error)
 	Update(session *models.DtoSession, briefly bool, inTrans bool) (err error)
 	Delete(token string, inTrans bool) (err error)
-	DeleteByUser(userid int64, inTrans bool) (err error)
+	DeleteByUser(userid int64, trans *gorp.Transaction) (err error)
 }
 
 type SessionService struct {
@@ -143,7 +143,11 @@ func (sessionservice *SessionService) Create(session *models.DtoSession, inTrans
 		}
 	}
 
-	err = sessionservice.DbContext.Insert(session)
+	if inTrans {
+		err = trans.Insert(session)
+	} else {
+		err = sessionservice.DbContext.Insert(session)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -152,7 +156,7 @@ func (sessionservice *SessionService) Create(session *models.DtoSession, inTrans
 		return err
 	}
 
-	err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, false)
+	err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -183,7 +187,11 @@ func (sessionservice *SessionService) Update(session *models.DtoSession, briefly
 		}
 	}
 
-	_, err = sessionservice.DbContext.Update(session)
+	if inTrans {
+		_, err = trans.Update(session)
+	} else {
+		_, err = sessionservice.DbContext.Update(session)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -193,7 +201,7 @@ func (sessionservice *SessionService) Update(session *models.DtoSession, briefly
 	}
 
 	if !briefly {
-		err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, false)
+		err = sessionservice.GroupRepository.SetBySession(session.AccessToken, &session.Roles, trans)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -225,7 +233,7 @@ func (sessionservice *SessionService) Delete(token string, inTrans bool) (err er
 		}
 	}
 
-	err = sessionservice.GroupRepository.SetBySession(token, &[]models.UserRole{}, false)
+	err = sessionservice.GroupRepository.SetBySession(token, &[]models.UserRole{}, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -234,7 +242,11 @@ func (sessionservice *SessionService) Delete(token string, inTrans bool) (err er
 		return err
 	}
 
-	_, err = sessionservice.DbContext.Exec("delete from "+sessionservice.Table+" where token = ?", token)
+	if inTrans {
+		_, err = trans.Exec("delete from "+sessionservice.Table+" where token = ?", token)
+	} else {
+		_, err = sessionservice.DbContext.Exec("delete from "+sessionservice.Table+" where token = ?", token)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -254,41 +266,21 @@ func (sessionservice *SessionService) Delete(token string, inTrans bool) (err er
 	return nil
 }
 
-func (sessionservice *SessionService) DeleteByUser(userid int64, inTrans bool) (err error) {
-	var trans *gorp.Transaction
-
-	if inTrans {
-		trans, err = sessionservice.DbContext.Begin()
-		if err != nil {
-			log.Error("Error during deleting session object for user in database %v", err)
-			return err
-		}
-	}
-
-	err = sessionservice.GroupRepository.DeleteByUser(userid)
+func (sessionservice *SessionService) DeleteByUser(userid int64, trans *gorp.Transaction) (err error) {
+	err = sessionservice.GroupRepository.DeleteByUser(userid, trans)
 	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
 		log.Error("Error during deleting session object for user in database %v with value %v", err, userid)
 		return err
 	}
 
-	_, err = sessionservice.DbContext.Exec("delete from "+sessionservice.Table+" where user_id = ?", userid)
+	if trans != nil {
+		_, err = trans.Exec("delete from "+sessionservice.Table+" where user_id = ?", userid)
+	} else {
+		_, err = sessionservice.DbContext.Exec("delete from "+sessionservice.Table+" where user_id = ?", userid)
+	}
 	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
 		log.Error("Error during deleting session object for user in database %v with value %v", err, userid)
 		return err
-	}
-
-	if inTrans {
-		err = trans.Commit()
-		if err != nil {
-			log.Error("Error during deleting session object for user in database %v", err)
-			return err
-		}
 	}
 
 	return nil

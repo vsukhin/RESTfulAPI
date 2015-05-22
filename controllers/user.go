@@ -24,7 +24,7 @@ const (
 func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render, params martini.Params,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, emailrepository services.EmailRepository,
 	unitrepository services.UnitRepository, captcharepository services.CaptchaRepository, templaterepository services.TemplateRepository,
-	grouprepository services.GroupRepository) {
+	grouprepository services.GroupRepository, classifierrepository services.ClassifierRepository) {
 	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
@@ -77,6 +77,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtouser.LastLogin = dtouser.Created
 	dtouser.Active = true
 	dtouser.Confirmed = false
+	dtouser.Surname = "Default surname for user"
 	dtouser.Name = "Default name for user"
 	dtouser.Language = config.Configuration.Server.DefaultLanguage
 	dtouser.Roles = *roles
@@ -107,6 +108,10 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtouser.Code = token
 	dtouser.Password = token
 
+	classifier, err := helpers.CheckClassifier(models.CLASSIFIER_TYPE_UNKNOWN, r, classifierrepository, config.Configuration.Server.DefaultLanguage)
+	if err != nil {
+		return
+	}
 	dtoemail := new(models.DtoEmail)
 	dtoemail.Email = viewuser.Login
 	dtoemail.Created = dtouser.LastLogin
@@ -116,8 +121,10 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtoemail.Code = dtouser.Code
 	dtoemail.Language = dtouser.Language
 	dtoemail.Exists = emailExists
+	dtoemail.Classifier_ID = classifier.ID
 
 	dtouser.Emails = &[]models.DtoEmail{*dtoemail}
+	dtouser.MobilePhones = new([]models.DtoMobilePhone)
 
 	err = userrepository.Create(dtouser, true)
 	if err != nil {
@@ -143,15 +150,15 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 
 	for _, confEmail := range *dtouser.Emails {
 		subject := config.Localization[confEmail.Language].Messages.RegistrationSubject
-		buf, err := templaterepository.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language, request.Host, confEmail.Code),
-			services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
+		buf, err := templaterepository.GenerateText(models.NewDtoCodeTemplate(models.NewDtoTemplate(confEmail.Email, confEmail.Language, request.Host),
+			confEmail.Code), services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 			return
 		}
 
-		err = emailrepository.SendEmail(confEmail.Email, subject, buf.String())
+		err = emailrepository.SendEmail(confEmail.Email, subject, buf.String(), "")
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -342,7 +349,7 @@ func DeletePasswordRestoring(r render.Render, params martini.Params, userreposit
 }
 
 // get /api/v1.0/user/groups/
-func GetGroups(r render.Render, grouprepository services.GroupRepository, session *models.DtoSession) {
+func GetGroups(w http.ResponseWriter, r render.Render, grouprepository services.GroupRepository, session *models.DtoSession) {
 	groups, err := grouprepository.GetByUserExt(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -350,7 +357,7 @@ func GetGroups(r render.Render, grouprepository services.GroupRepository, sessio
 		return
 	}
 
-	r.JSON(http.StatusOK, groups)
+	helpers.RenderJSONArray(groups, len(*groups), w, r)
 }
 
 // get /api/v1.0/user/
@@ -402,7 +409,7 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 }
 
 // get /api/v1.0/user/emails/
-func GetUserEmails(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+func GetUserEmails(w http.ResponseWriter, r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -410,17 +417,17 @@ func GetUserEmails(r render.Render, userrepository services.UserRepository, sess
 		return
 	}
 
-	emails := new([]models.ApiEmail)
+	emails := new([]models.ViewApiEmail)
 	for _, email := range *user.Emails {
-		*emails = append(*emails, *models.NewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
+		*emails = append(*emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
 			email.Language, email.Classifier_ID))
 	}
 
-	r.JSON(http.StatusOK, emails)
+	helpers.RenderJSONArray(emails, len(*emails), w, r)
 }
 
 // put /api/v1.0/user/emails/
-func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render,
+func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render,
 	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, userrepository services.UserRepository,
 	templaterepository services.TemplateRepository, classifierrepository services.ClassifierRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
@@ -462,16 +469,8 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 				break
 			}
 		}
-		classifier, err := classifierrepository.Get(updEmail.Classifier_ID)
+		classifier, err := helpers.CheckClassifier(updEmail.Classifier_ID, r, classifierrepository, session.Language)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-			return
-		}
-		if !classifier.Active {
-			log.Error("Classifier is not active %v", classifier.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 
@@ -544,13 +543,13 @@ func UpdateUserEmails(errors binding.Errors, updateemails models.UpdateEmails, r
 		return
 	}
 
-	emails := new([]models.ApiEmail)
+	emails := new([]models.ViewApiEmail)
 	for _, email := range *user.Emails {
-		*emails = append(*emails, *models.NewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
+		*emails = append(*emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
 			email.Language, email.Classifier_ID))
 	}
 
-	r.JSON(http.StatusOK, emails)
+	helpers.RenderJSONArray(emails, len(*emails), w, r)
 }
 
 // patch /api/v1.0/user/password/
@@ -565,7 +564,7 @@ func ChangePassword(errors binding.Errors, changepassword models.ChangePassword,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
-	if len(changepassword.NewPassword) < PASSWORD_LENGTH_MIN {
+	if len([]rune(changepassword.NewPassword)) < PASSWORD_LENGTH_MIN {
 		log.Error("Password is too simple %v", changepassword.NewPassword)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PASSWORD_TOOSIMPLE,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Password_Too_Simple})
@@ -606,7 +605,7 @@ func ChangePassword(errors binding.Errors, changepassword models.ChangePassword,
 }
 
 // get /api/v1.0/user/mobilephones/
-func GetUserMobilePhones(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+func GetUserMobilePhones(w http.ResponseWriter, r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
 	user, err := userrepository.Get(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -620,11 +619,11 @@ func GetUserMobilePhones(r render.Render, userrepository services.UserRepository
 			phone.Language, phone.Classifier_ID))
 	}
 
-	r.JSON(http.StatusOK, phones)
+	helpers.RenderJSONArray(phones, len(*phones), w, r)
 }
 
 // put /api/v1.0/user/mobilephones/
-func UpdateUserMobilePhones(errors binding.Errors, updatephones models.UpdateMobilePhones, request *http.Request, r render.Render,
+func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, updatephones models.UpdateMobilePhones, request *http.Request, r render.Render,
 	mobilephonerepository services.MobilePhoneRepository, userrepository services.UserRepository,
 	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
@@ -663,16 +662,8 @@ func UpdateUserMobilePhones(errors binding.Errors, updatephones models.UpdateMob
 				break
 			}
 		}
-		classifier, err := classifierrepository.Get(updMobilePhone.Classifier_ID)
+		classifier, err := helpers.CheckClassifier(updMobilePhone.Classifier_ID, r, classifierrepository, session.Language)
 		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-			return
-		}
-		if !classifier.Active {
-			log.Error("Classifier is not active %v", classifier.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 
@@ -721,5 +712,5 @@ func UpdateUserMobilePhones(errors binding.Errors, updatephones models.UpdateMob
 			phone.Language, phone.Classifier_ID))
 	}
 
-	r.JSON(http.StatusOK, phones)
+	helpers.RenderJSONArray(phones, len(*phones), w, r)
 }

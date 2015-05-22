@@ -17,7 +17,7 @@ type MessageRepository interface {
 	Create(message *models.DtoMessage, inTrans bool) (err error)
 	Update(message *models.DtoMessage) (err error)
 	Delete(message *models.DtoMessage, inTrans bool) (err error)
-	DeleteByUser(user_id int64, inTrans bool) (err error)
+	DeleteByUser(user_id int64, trans *gorp.Transaction) (err error)
 }
 
 type MessageService struct {
@@ -142,7 +142,11 @@ func (messageservice *MessageService) Create(message *models.DtoMessage, inTrans
 		}
 	}
 
-	err = messageservice.DbContext.Insert(message)
+	if inTrans {
+		err = trans.Insert(message)
+	} else {
+		err = messageservice.DbContext.Insert(message)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -151,7 +155,11 @@ func (messageservice *MessageService) Create(message *models.DtoMessage, inTrans
 		return err
 	}
 
-	_, err = messageservice.DbContext.Exec("insert into user_messages (message_id, user_id) values (?, ?)", message.ID, message.User_ID)
+	if inTrans {
+		_, err = trans.Exec("insert into user_messages (message_id, user_id) values (?, ?)", message.ID, message.User_ID)
+	} else {
+		_, err = messageservice.DbContext.Exec("insert into user_messages (message_id, user_id) values (?, ?)", message.ID, message.User_ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -192,7 +200,11 @@ func (messageservice *MessageService) Delete(message *models.DtoMessage, inTrans
 		}
 	}
 
-	_, err = messageservice.DbContext.Exec("delete from user_messages where message_id = ? and user_id = ?", message.ID, message.User_ID)
+	if inTrans {
+		_, err = trans.Exec("delete from user_messages where message_id = ? and user_id = ?", message.ID, message.User_ID)
+	} else {
+		_, err = messageservice.DbContext.Exec("delete from user_messages where message_id = ? and user_id = ?", message.ID, message.User_ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -201,7 +213,11 @@ func (messageservice *MessageService) Delete(message *models.DtoMessage, inTrans
 		return err
 	}
 
-	_, err = messageservice.DbContext.Exec("delete from "+messageservice.Table+" where id = ?", message.ID)
+	if inTrans {
+		_, err = trans.Exec("delete from "+messageservice.Table+" where id = ?", message.ID)
+	} else {
+		_, err = messageservice.DbContext.Exec("delete from "+messageservice.Table+" where id = ?", message.ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -221,41 +237,25 @@ func (messageservice *MessageService) Delete(message *models.DtoMessage, inTrans
 	return nil
 }
 
-func (messageservice *MessageService) DeleteByUser(user_id int64, inTrans bool) (err error) {
-	var trans *gorp.Transaction
-
-	if inTrans {
-		trans, err = messageservice.DbContext.Begin()
-		if err != nil {
-			log.Error("Error during deleting message object in database %v", err)
-			return err
-		}
+func (messageservice *MessageService) DeleteByUser(user_id int64, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		_, err = trans.Exec("delete from user_messages where user_id = ?", user_id)
+	} else {
+		_, err = messageservice.DbContext.Exec("delete from user_messages where user_id = ?", user_id)
 	}
-
-	_, err = messageservice.DbContext.Exec("delete from user_messages where user_id = ?", user_id)
 	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
 		log.Error("Error during deleting message object in database %v with value %v", err, user_id)
 		return err
 	}
 
-	_, err = messageservice.DbContext.Exec("delete from "+messageservice.Table+" where user_id = ?", user_id)
+	if trans != nil {
+		_, err = trans.Exec("delete from "+messageservice.Table+" where user_id = ?", user_id)
+	} else {
+		_, err = messageservice.DbContext.Exec("delete from "+messageservice.Table+" where user_id = ?", user_id)
+	}
 	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
 		log.Error("Error during deleting message object in database %v with value %v", err, user_id)
 		return err
-	}
-
-	if inTrans {
-		err = trans.Commit()
-		if err != nil {
-			log.Error("Error during deleting message object in database %v", err)
-			return err
-		}
 	}
 
 	return nil

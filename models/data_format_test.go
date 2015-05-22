@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestApiDataFormat(t *testing.T) {
+func TestNewApiDataFormat(t *testing.T) {
 	var id int = 1
 	var name = "format"
 	var description = "description"

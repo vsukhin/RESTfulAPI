@@ -34,7 +34,7 @@ func CheckRowValidity(tableid int64, rowid int64, r render.Render, tablerowrepos
 		log.Error("Row %v doesn't belong table %v", rowid, tableid)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, errors.New("Non matched table and row")
+		return nil, errors.New("Not matched table and row")
 	}
 
 	return dtotablerow, nil

@@ -8,7 +8,6 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
-	"regexp"
 	"time"
 	"types"
 )
@@ -17,29 +16,18 @@ func ValidateCell(value string, dtotablecolumn *models.DtoTableColumn, r render.
 	columntyperepository services.ColumnTypeRepository, language string) (valid bool, err error) {
 	valid = true
 
-	if dtotablecolumn.Column_Type_ID != 0 {
-		dtocolumntype, err := columntyperepository.Get(dtotablecolumn.Column_Type_ID)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return false, err
-		}
+	dtocolumntype, err := columntyperepository.Get(dtotablecolumn.Column_Type_ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return false, err
+	}
 
-		if dtocolumntype.Regexp != "" {
-			valid, err = regexp.MatchString(dtocolumntype.Regexp, value)
-			if err != nil {
-				log.Error("Error during running reg exp %v with value %v", err, dtocolumntype.Regexp)
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return false, err
-			}
-		}
-		if dtocolumntype.Required {
-			if value == "" {
-				valid = false
-			}
-		}
-
+	valid, _, err = columntyperepository.Validate(dtocolumntype, nil, value)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return false, err
 	}
 
 	return valid, nil

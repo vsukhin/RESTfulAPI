@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func TestApiColumnType(t *testing.T) {
-	var id int64 = 1
+func TestNewApiColumnType(t *testing.T) {
+	var id int = 1
 	var name = "column"
 	var description = "description"
 	var required = true
@@ -40,7 +40,7 @@ func TestApiColumnType(t *testing.T) {
 }
 
 func TestNewDtoColumnType(t *testing.T) {
-	var id int64 = 1
+	var id int = 1
 	var name = "column"
 	var description = "description"
 	var required = true

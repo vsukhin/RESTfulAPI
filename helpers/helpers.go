@@ -67,3 +67,12 @@ func CheckParameterInt(r render.Render, param string, language string) (value in
 
 	return value, nil
 }
+
+func RenderJSONArray(object interface{}, length int, w http.ResponseWriter, r render.Render) {
+	if length != 0 {
+		r.JSON(http.StatusOK, object)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+	}
+}

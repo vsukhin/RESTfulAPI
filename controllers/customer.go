@@ -14,20 +14,8 @@ import (
 	"types"
 )
 
-// get /api/v1.0/classification/contacts/
-func GetAvailableContacts(r render.Render, classifierrepository services.ClassifierRepository, session *models.DtoSession) {
-	classifiers, err := classifierrepository.GetAllAvailable()
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-
-	r.JSON(http.StatusOK, classifiers)
-}
-
 // get /api/v1.0/customers/services/
-func GetAvailableFacilities(r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
+func GetAvailableFacilities(w http.ResponseWriter, r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
 	facilities, err := facilityrepository.GetAllAvailable()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -35,7 +23,7 @@ func GetAvailableFacilities(r render.Render, facilityrepository services.Facilit
 		return
 	}
 
-	r.JSON(http.StatusOK, facilities)
+	helpers.RenderJSONArray(facilities, len(*facilities), w, r)
 }
 
 // options /api/v1.0/projects/
@@ -51,10 +39,10 @@ func GetMetaProjects(r render.Render, projectrepository services.ProjectReposito
 }
 
 // get /api/v1.0/projects/
-func GetProjects(request *http.Request, r render.Render, projectrepository services.ProjectRepository, session *models.DtoSession) {
+func GetAllProjects(w http.ResponseWriter, request *http.Request, r render.Render, projectrepository services.ProjectRepository, session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
-	filters, err := helpers.GetFilterArray(new(models.ProjectSearch), nil, request, r, session.Language)
+	filters, err := helpers.GetFilterArray(new(models.ProjectLongSearch), nil, request, r, session.Language)
 	if err != nil {
 		return
 	}
@@ -72,7 +60,7 @@ func GetProjects(request *http.Request, r render.Render, projectrepository servi
 	}
 
 	var sorts *[]models.OrderExp
-	sorts, err = helpers.GetOrderArray(new(models.ProjectSearch), request, r, session.Language)
+	sorts, err = helpers.GetOrderArray(new(models.ProjectLongSearch), request, r, session.Language)
 	if err != nil {
 		return
 	}
@@ -99,7 +87,17 @@ func GetProjects(request *http.Request, r render.Render, projectrepository servi
 		return
 	}
 
-	r.JSON(http.StatusOK, projects)
+	helpers.RenderJSONArray(projects, len(*projects), w, r)
+}
+
+// get /api/v1.0/projects/onthego/
+func GetActiveProjects(request *http.Request, w http.ResponseWriter, r render.Render, projectrepository services.ProjectRepository, session *models.DtoSession) {
+	helpers.GetProjects(session.UserID, true, request, w, r, projectrepository, session.Language)
+}
+
+// get /api/v1.0/projects/wasarchived/
+func GetArchiveProjects(request *http.Request, w http.ResponseWriter, r render.Render, projectrepository services.ProjectRepository, session *models.DtoSession) {
+	helpers.GetProjects(session.UserID, false, request, w, r, projectrepository, session.Language)
 }
 
 // post /api/v1.0/projects/
@@ -216,53 +214,100 @@ func DeleteProject(r render.Render, params martini.Params, projectrepository ser
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
 }
 
-// options /api/v1.0/projects/:prid/orders/
-func GetMetaProjectOrders(r render.Render, params martini.Params, projectrepository services.ProjectRepository,
-	orderrepository services.OrderRepository, session *models.DtoSession) {
-	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
-	if err != nil {
-		return
-	}
-
-	order, err := orderrepository.GetMetaByProject(dtoproject.ID)
+// options /api/v1.0/smsfrom/
+func GetMetaSMSSenders(r render.Render, smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+	smssender, err := smssenderrepository.GetMeta(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	r.JSON(http.StatusOK, order)
+	r.JSON(http.StatusOK, smssender)
 }
 
-// get /api/v1.0/projects/:prid/orders/
-func GetProjectOrders(r render.Render, params martini.Params, projectrepository services.ProjectRepository,
-	orderrepository services.OrderRepository, session *models.DtoSession) {
-	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
+// get /api/v1.0/smsfrom/
+func GetSMSSenders(w http.ResponseWriter, request *http.Request, r render.Render, smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err := helpers.GetFilterArray(new(models.SMSSenderSearch), nil, request, r, session.Language)
 	if err != nil {
 		return
 	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
 
-	orders, err := orderrepository.GetByProject(dtoproject.ID)
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.SMSSenderSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	smssenders, err := smssenderrepository.GetByUser(session.UserID, query)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	r.JSON(http.StatusOK, orders)
+	helpers.RenderJSONArray(smssenders, len(*smssenders), w, r)
 }
 
-// post /api/v1.0/projects/:prid/orders/
-func CreateProjectOrder(errors binding.Errors, vieworder models.ViewShortOrder, r render.Render, params martini.Params,
-	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
+// get /api/v1.0/smsfrom/:frmid/
+func GetSMSSender(r render.Render, params martini.Params, smssenderrepository services.SMSSenderRepository,
 	session *models.DtoSession) {
+	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, models.NewApiMiddleSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered, !dtosmssender.Active))
+}
+
+// post /api/v1.0/smsfrom/
+func CreateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, r render.Render, params martini.Params,
+	smssenderrepository services.SMSSenderRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
-	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
+
+	found, err := smssenderrepository.Exists(viewsmssender.Name)
 	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
+	if found {
+		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_SMSSENDER_INUSE,
+			Message: config.Localization[session.Language].Errors.Api.SMSSender_InUse})
+		return
+	}
+
 	unit, err := unitrepository.FindByUser(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -270,87 +315,73 @@ func CreateProjectOrder(errors binding.Errors, vieworder models.ViewShortOrder, 
 		return
 	}
 
-	dtoorder := new(models.DtoOrder)
-	dtoorder.Project_ID = dtoproject.ID
-	dtoorder.Creator_ID = session.UserID
-	dtoorder.Unit_ID = unit.ID
-	dtoorder.Name = vieworder.Name
-	dtoorder.Step = 0
-	dtoorder.Created = time.Now()
+	dtosmssender := new(models.DtoSMSSender)
+	dtosmssender.Unit_ID = unit.ID
+	dtosmssender.Name = viewsmssender.Name
+	dtosmssender.Created = time.Now()
+	dtosmssender.Registered = false
+	dtosmssender.Withdraw = false
+	dtosmssender.Withdrawn = false
+	dtosmssender.Active = true
 
-	order := new(models.ViewLongOrder)
-	dtoorderstatuses := order.ToOrderStatuses(dtoorder.ID)
-	err = orderrepository.Create(dtoorder, dtoorderstatuses, true)
+	err = smssenderrepository.Create(dtosmssender)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
-	r.JSON(http.StatusOK, models.NewApiLongOrderFromDto(dtoorder, dtoorderstatuses))
+	r.JSON(http.StatusOK, models.NewApiShortSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered))
 }
 
-// get /api/v1.0/projects/:prid/orders/:oid/
-func GetProjectOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository,
-	orderrepository services.OrderRepository, orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
-	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
-	if err != nil {
-		return
-	}
-
-	dtoorderstatuses, err := orderstatusrepository.GetByOrder(dtoorder.ID)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-
-	r.JSON(http.StatusOK, models.NewApiLongOrderFromDto(dtoorder, dtoorderstatuses))
-}
-
-// put /api/v1.0/projects/:prid/orders/:oid/
-func UpdateProjectOrder(errors binding.Errors, vieworder models.ViewLongOrder, r render.Render, params martini.Params,
-	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
-	facilityrepository services.FacilityRepository, session *models.DtoSession) {
+// patch /api/v1.0/smsfrom/:frmid/
+func UpdateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, r render.Render, params martini.Params,
+	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
-	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
+	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
 	if err != nil {
 		return
 	}
 
-	apiorder, err := helpers.UpdateOrder(dtoorder, &vieworder, r, params, orderrepository, unitrepository, facilityrepository, session.Language)
+	found, err := smssenderrepository.Exists(viewsmssender.Name)
 	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	if found && dtosmssender.Name != viewsmssender.Name {
+		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_SMSSENDER_INUSE,
+			Message: config.Localization[session.Language].Errors.Api.SMSSender_InUse})
 		return
 	}
 
-	r.JSON(http.StatusOK, apiorder)
+	dtosmssender.Name = viewsmssender.Name
+	err = smssenderrepository.Update(dtosmssender)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	r.JSON(http.StatusOK, models.NewApiShortSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered))
 }
 
-// delete /api/v1.0/projects/:prid/orders/:oid/
-func DeleteProjectOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository,
-	orderrepository services.OrderRepository, orderstatusrepository services.OrderStatusRepository,
+// delete //api/v1.0/smsfrom/:frmid/
+func DeleteSMSSender(r render.Render, params martini.Params, smssenderrepository services.SMSSenderRepository,
 	session *models.DtoSession) {
-	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
+	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
 	if err != nil {
 		return
 	}
-	confirmed, err := orderrepository.IsConfirmed(dtoorder.ID)
+	_, err = helpers.IsSMSSenderActive(dtosmssender.ID, r, smssenderrepository, session.Language)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-	if confirmed {
-		log.Error("Can't delete confirmed order %v", dtoorder.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	orderstatus := models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_DEL, true, "", time.Now())
-	err = orderstatusrepository.Save(orderstatus)
+	dtosmssender.Withdraw = true
+	err = smssenderrepository.Update(dtosmssender)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

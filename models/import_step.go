@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения шага импорта
+// Структура для организации хранения шага импорта
 type ApiImportStep struct {
 	Step       byte `json:"step" `   // Номер шага
 	Ready      bool `json:"ready" `  // Готова

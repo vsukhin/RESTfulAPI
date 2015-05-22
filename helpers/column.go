@@ -30,17 +30,17 @@ func CheckColumnValidity(tableid int64, columnid int64, r render.Render, columnt
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, errors.New("Column is not active")
 	}
-	if dtotablecolumn.Column_Type_ID != 0 {
-		err = IsColumnTypeActive(r, columntyperepository, dtotablecolumn.Column_Type_ID, language)
-		if err != nil {
-			return nil, err
-		}
+
+	err = IsColumnTypeActive(r, columntyperepository, dtotablecolumn.Column_Type_ID, language)
+	if err != nil {
+		return nil, err
 	}
+
 	if dtotablecolumn.Customer_Table_ID != tableid {
 		log.Error("Column %v doesn't belong table %v", columnid, tableid)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, errors.New("Non matched table and column")
+		return nil, errors.New("Not matched table and column")
 	}
 
 	return dtotablecolumn, nil
@@ -68,7 +68,7 @@ func CheckTableColumn(r render.Render, params martini.Params, columntypereposito
 	return CheckColumnValidity(tableid, columnid, r, columntyperepository, tablecolumnrepository, language)
 }
 
-func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTypeRepository, typeid int64, language string) (err error) {
+func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTypeRepository, typeid int, language string) (err error) {
 	dtocolumntype, err := columntyperepository.Get(typeid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,

@@ -2,14 +2,15 @@ package services
 
 import (
 	"application/models"
+	"github.com/coopernurse/gorp"
 )
 
 type OrderStatusRepository interface {
 	Get(order_id int64, status_id models.OrderStatus) (order *models.DtoOrderStatus, err error)
 	GetByOrder(order_id int64) (orderstatuses *[]models.DtoOrderStatus, err error)
-	Create(orderstatus *models.DtoOrderStatus) (err error)
-	Update(orderstatus *models.DtoOrderStatus) (err error)
-	Save(orderstatus *models.DtoOrderStatus) (err error)
+	Create(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error)
+	Update(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error)
+	Save(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error)
 }
 
 type OrderStatusService struct {
@@ -46,8 +47,12 @@ func (orderstatusservice *OrderStatusService) GetByOrder(order_id int64) (orders
 	return orderstatuses, nil
 }
 
-func (orderstatusservice *OrderStatusService) Create(orderstatus *models.DtoOrderStatus) (err error) {
-	err = orderstatusservice.DbContext.Insert(orderstatus)
+func (orderstatusservice *OrderStatusService) Create(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		err = trans.Insert(orderstatus)
+	} else {
+		err = orderstatusservice.DbContext.Insert(orderstatus)
+	}
 	if err != nil {
 		log.Error("Error during creating order status object in database %v", err)
 		return err
@@ -56,8 +61,12 @@ func (orderstatusservice *OrderStatusService) Create(orderstatus *models.DtoOrde
 	return nil
 }
 
-func (orderstatusservice *OrderStatusService) Update(orderstatus *models.DtoOrderStatus) (err error) {
-	_, err = orderstatusservice.DbContext.Update(orderstatus)
+func (orderstatusservice *OrderStatusService) Update(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		_, err = trans.Update(orderstatus)
+	} else {
+		_, err = orderstatusservice.DbContext.Update(orderstatus)
+	}
 	if err != nil {
 		log.Error("Error during updating order status object in database %v with value %v, %v", err, orderstatus.Order_ID, orderstatus.Status_ID)
 		return err
@@ -66,17 +75,23 @@ func (orderstatusservice *OrderStatusService) Update(orderstatus *models.DtoOrde
 	return nil
 }
 
-func (orderstatusservice *OrderStatusService) Save(orderstatus *models.DtoOrderStatus) (err error) {
-	count, err := orderstatusservice.DbContext.SelectInt("select count(*) from "+orderstatusservice.Table+
-		" where order_id = ? and status_id = ?", orderstatus.Order_ID, orderstatus.Status_ID)
+func (orderstatusservice *OrderStatusService) Save(orderstatus *models.DtoOrderStatus, trans *gorp.Transaction) (err error) {
+	var count int64
+	if trans != nil {
+		count, err = trans.SelectInt("select count(*) from "+orderstatusservice.Table+
+			" where order_id = ? and status_id = ?", orderstatus.Order_ID, orderstatus.Status_ID)
+	} else {
+		count, err = orderstatusservice.DbContext.SelectInt("select count(*) from "+orderstatusservice.Table+
+			" where order_id = ? and status_id = ?", orderstatus.Order_ID, orderstatus.Status_ID)
+	}
 	if err != nil {
 		log.Error("Error during saving order status object in database %v with value %v, %v", err, orderstatus.Order_ID, orderstatus.Status_ID)
 		return err
 	}
 	if count == 0 {
-		err = orderstatusservice.Create(orderstatus)
+		err = orderstatusservice.Create(orderstatus, trans)
 	} else {
-		err = orderstatusservice.Update(orderstatus)
+		err = orderstatusservice.Update(orderstatus, trans)
 	}
 
 	return err

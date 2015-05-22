@@ -11,7 +11,8 @@ type ProjectRepository interface {
 	HasNotPaidOrder(id int64) (has bool, err error)
 	Get(id int64) (project *models.DtoProject, err error)
 	GetMeta(user_id int64) (project *models.ApiMetaProject, err error)
-	GetByUser(userid int64, filter string) (projects *[]models.ApiShortProject, err error)
+	GetByUser(userid int64, filter string) (projects *[]models.ApiMiddleProject, err error)
+	GetByUserWithStatus(userid int64, active bool, filter string) (projects *[]models.ApiShortProject, err error)
 	GetByUnit(unitid int64) (projects *[]models.ApiShortProject, err error)
 	Create(project *models.DtoProject) (err error)
 	Update(project *models.DtoProject) (err error)
@@ -95,10 +96,28 @@ func (projectservice *ProjectService) GetMeta(user_id int64) (project *models.Ap
 	return project, nil
 }
 
-func (projectservice *ProjectService) GetByUser(userid int64, filter string) (projects *[]models.ApiShortProject, err error) {
-	projects = new([]models.ApiShortProject)
-	_, err = projectservice.DbContext.Select(projects, "select id, name from "+projectservice.Table+
+func (projectservice *ProjectService) GetByUser(userid int64, filter string) (projects *[]models.ApiMiddleProject, err error) {
+	projects = new([]models.ApiMiddleProject)
+	_, err = projectservice.DbContext.Select(projects, "select id, name, not active as archive from "+projectservice.Table+
 		" where unit_id = (select unit_id from users where id = ?)"+filter, userid)
+	if err != nil {
+		log.Error("Error during getting unit project object from database %v with value %v", err, userid)
+		return nil, err
+	}
+
+	return projects, nil
+}
+
+func (projectservice *ProjectService) GetByUserWithStatus(userid int64, active bool, filter string) (projects *[]models.ApiShortProject, err error) {
+	projects = new([]models.ApiShortProject)
+	constraint := " and "
+	if active {
+		constraint += " active = 1"
+	} else {
+		constraint += " active = 0"
+	}
+	_, err = projectservice.DbContext.Select(projects, "select id, name from "+projectservice.Table+
+		" where unit_id = (select unit_id from users where id = ?)"+constraint+filter, userid)
 	if err != nil {
 		log.Error("Error during getting unit project object from database %v with value %v", err, userid)
 		return nil, err

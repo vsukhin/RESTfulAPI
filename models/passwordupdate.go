@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-//Структура для смены пароля
+// Структура для смены пароля
 type PasswordUpdate struct {
 	Code  string `json:"code" validate:"nonzero,min=1,max=255"`     // Код для смены пароля
 	Value string `json:"password" validate:"nonzero,min=1,max=255"` // Значение пароля

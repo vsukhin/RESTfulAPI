@@ -8,6 +8,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"strings"
 	"types"
 )
 
@@ -46,8 +47,60 @@ func CheckProjectOrder(r render.Render, params martini.Params, projectrepository
 		log.Error("Order %v doesn't belong to project %v", dtoorder.ID, dtoproject.ID)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, errors.New("Non matched project and order")
+		return nil, nil, errors.New("Not matched project and order")
 	}
 
 	return dtoproject, dtoorder, nil
+}
+
+func GetProjects(userid int64, active bool, request *http.Request, w http.ResponseWriter, r render.Render, projectrepository services.ProjectRepository,
+	language string) {
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err := GetFilterArray(new(models.ProjectShortSearch), nil, request, r, language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = GetOrderArray(new(models.ProjectShortSearch), request, r, language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = GetLimitQuery(request, r, language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	projects, err := projectrepository.GetByUserWithStatus(userid, active, query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	RenderJSONArray(projects, len(*projects), w, r)
 }

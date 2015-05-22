@@ -17,7 +17,7 @@ import (
 )
 
 // get /api/v1.0/tables/:tid/data/
-func GetTableData(request *http.Request, r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+func GetTableData(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
 	tablerowrepository services.TableRowRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
 	if err != nil {
@@ -116,11 +116,11 @@ func GetTableData(request *http.Request, r render.Render, params martini.Params,
 		return
 	}
 
-	r.JSON(http.StatusOK, tablerows)
+	helpers.RenderJSONArray(tablerows, len(*tablerows), w, r)
 }
 
 // get /api/v1.0/tables/:tid/data/:rowid/
-func GetTableRow(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+func GetTableRow(w http.ResponseWriter, r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
 	tablerowrepository services.TableRowRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	dtotablerow, err := helpers.CheckTableRow(r, params, customertablerepository, tablerowrepository, session.Language)
 	if err != nil {
@@ -146,7 +146,7 @@ func GetTableRow(r render.Render, params martini.Params, customertablerepository
 		*cells = append(*cells, *models.NewViewApiTableRowCell(cell.Table_Column_ID, cell.Value))
 	}
 
-	r.JSON(http.StatusOK, cells)
+	helpers.RenderJSONArray(cells, len(*cells), w, r)
 }
 
 // post /api/v1.0/tables/:tid/data/

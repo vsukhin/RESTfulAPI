@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestApiGroup(t *testing.T) {
+func TestNewApiGroup(t *testing.T) {
 	var id int = 1
 	var name = "group"
 	var аpiGroup *ApiGroup

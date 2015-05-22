@@ -12,9 +12,23 @@ const (
 	ALIGNMENT_CENTER
 )
 
-//Структура для организации хранения типов колонок
+const (
+	COLUMN_TYPE_DEFAULT           = 0
+	COLUMN_TYPE_MOBILE_PHONE      = 1
+	COLUMN_TYPE_SMS               = 2
+	COLUMN_TYPE_SMS_SENDER        = 3
+	COLUMN_TYPE_BIRTHDAY          = 4
+	COLUMN_TYPE_SOURCE_ADDRESS    = 5
+	COLUMN_TYPE_SOURCE_PHONE      = 6
+	COLUMN_TYPE_SOURCE_FIO        = 7
+	COLUMN_TYPE_SOURCE_EMAIL      = 8
+	COLUMN_TYPE_SOURCE_DATE       = 9
+	COLUMN_TYPE_SOURCE_AUTOMOBILE = 10
+)
+
+// Структура для организации хранения типов колонок
 type ApiColumnType struct {
-	ID               int64  `json:"id" db:"id"`                       // Уникальный идентификатор типа колонки
+	ID               int    `json:"id" db:"id"`                       // Уникальный идентификатор типа колонки
 	Name             string `json:"name" db:"name"`                   // Название
 	Description      string `json:"description" db:"description"`     // Описание
 	Required         bool   `json:"notNull" db:"required"`            // Обязательность к заполнению
@@ -24,7 +38,7 @@ type ApiColumnType struct {
 }
 
 type DtoColumnType struct {
-	ID               int64     `db:"id"`               // Уникальный идентификатор типа колонки
+	ID               int       `db:"id"`               // Уникальный идентификатор типа колонки
 	Name             string    `db:"name"`             // Название
 	Description      string    `db:"description"`      // Описание
 	Required         bool      `db:"required"`         // Обязательность к заполнению
@@ -36,7 +50,7 @@ type DtoColumnType struct {
 }
 
 // Конструктор создания объекта типа колонки в api
-func NewApiColumnType(id int64, name string, description string, required bool, regexp string,
+func NewApiColumnType(id int, name string, description string, required bool, regexp string,
 	horalignmenthead string, horalignmentbody string) *ApiColumnType {
 	return &ApiColumnType{
 		ID:               id,
@@ -50,7 +64,7 @@ func NewApiColumnType(id int64, name string, description string, required bool, 
 }
 
 // Конструктор создания объекта типа колонки в бд
-func NewDtoColumnType(id int64, name string, description string, required bool, regexp string,
+func NewDtoColumnType(id int, name string, description string, required bool, regexp string,
 	horalignmenthead Alignment, horalignmentbody Alignment, created time.Time, active bool) *DtoColumnType {
 	return &DtoColumnType{
 		ID:               id,

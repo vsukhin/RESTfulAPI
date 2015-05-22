@@ -9,6 +9,7 @@ type PricePropertiesRepository interface {
 	Get(tableid int64) (priceproperties *models.DtoPriceProperties, err error)
 	Exists(tableid int64) (found bool, err error)
 	Create(priceproperties *models.DtoPriceProperties, inTrans bool) (err error)
+	Update(priceproperties *models.DtoPriceProperties, inTrans bool) (err error)
 }
 
 type PricePropertiesService struct {
@@ -55,7 +56,11 @@ func (pricepropertiesservice *PricePropertiesService) Create(priceproperties *mo
 		}
 	}
 
-	err = pricepropertiesservice.DbContext.Insert(priceproperties)
+	if inTrans {
+		err = trans.Insert(priceproperties)
+	} else {
+		err = pricepropertiesservice.DbContext.Insert(priceproperties)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -64,9 +69,13 @@ func (pricepropertiesservice *PricePropertiesService) Create(priceproperties *mo
 		return err
 	}
 
-	_, err = pricepropertiesservice.DbContext.Exec(
-		"update customer_tables set type_id =(select id from table_types where name = ?) where id = ?",
-		models.TABLE_TYPE_PRICE, priceproperties.Customer_Table_ID)
+	if inTrans {
+		_, err = trans.Exec(
+			"update customer_tables set type_id = ? where id = ?", models.TABLE_TYPE_PRICE, priceproperties.Customer_Table_ID)
+	} else {
+		_, err = pricepropertiesservice.DbContext.Exec(
+			"update customer_tables set type_id = ? where id = ?", models.TABLE_TYPE_PRICE, priceproperties.Customer_Table_ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -79,6 +88,56 @@ func (pricepropertiesservice *PricePropertiesService) Create(priceproperties *mo
 		err = trans.Commit()
 		if err != nil {
 			log.Error("Error during creating price properties object in database %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (pricepropertiesservice *PricePropertiesService) Update(priceproperties *models.DtoPriceProperties, inTrans bool) (err error) {
+	var trans *gorp.Transaction
+
+	if inTrans {
+		trans, err = pricepropertiesservice.DbContext.Begin()
+		if err != nil {
+			log.Error("Error during updating price properties object in database %v", err)
+			return err
+		}
+	}
+
+	if inTrans {
+		_, err = trans.Update(priceproperties)
+	} else {
+		_, err = pricepropertiesservice.DbContext.Update(priceproperties)
+	}
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during updating price properties object in database %v", err)
+		return err
+	}
+
+	if inTrans {
+		_, err = trans.Exec(
+			"update customer_tables set type_id = ? where id = ?", models.TABLE_TYPE_PRICE, priceproperties.Customer_Table_ID)
+	} else {
+		_, err = pricepropertiesservice.DbContext.Exec(
+			"update customer_tables set type_id = ? where id = ?", models.TABLE_TYPE_PRICE, priceproperties.Customer_Table_ID)
+	}
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during updating price properties object in database %v with value %v", err, priceproperties.Customer_Table_ID)
+		return err
+	}
+
+	if inTrans {
+		err = trans.Commit()
+		if err != nil {
+			log.Error("Error during updating price properties object in database %v", err)
 			return err
 		}
 	}

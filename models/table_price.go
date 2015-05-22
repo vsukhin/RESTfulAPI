@@ -6,7 +6,15 @@ import (
 	"time"
 )
 
-//Структура для организации хранения свойств прайс-листов
+// Структура для организации хранения свойств прайс-листов
+type ViewApiPriceProperties struct {
+	Facility_ID int64     `json:"serviceId" db:"service_id" validate:"nonzero"` // Уникальный идентификатор сервиса
+	After_ID    int64     `json:"afterPriceId" db:"after_id"`                   // Уникальный идентификатор предыдущего прайс-листа
+	Begin       time.Time `json:"begin" db:"begin"`                             // Время начало действия прайс-листа
+	End         time.Time `json:"end" db:"end"`                                 // Время окончания действия прайс-листа
+	Published   bool      `json:"publicate" db:"published"`                     // Опубликован
+}
+
 type DtoPriceProperties struct {
 	Customer_Table_ID int64     `db:"customer_table_id"` // Идентификатор пользовательской таблицы
 	Facility_ID       int64     `db:"service_id"`        // Идентификатор сервиса
@@ -14,28 +22,23 @@ type DtoPriceProperties struct {
 	Begin             time.Time `db:"begin"`             // Время начало действия прайс-листа
 	End               time.Time `db:"end"`               // Время окончания действия прайс-листа
 	Created           time.Time `db:"created"`           // Время создания
-}
-
-type ViewApiPriceProperties struct {
-	Facility_ID int64     `json:"serviceId" db:"service_id" validate:"nonzero"` // Уникальный идентификатор сервиса
-	After_ID    int64     `json:"afterPriceId" db:"after_id"`                   // Уникальный идентификатор предыдущего прайс-листа
-	Begin       time.Time `json:"begin" db:"begin"`                             // Время начало действия прайс-листа
-	End         time.Time `json:"end" db:"end"`                                 // Время окончания действия прайс-листа
+	Published         bool      `db:"published"`         // Опубликован
 }
 
 // Конструктор создания объекта свойств прайс-листа в api
-func NewViewApiPriceProperties(facility_id int64, after_id int64, begin time.Time, end time.Time) *ViewApiPriceProperties {
+func NewViewApiPriceProperties(facility_id int64, after_id int64, begin time.Time, end time.Time, published bool) *ViewApiPriceProperties {
 	return &ViewApiPriceProperties{
 		Facility_ID: facility_id,
 		After_ID:    after_id,
 		Begin:       begin,
 		End:         end,
+		Published:   published,
 	}
 }
 
 // Конструктор создания объекта свойств прайс-листа в бд
 func NewDtoPriceProperties(customer_table_id int64, facility_id int64, after_id int64,
-	begin time.Time, end time.Time, created time.Time) *DtoPriceProperties {
+	begin time.Time, end time.Time, created time.Time, published bool) *DtoPriceProperties {
 	return &DtoPriceProperties{
 		Customer_Table_ID: customer_table_id,
 		Facility_ID:       facility_id,
@@ -43,6 +46,7 @@ func NewDtoPriceProperties(customer_table_id int64, facility_id int64, after_id 
 		Begin:             begin,
 		End:               end,
 		Created:           created,
+		Published:         published,
 	}
 }
 

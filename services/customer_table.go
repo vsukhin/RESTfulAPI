@@ -22,7 +22,7 @@ type CustomerTableRepository interface {
 	Get(id int64) (customertable *models.DtoCustomerTable, err error)
 	GetEx(id int64) (customertable *models.ApiLongCustomerTable, err error)
 	GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error)
-	GetByUser(userid int64, filter string) (customertables *[]models.ApiLongCustomerTable, err error)
+	GetByUser(userid int64, filter string, fulllist bool) (customertables *[]models.ApiLongCustomerTable, err error)
 	GetByUnit(unitid int64) (customertables *[]models.ApiMiddleCustomerTable, err error)
 	GetExpired(timeout time.Duration) (customertables *[]models.DtoCustomerTable, err error)
 	Create(customertable *models.DtoCustomerTable) (err error)
@@ -56,7 +56,7 @@ func (customertableservice *CustomerTableService) ImportDataStructure(dtotableco
 
 	log.Info("Starting inserting table columns %v", time.Now())
 	for _, dtotablecolumn := range *dtotablecolumns {
-		err = customertableservice.TableColumnRepository.Create(&dtotablecolumn)
+		err = customertableservice.TableColumnRepository.Create(&dtotablecolumn, trans)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -91,7 +91,11 @@ func (customertableservice *CustomerTableService) UpdateImportStructure(customer
 		}
 	}
 
-	_, err = customertableservice.DbContext.Update(customertable)
+	if inTrans {
+		_, err = trans.Update(customertable)
+	} else {
+		_, err = customertableservice.DbContext.Update(customertable)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -100,7 +104,7 @@ func (customertableservice *CustomerTableService) UpdateImportStructure(customer
 		return err
 	}
 
-	err = customertableservice.TableColumnRepository.UpdateBriefly(dtotablecolumns, false)
+	err = customertableservice.TableColumnRepository.UpdateBriefly(dtotablecolumns, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -250,7 +254,8 @@ func (customertableservice *CustomerTableService) Get(id int64) (customertable *
 func (customertableservice *CustomerTableService) GetEx(id int64) (customertable *models.ApiLongCustomerTable, err error) {
 	customertable = new(models.ApiLongCustomerTable)
 	err = customertableservice.DbContext.SelectOne(customertable,
-		"select c.id, c.name, t.name as type, c.unit_id from "+customertableservice.Table+" c inner join table_types t on c.type_id = t.id where c.id = ?", id)
+		"select c.id, c.name, c.type_id as type, c.unit_id from "+customertableservice.Table+
+			" c inner join table_types t on c.type_id = t.id where c.id = ?", id)
 	if err != nil {
 		log.Error("Error during getting extended customer table object from database %v with value %v", err, id)
 		return nil, err
@@ -337,10 +342,15 @@ func (customertableservice *CustomerTableService) GetMeta(id int64) (customertab
 	return customertable, nil
 }
 
-func (customertableservice *CustomerTableService) GetByUser(userid int64, filter string) (customertables *[]models.ApiLongCustomerTable, err error) {
+func (customertableservice *CustomerTableService) GetByUser(userid int64, filter string,
+	fulllist bool) (customertables *[]models.ApiLongCustomerTable, err error) {
 	customertables = new([]models.ApiLongCustomerTable)
+	if !fulllist {
+		filter = " and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN) +
+			" and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN_READONLY) + filter
+	}
 	_, err = customertableservice.DbContext.Select(customertables,
-		"select c.id, c.name, t.name as type, c.unit_id from "+customertableservice.Table+
+		"select c.id, c.name, c.type_id as type, c.unit_id from "+customertableservice.Table+
 			" c inner join table_types t on c.type_id = t.id where c.active = 1 and c.permanent = 1 and"+
 			" c.unit_id = (select unit_id from users where id = ?)"+filter, userid)
 	if err != nil {
@@ -354,7 +364,7 @@ func (customertableservice *CustomerTableService) GetByUser(userid int64, filter
 func (customertableservice *CustomerTableService) GetByUnit(unitid int64) (customertables *[]models.ApiMiddleCustomerTable, err error) {
 	customertables = new([]models.ApiMiddleCustomerTable)
 	_, err = customertableservice.DbContext.Select(customertables,
-		"select c.id, c.name, t.name as type from "+customertableservice.Table+
+		"select c.id, c.name, c.type_id as type from "+customertableservice.Table+
 			" c inner join table_types t on c.type_id = t.id where c.active = 1 and c.permanent = 1 and c.unit_id = ?", unitid)
 	if err != nil {
 		log.Error("Error during getting unit customer table object from database %v with value %v", err, unitid)

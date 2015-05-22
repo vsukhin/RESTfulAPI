@@ -163,8 +163,8 @@ func CheckMobilePhoneAvailability(value string, language string, r render.Render
 		}
 		if mobilephone.Confirmed {
 			log.Error("Mobile phone exists in database %v", value)
-			r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_EMAIL_INUSE,
-				Message: config.Localization[language].Errors.Api.Email_InUse})
+			r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_MOBILEPHONE_INUSE,
+				Message: config.Localization[language].Errors.Api.MobilePhone_InUse})
 			return phoneExists, errors.New("Mobile phone exists")
 		}
 	}
@@ -183,15 +183,15 @@ func SendConfirmations(dtouser *models.DtoUser, session *models.DtoSession, requ
 				subject = config.Localization[confEmail.Language].Messages.EmailSubject
 			}
 
-			buf, err := templaterepository.GenerateText(models.NewDtoTemplate(confEmail.Email, confEmail.Language,
-				request.Host, confEmail.Code), services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
+			buf, err := templaterepository.GenerateText(models.NewDtoCodeTemplate(models.NewDtoTemplate(confEmail.Email, confEmail.Language,
+				request.Host), confEmail.Code), services.TEMPLATE_EMAIL, services.TEMPLATE_LAYOUT)
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return err
 			}
 
-			err = emailrepository.SendEmail(confEmail.Email, subject, buf.String())
+			err = emailrepository.SendEmail(confEmail.Email, subject, buf.String(), "")
 			if err != nil {
 				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -223,37 +223,71 @@ func CheckUnit(r render.Render, params martini.Params, unitrepository services.U
 func GetUnitDependences(unitid int64, r render.Render, userrepository services.UserRepository,
 	customertablerepository services.CustomerTableRepository, projectrepository services.ProjectRepository,
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
+	companyrepository services.CompanyRepository, smssenderrepository services.SMSSenderRepository,
 	language string) (users *[]models.ApiUserTiny, tables *[]models.ApiMiddleCustomerTable,
-	projects *[]models.ApiShortProject, orders *[]models.ApiBriefOrder, facilities *[]models.ApiLongFacility, err error) {
+	projects *[]models.ApiShortProject, orders *[]models.ApiBriefOrder, facilities *[]models.ApiLongFacility,
+	companies *[]models.ApiShortCompany, smssenders *[]models.ApiLongSMSSender, err error) {
 	users, err = userrepository.GetByUnit(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, err
 	}
 	tables, err = customertablerepository.GetByUnit(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, err
 	}
 	projects, err = projectrepository.GetByUnit(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, err
 	}
 	orders, err = orderrepository.GetByUnit(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, err
 	}
 	facilities, err = facilityrepository.GetByUnit(unitid)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, err
 	}
-	return users, tables, projects, orders, facilities, nil
+	companies, err = companyrepository.GetByUnit(unitid)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, nil, nil, nil, nil, nil, nil, err
+	}
+
+	smssenders, err = smssenderrepository.GetByUnit(unitid)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, nil, nil, nil, nil, nil, nil, err
+	}
+
+	return users, tables, projects, orders, facilities, companies, smssenders, nil
+}
+
+func CheckClassifier(classifierid int, r render.Render, classifierrepository services.ClassifierRepository,
+	language string) (dtoclassifier *models.DtoClassifier, err error) {
+	dtoclassifier, err = classifierrepository.Get(classifierid)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+	if !dtoclassifier.Active {
+		log.Error("Classifier is not active %v", dtoclassifier.ID)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, errors.New("Classifier not active")
+	}
+
+	return dtoclassifier, nil
 }

@@ -15,7 +15,7 @@ import (
 )
 
 // get /api/v1.0/administration/classification/contacts/
-func GetClassifiers(request *http.Request, r render.Render, params martini.Params,
+func GetClassifiers(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params,
 	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
@@ -64,7 +64,7 @@ func GetClassifiers(request *http.Request, r render.Render, params martini.Param
 		return
 	}
 
-	r.JSON(http.StatusOK, classifiers)
+	helpers.RenderJSONArray(classifiers, len(*classifiers), w, r)
 }
 
 // post /api/v1.0/administration/classification/contacts/

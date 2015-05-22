@@ -7,6 +7,7 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/go-martini/martini"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"types"
 )
@@ -40,15 +41,15 @@ func (testGroupRepository *TestGroupRepository) GetAll() (groups *[]models.ApiGr
 	return testGroupRepository.Groups, testGroupRepository.Err
 }
 
-func (testGroupRepository *TestGroupRepository) SetByUser(userid int64, groups *[]models.UserRole, inTrans bool) (err error) {
+func (testGroupRepository *TestGroupRepository) SetByUser(userid int64, groups *[]models.UserRole, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testGroupRepository *TestGroupRepository) SetBySession(token string, groups *[]models.UserRole, inTrans bool) (err error) {
+func (testGroupRepository *TestGroupRepository) SetBySession(token string, groups *[]models.UserRole, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testGroupRepository *TestGroupRepository) DeleteByUser(userid int64) (err error) {
+func (testGroupRepository *TestGroupRepository) DeleteByUser(userid int64, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
@@ -87,7 +88,7 @@ func (testUserRepository *TestUserRepository) GetMeta() (usermeta *models.ApiUse
 	return testUserRepository.Meta, testUserRepository.GetErr
 }
 
-func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error) {
+func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction) (unitid int64, err error) {
 	return 0, nil
 }
 
@@ -124,9 +125,10 @@ func TestGetGroupsInfoError(t *testing.T) {
 	var grouprepository = new(TestGroupRepository)
 	grouprepository.Groups = nil
 	grouprepository.Err = errors.New("Groups error")
+	var w = httptest.NewRecorder()
 
-	GetGroupsInfo(r, grouprepository, session)
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	GetGroupsInfo(w, r, grouprepository, session)
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Get groups info wrong http status and error code")
 	}
 }
@@ -137,8 +139,9 @@ func TestGetGroupsInfoOk(t *testing.T) {
 	var grouprepository = new(TestGroupRepository)
 	grouprepository.Groups = &([]models.ApiGroup{{1, "Developer"}, {2, "Administrator"}, {3, "Supplier"}, {4, "Customer"}})
 	grouprepository.Err = nil
+	var w = httptest.NewRecorder()
 
-	GetGroupsInfo(r, grouprepository, session)
+	GetGroupsInfo(w, r, grouprepository, session)
 	if r.StatusValue != http.StatusOK {
 		t.Error("Get groups info wrong http status")
 	}
@@ -153,7 +156,7 @@ func TestGetUserFullInfoParameterError(t *testing.T) {
 	helpers.InitLogger(testlogger)
 
 	GetUserFullInfo(r, params, userrepository, session)
-	if r.StatusValue != http.StatusBadRequest && r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Get user full info wrong http status and error code")
 	}
 }
@@ -167,7 +170,7 @@ func TestGetUserFullInfoUserError(t *testing.T) {
 	userrepository.User = nil
 
 	GetUserFullInfo(r, params, userrepository, session)
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Get user full info wrong http status and error code")
 	}
 }
@@ -178,7 +181,7 @@ func TestGetUserFullInfoUserOk(t *testing.T) {
 	var params = martini.Params{helpers.PARAM_NAME_USER_ID: "1"}
 	var userrepository = new(TestUserRepository)
 	userrepository.GetErr = nil
-	userrepository.User = &(models.DtoUser{Emails: new([]models.DtoEmail)})
+	userrepository.User = &(models.DtoUser{Emails: new([]models.DtoEmail), MobilePhones: new([]models.DtoMobilePhone)})
 
 	GetUserFullInfo(r, params, userrepository, session)
 	if r.StatusValue != http.StatusOK {
@@ -194,7 +197,7 @@ func TestGetUserMetaDataError(t *testing.T) {
 	userrepository.Meta = nil
 
 	GetUserMetaData(r, userrepository, session)
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Get user full info wrong http status and error code")
 	}
 }
@@ -221,7 +224,7 @@ func TestDeleteUserParameterError(t *testing.T) {
 	helpers.InitLogger(testlogger)
 
 	DeleteUser(r, params, userrepository, session)
-	if r.StatusValue != http.StatusBadRequest && r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Delete user wrong http status and error code")
 	}
 }
@@ -235,7 +238,7 @@ func TestDeleteUserGetError(t *testing.T) {
 	userrepository.User = nil
 
 	DeleteUser(r, params, userrepository, session)
-	if r.StatusValue == http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Delete user wrong http status and error code")
 	}
 }
@@ -250,7 +253,7 @@ func TestDeleteUserDelError(t *testing.T) {
 	userrepository.DelErr = errors.New("User error")
 	DeleteUser(r, params, userrepository, session)
 
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Delete user wrong http status and error code")
 	}
 }

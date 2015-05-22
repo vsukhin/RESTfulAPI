@@ -1,6 +1,6 @@
 package models
 
-//Структура для организации хранения форматов данных
+// Структура для организации хранения форматов данных
 type ApiDataFormat struct {
 	ID          int    `json:"id" db:"id"`                   // Уникальный идентификатор формата данных
 	Name        string `json:"name" db:"name"`               // Название

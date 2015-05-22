@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-//Структура для организации хранения ячеек таблиц
+// Структура для организации хранения ячеек таблиц
 type ViewTableCell struct {
 	Value string `json:"data" validate:"max=255"` // Значение ячейки
 }
@@ -18,9 +18,9 @@ type DtoTableCell struct {
 }
 
 type ApiMetaTableCell struct {
-	Checked        bool  `json:"verified" db:"checked"`    // Выполнялась проверка
-	Valid          bool  `json:"correct" db:"valid"`       // Подходит под regexp
-	Column_Type_ID int64 `json:"type" db:"column_type_id"` // Идентификатор типа колонки
+	Checked        bool `json:"verified" db:"checked"`    // Выполнялась проверка
+	Valid          bool `json:"correct" db:"valid"`       // Подходит под regexp
+	Column_Type_ID int  `json:"type" db:"column_type_id"` // Идентификатор типа колонки
 }
 
 type ApiShortTableCell struct {
@@ -31,12 +31,12 @@ type ApiShortTableCell struct {
 type ApiLongTableCell struct {
 	Table_Column_ID int64  `json:"columnId" db:"table_column_id"` // Идентификатор колонки таблицы
 	Value           string `json:"data" db:"value"`               // Значение ячейки
-	Column_Type_ID  int64  `json:"type" db:"column_type_id"`      // Идентификатор типа колонки
+	Column_Type_ID  int    `json:"type" db:"column_type_id"`      // Идентификатор типа колонки
 	Valid           bool   `json:"correct" db:"valid"`            // Подходит под regexp
 }
 
 // Конструктор создания объекта ячейки таблицы в api
-func NewApiMetaTableCell(checked bool, valid bool, column_type_id int64) *ApiMetaTableCell {
+func NewApiMetaTableCell(checked bool, valid bool, column_type_id int) *ApiMetaTableCell {
 	return &ApiMetaTableCell{
 		Checked:        checked,
 		Valid:          valid,
@@ -51,7 +51,7 @@ func NewApiShortTableCell(value string, valid bool) *ApiShortTableCell {
 	}
 }
 
-func NewApiLongTableCell(table_column_id int64, value string, column_type_id int64, valid bool) *ApiLongTableCell {
+func NewApiLongTableCell(table_column_id int64, value string, column_type_id int, valid bool) *ApiLongTableCell {
 	return &ApiLongTableCell{
 		Table_Column_ID: table_column_id,
 		Value:           value,

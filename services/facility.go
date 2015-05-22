@@ -2,17 +2,14 @@ package services
 
 import (
 	"application/models"
-	"fmt"
-	"github.com/coopernurse/gorp"
 )
 
 type FacilityRepository interface {
 	Get(id int64) (facility *models.DtoFacility, err error)
-	GetAll() (facilities *[]models.DtoFacility, err error)
+	GetAll() (facilities *[]models.ApiFullFacility, err error)
 	GetAllAvailable() (facilities *[]models.ApiShortFacility, err error)
 	GetByUnit(unitid int64) (facilities *[]models.ApiLongFacility, err error)
 	GetByUser(user_id int64) (facilities *[]models.ApiShortFacility, err error)
-	SetByUser(user_id int64, facilities *[]int64, inTrans bool) (err error)
 	Create(facility *models.DtoFacility) (err error)
 	Update(facility *models.DtoFacility) (err error)
 	Delete(id int64) (err error)
@@ -40,9 +37,11 @@ func (facilityservice *FacilityService) Get(id int64) (facility *models.DtoFacil
 	return facility, nil
 }
 
-func (facilityservice *FacilityService) GetAll() (facilities *[]models.DtoFacility, err error) {
-	facilities = new([]models.DtoFacility)
-	_, err = facilityservice.DbContext.Select(facilities, "select * from "+facilityservice.Table)
+func (facilityservice *FacilityService) GetAll() (facilities *[]models.ApiFullFacility, err error) {
+	facilities = new([]models.ApiFullFacility)
+	_, err = facilityservice.DbContext.Select(facilities,
+		"select id, category_id, alias, name, description, description_soon, active,"+
+			" picNormal_id, picOver_id, picSoon_id, picDisable_id from "+facilityservice.Table)
 	if err != nil {
 		log.Error("Error during getting all facility object from database %v", err)
 		return nil, err
@@ -53,10 +52,15 @@ func (facilityservice *FacilityService) GetAll() (facilities *[]models.DtoFacili
 
 func (facilityservice *FacilityService) GetAllAvailable() (facilities *[]models.ApiShortFacility, err error) {
 	facilities = new([]models.ApiShortFacility)
-	_, err = facilityservice.DbContext.Select(facilities, "select id, name, description from "+facilityservice.Table+
-		" where active = 1 and id in (select service_id from supplier_services) and"+
-		" id in (select service_id from price_properties where customer_table_id in"+
-		" (select id from customer_tables where active = 1 and permanent = 1))")
+	_, err = facilityservice.DbContext.Select(facilities, "select distinct f.id, f.name, f.description from "+facilityservice.Table+
+		" f inner join supplier_services s on f.id = s.service_id where f.active = 1 and s.supplier_id in (select id from units where active = 1) and"+
+		" f.id in (select service_id from price_properties p where published = 1 and customer_table_id in"+
+		" (select id from customer_tables where active = 1 and permanent = 1 and type_id = ? and unit_id = s.supplier_id)"+
+		" and ((date(end) != '0001-01-01' and now() <= end) or (date(end) = '0001-01-01'))"+
+		" and ((date(begin) != '0001-01-01' and now() >= begin) or (date(begin) = '0001-01-01' and after_id = 0)"+
+		" or (date(begin) = '0001-01-01' and after_id != 0 and"+
+		" (select date(end) from price_properties where customer_table_id = p.after_id) != '0001-01-01' and"+
+		" now() > (select end from price_properties where customer_table_id = p.after_id))))", models.TABLE_TYPE_PRICE)
 	if err != nil {
 		log.Error("Error during getting all facility object from database %v", err)
 		return nil, err
@@ -88,56 +92,6 @@ func (facilityservice *FacilityService) GetByUser(user_id int64) (facilities *[]
 	}
 
 	return facilities, nil
-}
-
-func (facilityservice *FacilityService) SetByUser(user_id int64, facilities *[]int64, inTrans bool) (err error) {
-	var trans *gorp.Transaction
-
-	if inTrans {
-		trans, err = facilityservice.DbContext.Begin()
-		if err != nil {
-			log.Error("Error during setting facility objects for user object in database %v", err)
-			return err
-		}
-	}
-
-	_, err = facilityservice.DbContext.Exec("delete from supplier_services where supplier_id = "+
-		"(select unit_id from users where id = ?)", user_id)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
-		log.Error("Error during setting facility objects for user object in database %v with value %v", err, user_id)
-		return err
-	}
-
-	if len(*facilities) > 0 {
-		statement := ""
-		for _, value := range *facilities {
-			if statement != "" {
-				statement += " union"
-			}
-			statement += fmt.Sprintf(" select (select unit_id from users where id = %v), %v", user_id, value)
-		}
-		_, err = facilityservice.DbContext.Exec("insert into supplier_services (supplier_id, service_id)" + statement)
-		if err != nil {
-			if inTrans {
-				_ = trans.Rollback()
-			}
-			log.Error("Error during setting facility objects for user object in database %v with value %v", err, user_id)
-			return err
-		}
-	}
-
-	if inTrans {
-		err = trans.Commit()
-		if err != nil {
-			log.Error("Error during setting facility objects for user object in database %v", err)
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (facilityservice *FacilityService) Create(facility *models.DtoFacility) (err error) {

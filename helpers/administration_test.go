@@ -39,15 +39,15 @@ func (testGroupRepository *TestGroupRepository) GetAll() (groups *[]models.ApiGr
 	return testGroupRepository.Groups, testGroupRepository.Err
 }
 
-func (testGroupRepository *TestGroupRepository) SetByUser(userid int64, groups *[]models.UserRole, inTrans bool) (err error) {
+func (testGroupRepository *TestGroupRepository) SetByUser(userid int64, groups *[]models.UserRole, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testGroupRepository *TestGroupRepository) SetBySession(token string, groups *[]models.UserRole, inTrans bool) (err error) {
+func (testGroupRepository *TestGroupRepository) SetBySession(token string, groups *[]models.UserRole, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testGroupRepository *TestGroupRepository) DeleteByUser(userid int64) (err error) {
+func (testGroupRepository *TestGroupRepository) DeleteByUser(userid int64, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
@@ -84,7 +84,7 @@ func (testUserRepository *TestUserRepository) GetMeta() (usermeta *models.ApiUse
 	return nil, nil
 }
 
-func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error) {
+func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction) (unitid int64, err error) {
 	return 0, nil
 }
 
@@ -121,7 +121,7 @@ func (testUnitRepository *TestUnitRepository) GetAll(filter string) (units *[]mo
 	return nil, nil
 }
 
-func (testUnitRepository *TestUnitRepository) Create(unit *models.DtoUnit) (err error) {
+func (testUnitRepository *TestUnitRepository) Create(unit *models.DtoUnit, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
@@ -141,7 +141,7 @@ type TestEmailRepository struct {
 	SendErr   error
 }
 
-func (testEmailRepository *TestEmailRepository) SendEmail(email string, subject string, body string) (err error) {
+func (testEmailRepository *TestEmailRepository) SendEmail(email string, subject string, body string, headers string) (err error) {
 	return testEmailRepository.SendErr
 }
 
@@ -161,19 +161,19 @@ func (testEmailRepository *TestEmailRepository) GetByUser(userid int64) (emails 
 	return nil, nil
 }
 
-func (testEmailRepository *TestEmailRepository) Create(email *models.DtoEmail) (err error) {
+func (testEmailRepository *TestEmailRepository) Create(email *models.DtoEmail, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testEmailRepository *TestEmailRepository) Update(email *models.DtoEmail) (err error) {
+func (testEmailRepository *TestEmailRepository) Update(email *models.DtoEmail, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testEmailRepository *TestEmailRepository) Delete(email string) (err error) {
+func (testEmailRepository *TestEmailRepository) Delete(email string, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
-func (testEmailRepository *TestEmailRepository) DeleteByUser(userid int64) (err error) {
+func (testEmailRepository *TestEmailRepository) DeleteByUser(userid int64, trans *gorp.Transaction) (err error) {
 	return nil
 }
 
@@ -182,8 +182,7 @@ type TestTemplateRepository struct {
 	Err error
 }
 
-func (testTemplateRepository *TestTemplateRepository) GenerateText(
-	dtotemplate *models.DtoTemplate, name string, layout string) (buf *bytes.Buffer, err error) {
+func (testTemplateRepository *TestTemplateRepository) GenerateText(object interface{}, name string, layout string) (buf *bytes.Buffer, err error) {
 	return testTemplateRepository.Buf, testTemplateRepository.Err
 }
 
@@ -234,7 +233,7 @@ func TestCheckUserRolesNonMatching(t *testing.T) {
 	if err == nil {
 		t.Error("Check user roles should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Check user roles wrong http status and error code")
 	}
 }
@@ -254,7 +253,7 @@ func TestCheckUserNotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Check user should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Check user wrong http status and error code")
 	}
 }
@@ -276,7 +275,7 @@ func TestCheckUserNotActive(t *testing.T) {
 	if err == nil {
 		t.Error("Check user should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_USER_BLOCKED {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_USER_BLOCKED {
 		t.Error("Check user wrong http status and error code")
 	}
 }
@@ -298,7 +297,7 @@ func TestCheckUserNotConfirmed(t *testing.T) {
 	if err == nil {
 		t.Error("Check user should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_USER_BLOCKED {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_USER_BLOCKED {
 		t.Error("Check user wrong http status and error code")
 	}
 }
@@ -337,7 +336,7 @@ func TestCheckUnitNotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Check unit should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Check unit wrong http status and error code")
 	}
 }
@@ -367,7 +366,7 @@ func TestCheckPrimaryEmailZero(t *testing.T) {
 	if err == nil {
 		t.Error("Check primary email should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Check primary email wrong http status and error code")
 	}
 }
@@ -384,7 +383,7 @@ func TestCheckPrimaryEmailMany(t *testing.T) {
 	if err == nil {
 		t.Error("Check primary email should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Check primary email wrong http status and error code")
 	}
 }
@@ -402,7 +401,7 @@ func TestCheckPrimaryEmailUserNotConfirmed(t *testing.T) {
 	if err == nil {
 		t.Error("Check primary email should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Check primary email wrong http status and error code")
 	}
 }
@@ -420,7 +419,7 @@ func TestCheckPrimaryEmailEmailNotConfirmed(t *testing.T) {
 	if err == nil {
 		t.Error("Check primary email should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusBadRequest || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Check primary email wrong http status and error code")
 	}
 }
@@ -452,7 +451,7 @@ func TestCheckEmailAvailabilityExistsError(t *testing.T) {
 	if err == nil {
 		t.Error("Check email availability should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Check email availability wrong http status and error code")
 	}
 }
@@ -491,7 +490,7 @@ func TestCheckEmailAvailabilityGetError(t *testing.T) {
 	if !emailExists {
 		t.Error("Check email availability should return exists status")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Check email availability wrong http status and error code")
 	}
 }
@@ -513,7 +512,7 @@ func TestCheckEmailAvailabilityExistsConfirmed(t *testing.T) {
 	if !emailExists {
 		t.Error("Check email availability should return exists status")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_EMAIL_INUSE {
+	if r.StatusValue != http.StatusConflict || r.ErrorValue.Code != types.TYPE_ERROR_EMAIL_INUSE {
 		t.Error("Check email availability wrong http status and error code")
 	}
 }
@@ -566,7 +565,7 @@ func TestSendConfirmationTemplateErr(t *testing.T) {
 	if err == nil {
 		t.Error("Send confirmations should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Send confirmations wrong http status and error code")
 	}
 }
@@ -587,7 +586,7 @@ func TestSendConfirmationEmailErr(t *testing.T) {
 	if err == nil {
 		t.Error("Send confirmations should return error")
 	}
-	if r.StatusValue != http.StatusNotFound && r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
 		t.Error("Send confirmations wrong http status and error code")
 	}
 }

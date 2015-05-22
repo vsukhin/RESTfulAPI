@@ -26,13 +26,38 @@ type ViewUser struct {
 	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                        // Хэш капчи
 }
 
+type ChangeUser struct {
+	Surname    string `json:"surname" validate:"nonzero,min=1,max=255"` // Фамилия пользователя
+	Name       string `json:"name" validate:"nonzero,min=1,max=255"`    // Логин пользователя
+	MiddleName string `json:"middleName"  validate:"max=255"`           // Отчество пользователя
+	WorkPhone  string `json:"workPhone" validate:"max=25"`              // Рабочий телефон
+	JobTitle   string `json:"jobTitle" validate:"max=255"`              // Должность
+	Language   string `json:"language" validate:"max=10"`               // Язык пользователя по умолчанию
+}
+
+type ViewApiUserFull struct {
+	Creator_ID   int64                `json:"userId" db:"user_id"`                                    // Уникальный id создателя
+	Unit_ID      int64                `json:"unitId" db:"unit_id"`                                    // Уникальный id объединения
+	UnitAdmin    bool                 `json:"unitAdmin" db:"unitAdmin"`                               // Администратор объединения
+	Active       bool                 `json:"active" db:"active"`                                     // Пользователь активен
+	Confirmed    bool                 `json:"confirmed" db:"confirmed"`                               // Пользователь подтвержден
+	Surname      string               `json:"surname" db:"surname" validate:"nonzero,min=1,max=255"`  // Фамилия пользователя
+	Name         string               `json:"name" db:"name" validate:"nonzero,min=1,max=255"`        // Имя пользователя
+	MiddleName   string               `json:"middleName" db:"middleName" validate:"max=255"`          // Отчество пользователя
+	WorkPhone    string               `json:"workPhone" db:"workPhone" validate:"max=25"`             // Рабочий телефон
+	JobTitle     string               `json:"jobTitle" db:"jobTitle" validate:"max=255"`              // Должность
+	Language     string               `json:"language" db:"language" validate:"nonzero,min=1,max=10"` // Язык пользователя по умолчанию
+	Roles        []UserRole           `json:"groups,omitempty" db:"-"`                                // Массив значений уровней доступа пользователя
+	Emails       []ViewApiEmail       `json:"emails,omitempty" db:"-"`                                // Массив email
+	MobilePhones []ViewApiMobilePhone `json:"mobilePhones,omitempty" db:"-"`                          // Массив мобильных телефонов
+}
+
 type ApiUserTiny struct {
 	ID int64 `json:"id" db:"id"` // Уникальный id пользователя
 }
 
 type ApiUserShort struct {
 	ID         int64     `json:"id" db:"id"`                   // Уникальный id пользователя
-	Login      string    `json:"login" db:"login"`             // Логин пользователя
 	Blocked    bool      `json:"blocked" db:"blocked"`         // Пользователь активен
 	Confirmed  bool      `json:"confirmed" db:"confirmed"`     // Пользователь подтвержден
 	LastLogin  time.Time `json:"lastLoginAt" db:"lastLoginAt"` // Время последнего логина
@@ -55,45 +80,18 @@ type ApiUserLong struct {
 	Language   string `json:"language" db:"language"`     // Язык пользователя по умолчанию
 }
 
-type ViewApiUserFull struct {
-	Creator_ID   int64                `json:"userId" db:"user_id"`                                    // Уникальный id создателя
-	Unit_ID      int64                `json:"unitId" db:"unit_id"`                                    // Уникальный id объединения
-	UnitAdmin    bool                 `json:"unitAdmin" db:"unitAdmin"`                               // Администратор объединения
-	Active       bool                 `json:"active" db:"active"`                                     // Пользователь активен
-	Confirmed    bool                 `json:"confirmed" db:"confirmed"`                               // Пользователь подтвержден
-	Surname      string               `json:"surname" db:"surname" validate:"nonzero,min=1,max=255"`  // Фамилия пользователя
-	Name         string               `json:"name" db:"name" validate:"nonzero,min=1,max=255"`        // Имя пользователя
-	MiddleName   string               `json:"middleName" db:"middleName" validate:"max=255"`          // Отчество пользователя
-	WorkPhone    string               `json:"workPhone" db:"workPhone" validate:"max=25"`             // Рабочий телефон
-	JobTitle     string               `json:"jobTitle" db:"jobTitle" validate:"max=255"`              // Должность
-	Language     string               `json:"language" db:"language" validate:"nonzero,min=1,max=10"` // Язык пользователя по умолчанию
-	Roles        []UserRole           `json:"groups,omitempty" db:"-"`                                // Массив значений уровней доступа пользователя
-	Emails       []ApiEmail           `json:"emails,omitempty" db:"-"`                                // Массив email
-	MobilePhones []ViewApiMobilePhone `json:"mobilePhones,omitempty" db:"-"`                          // Массив мобильных телефонов
-}
-
 type ApiUserMeta struct {
 	NumOfRows int64 `json:"rows"` // Число строк
 }
 
-type ChangeUser struct {
-	Surname    string `json:"surname" validate:"nonzero,min=1,max=255"` // Фамилия пользователя
-	Name       string `json:"name" validate:"nonzero,min=1,max=255"`    // Логин пользователя
-	MiddleName string `json:"middleName"  validate:"max=255"`           // Отчество пользователя
-	WorkPhone  string `json:"workPhone" validate:"max=25"`              // Рабочий телефон
-	JobTitle   string `json:"jobTitle" validate:"max=255"`              // Должность
-	Language   string `json:"language" validate:"max=10"`               // Язык пользователя по умолчанию
-}
-
 type UserSearch struct {
-	ID         int64  `query:"id" search:"u.id"`                 // id пользователя
-	Login      string `query:"login" search:"login"`             // Логин пользователя
-	Blocked    bool   `query:"blocked" search:"(not u.active)"`  // Пользователь заблокирован
-	Confirmed  bool   `query:"confirmed" search:"u.confirmed"`   // Пользователь подтвержден
-	LastLogin  string `query:"lastLoginAt" search:"u.lastLogin"` // Последний заход
-	Surname    string `query:"surname" search:"u.surname"`       // Фамилия пользователя
-	Name       string `query:"name" search:"u.name"`             // Имя пользователя
-	MiddleName string `query:"middleName" search:"u.middleName"` // Отчество пользователя
+	ID         int64  `query:"id" search:"id"`                 // id пользователя
+	Blocked    bool   `query:"blocked" search:"(not active)"`  // Пользователь заблокирован
+	Confirmed  bool   `query:"confirmed" search:"confirmed"`   // Пользователь подтвержден
+	LastLogin  string `query:"lastLoginAt" search:"lastLogin"` // Последний заход
+	Surname    string `query:"surname" search:"surname"`       // Фамилия пользователя
+	Name       string `query:"name" search:"name"`             // Имя пользователя
+	MiddleName string `query:"middleName" search:"middleName"` // Отчество пользователя
 }
 
 type DtoUser struct {
@@ -125,11 +123,10 @@ func NewApiUserTiny(id int64) *ApiUserTiny {
 	}
 }
 
-func NewApiUserShort(id int64, login string, blocked bool, confirmed bool, created time.Time,
+func NewApiUserShort(id int64, blocked bool, confirmed bool, created time.Time,
 	lastlogin time.Time, surname string, name string, middlename string) *ApiUserShort {
 	return &ApiUserShort{
 		ID:         id,
-		Login:      login,
 		Blocked:    blocked,
 		Confirmed:  confirmed,
 		LastLogin:  lastlogin,
@@ -158,7 +155,7 @@ func NewApiUserLong(id int64, unitid int64, unitadmin bool, active bool, confirm
 
 func NewViewApiUserFull(creator_id int64, unit_id int64, unitadmin bool, active bool, confirmed bool,
 	surname string, name string, middlename string, workphone string, jobtitle string, language string,
-	roles []UserRole, emails []ApiEmail, mobilephones []ViewApiMobilePhone) *ViewApiUserFull {
+	roles []UserRole, emails []ViewApiEmail, mobilephones []ViewApiMobilePhone) *ViewApiUserFull {
 	return &ViewApiUserFull{
 		Creator_ID:   creator_id,
 		Unit_ID:      unit_id,
@@ -216,11 +213,11 @@ func (user *ViewUser) Validate(errors binding.Errors, req *http.Request) binding
 }
 
 func (user *ViewApiUserFull) Validate(errors binding.Errors, req *http.Request) binding.Errors {
-	for _, apiEmail := range user.Emails {
-		errors = ValidateWithLanguage(&apiEmail, errors, req, apiEmail.Language)
+	for _, email := range user.Emails {
+		errors = ValidateWithLanguage(&email, errors, req, email.Language)
 	}
-	for _, apiMobilePhone := range user.MobilePhones {
-		errors = ValidateWithLanguage(&apiMobilePhone, errors, req, apiMobilePhone.Language)
+	for _, mobilephone := range user.MobilePhones {
+		errors = ValidateWithLanguage(&mobilephone, errors, req, mobilephone.Language)
 	}
 	return ValidateWithLanguage(user, errors, req, user.Language)
 }
@@ -247,9 +244,6 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 			break
 		}
 		outvalue = invalue
-	case "login":
-		invalue = strings.ToLower(invalue)
-		fallthrough
 	case "surname":
 		fallthrough
 	case "name":
@@ -272,7 +266,7 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue

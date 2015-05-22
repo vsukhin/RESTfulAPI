@@ -42,7 +42,7 @@ func Ping(request *http.Request, r render.Render, params martini.Params, session
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
 }
 
-// post /api/v1.0/user/session/
+// post /api/v1.0/session/user/
 func CreateSession(errors binding.Errors, viewsession models.ViewSession, r render.Render, params martini.Params,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, captcharepository services.CaptchaRepository) {
 	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {

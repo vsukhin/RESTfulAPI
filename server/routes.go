@@ -8,13 +8,22 @@ import (
 	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
+	"strconv"
 )
 
 func PrintRoutes(router martini.Router) {
 	routes := router.All()
-	fmt.Printf("%-3v|%-8v|%-50v|%v\n", "#", "method", "pattern", "description")
+
+	urlLength := 0
+	for _, routeinfo := range routes {
+		if len(routeinfo.Pattern()) > urlLength {
+			urlLength = len(routeinfo.Pattern())
+		}
+	}
+
+	fmt.Printf("%-4v|%-8v|%-"+strconv.Itoa(urlLength)+"v|%v\n", "#", "method", "pattern", "description")
 	for i, routeinfo := range routes {
-		fmt.Printf("%-3v|%-8v|%-50v|%v", i+1, routeinfo.Method(), routeinfo.Pattern(), routeinfo.GetName()+"\n")
+		fmt.Printf("%-4v|%-8v|%-"+strconv.Itoa(urlLength)+"v|%v", i+1, routeinfo.Method(), routeinfo.Pattern(), routeinfo.GetName()+"\n")
 	}
 }
 
@@ -23,7 +32,19 @@ func Routes() martini.Router {
 
 	router = martini.NewRouter()
 
+	router.Group("/subscriptions", func(a martini.Router) {
+		// Выдача последних новостей в виде ленты RSS +
+		a.Get("/news/rss/", controllers.GetNewsRss).
+			Name("Выдача последних новостей в виде ленты RSS")
+		// Удаление подписки на новости +
+		a.Get("/unsubscribe/:unsubscribeCode/", controllers.UnsubscribeFromNews).
+			Name("Удаление подписки на новости")
+	})
+
 	router.Group("/api/v1.0/session", func(a martini.Router) {
+		// Аутентификация пользователя +
+		a.Post("/user/", binding.Json(models.ViewSession{}), controllers.CreateSession).
+			Name("Аутентификация пользователя")
 		// Проверка токена с продлением +
 		a.Get("/:token", middlewares.RequireSessionKeepWithRoute, controllers.KeepSession).
 			Name("Проверка токена с продлением")
@@ -70,9 +91,6 @@ func Routes() martini.Router {
 	})
 
 	router.Group("/api/v1.0/user", func(a martini.Router) {
-		// Аутентификация пользователя +
-		a.Post("/session/", binding.Json(models.ViewSession{}), controllers.CreateSession).
-			Name("Аутентификация пользователя")
 		// Получение списка групп пользователей +
 		a.Get("/groups/", middlewares.RequireSessionKeepWithoutRoute, controllers.GetGroups).
 			Name("Получение списка групп пользователей")
@@ -186,6 +204,15 @@ func Routes() martini.Router {
 		// Получение списка услуг привязанных к объединению +
 		a.Get("/:unitId/services/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, administration.GetUnitFacilities).
 			Name("Получение списка услуг привязанных к объединению")
+		// Получение списка компаний объединения +
+		a.Get("/:unitId/organisations/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, administration.GetUnitCompanies).
+			Name("Получение списка компаний объединения")
+		// Получение списка зарегистрированных за объединением имён отправителей sms +
+		a.Get("/:unitId/smsfroms/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, administration.GetUnitSMSSenders).
+			Name("Получение списка зарегистрированных за объединением имён отправителей sms")
+		// Получение списка счетов организаций объединения +
+		a.Get("/:unitId/invoices/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireAdminRights, administration.GetUnitInvoices).
+			Name("Получение списка счетов организаций объединения")
 	})
 
 	router.Group("/api/v1.0/administration/orders", func(a martini.Router) {
@@ -207,10 +234,28 @@ func Routes() martini.Router {
 			Name("Удаление заказа")
 	})
 
-	router.Group("/api/v1.0/classification/contacts", func(a martini.Router) {
+	router.Group("/api/v1.0/classification", func(a martini.Router) {
 		// Получение справочника классификации контактов  +
-		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetAvailableContacts).
+		a.Get("/contacts/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetAvailableContacts).
 			Name("Получение справочника классификации контактов")
+		// Получение справочника операторов мобильной связи +
+		a.Get("/mobileoperators/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetMobileOperators).
+			Name("Получение справочника операторов мобильной связи")
+		// Получение списка категорий услуг +
+		a.Get("/services/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetFacilityTypes).
+			Name("Получение списка категорий услуг")
+		// Получение справочника правовых форм организаций +
+		a.Get("/legalformorganisation/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetCompanyTypes).
+			Name("Получение справочника правовых форм организаций")
+		// Получение справочника кодов классификации организаций +
+		a.Get("/organisationClasses/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetCompanyClasses).
+			Name("Получение справочника кодов классификации организаций")
+		// Получение справочника типов адресов +
+		a.Get("/addresses/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetAddressTypes).
+			Name("Получение справочника типов адресов")
+		// Справочник статусов заказа +
+		a.Get("/orderstatuses/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetComplexStatuses).
+			Name("Справочник статусов заказа")
 	})
 
 	router.Group("/api/v1.0/administration/classification/contacts", func(a martini.Router) {
@@ -235,13 +280,31 @@ func Routes() martini.Router {
 
 	router.Group("/api/v1.0/services", func(a martini.Router) {
 		// Получение списка услуг поставщиков +
-		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetFacilities).
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetFacilities).
 			Name("Получение списка услуг поставщиков")
+		// Получение справочника периодов +
+		a.Get("/periods/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetPeriods).
+			Name("Получение справочника периодов")
+		// Получение справочника событий +
+		a.Get("/events/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetEvents).
+			Name("Получение справочника событий")
+		// Получение поставщиков услуг оказывающих услугу sms рассылка +
+		a.Get("/suppliers/sms/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetSMSSuppliers).
+			Name("Получение поставщиков услуг оказывающих услугу sms рассылка")
+		// Получение поставщиков услуги «HLR запрос» +
+		a.Get("/suppliers/hlr/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetHLRSuppliers).
+			Name("Получение поставщиков услуги «HLR запрос»")
+		// Получение поставщиков услуги «Ввод данных» +
+		a.Get("/suppliers/recognize/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetRecognizeSuppliers).
+			Name("Получение поставщиков услуги «Ввод данных»")
+		// Получение поставщиков услуги «Верификация базы данных» +
+		a.Get("/suppliers/verification/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetVerifySuppliers).
+			Name("Получение поставщиков услуги «Верификация базы данных»")
 	})
 
 	router.Group("/api/v1.0/suppliers/services", func(a martini.Router) {
 		// Получение списка услуг поставщиков +
-		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetFacilities).
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetFacilities).
 			Name("Получение списка услуг поставщиков")
 		// Получение текущего списка услуг оказываемых поставщиком услуг +
 		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, controllers.GetSupplierFacilities).
@@ -269,14 +332,38 @@ func Routes() martini.Router {
 		// Отклонение заказа +
 		a.Delete("/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireOrderRights, controllers.DeleteOrder).
 			Name("Отклонение заказа")
-		// Получение расширенной информации о заказе по оказываемому сервису
-		a.Get("/:oid/services/:sid/", middlewares.RequireSessionKeepWithoutRoute,
-			middlewares.RequireOrderRights, controllers.GetOrderInfo).
-			Name("Получение расширенной информации о заказе по оказываемому сервису")
-		// Внесение изменений в информацию о заказе по оказываемому сервису
-		a.Put("/:oid/services/:sid/", middlewares.RequireSessionKeepWithoutRoute,
-			middlewares.RequireOrderRights, controllers.UpdateOrderInfo).
-			Name("Внесение изменений в информацию о заказе по оказываемому сервису")
+		// Получение расширенной информации заказа - SMS рассылка +
+		a.Get("/:oid/service/sms/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.GetSMSOrder).
+			Name("Получение расширенной информации заказа - SMS рассылка")
+		// Внесение изменений в расширенную информацию заказа - SMS рассылка +
+		a.Put("/:oid/service/sms/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, binding.Json(models.ViewSMSFacility{}), controllers.UpdateSMSOrder).
+			Name("Внесение изменений в расширенную информацию заказа - SMS рассылка")
+		// Получение расширенной информации заказа - HLR запросы +
+		a.Get("/:oid/service/hlr/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.GetHLROrder).
+			Name("Получение расширенной информации заказа - HLR запросы")
+		// Внесение изменений в расширенную информацию заказа - HLR запросы +
+		a.Put("/:oid/service/hlr/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, binding.Json(models.ViewHLRFacility{}), controllers.UpdateHLROrder).
+			Name("Внесение изменений в расширенную информацию заказа - HLR запросы")
+		// Получение расширенной информации заказа - Ввод данных +
+		a.Get("/:oid/service/recognize/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.GetRecognizeOrder).
+			Name("Получение расширенной информации заказа - Ввод данных")
+		// Внесение изменений в расширенную информацию заказа - Ввод данных +
+		a.Put("/:oid/service/recognize/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, binding.Json(models.ViewRecognizeFacility{}), controllers.UpdateRecognizeOrder).
+			Name("Внесение изменений в расширенную информацию заказа - Ввод данных")
+		// Получение расширенной информации заказа - Верификация базы данных +
+		a.Get("/:oid/service/verification/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, controllers.GetVerifyOrder).
+			Name("Получение расширенной информации заказа - Верификация базы данных")
+		// Внесение изменений в расширенную информацию заказа - Верификация базы данных +
+		a.Put("/:oid/service/verification/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireOrderRights, binding.Json(models.ViewVerifyFacility{}), controllers.UpdateVerifyOrder).
+			Name("Внесение изменений в расширенную информацию заказа - Верификация базы данных")
 	})
 
 	router.Group("/api/v1.0/tables", func(a martini.Router) {
@@ -307,7 +394,7 @@ func Routes() martini.Router {
 			Name("Получение списка колонок импортируемой таблицы")
 		// Сохранение списка импортируемых колонок и присвоение типа колонкам +
 		a.Put("/import/:tmpid/columns/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewImportColumns{}), controllers.UpdateImportDataColumns).
+			middlewares.RequireEditableTable, binding.Json(models.ViewImportColumns{}), controllers.UpdateImportDataColumns).
 			Name("Сохранение списка импортируемых колонок и присвоение типа колонкам")
 		// Получение информации об экспорте данных +
 		a.Options("/export/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetExportDataMeta).
@@ -315,19 +402,29 @@ func Routes() martini.Router {
 		// Получение экспортируемых данных данных +
 		a.Get("/export/:token/:fid/", controllers.GetExportData).
 			Name("Получение экспортируемых данных данных")
+		// Получение списка таблиц подходящих под услугу sms рассылка +
+		a.Get("/services/sms/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetSMSTables).
+			Name("Получение списка таблиц подходящих под услугу sms рассылка")
+		// Получение списка таблиц подходящих под услугу hlr рассылка +
+		a.Get("/services/hlr/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetHLRTables).
+			Name("Получение списка таблиц подходящих под услугу hlr рассылка")
+		// Получение списка таблиц подходящих под услугу верификация базы данных +
+		a.Get("/services/verification/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetVerifyTables).
+			Name("Получение списка таблиц подходящих под услугу верификация базы данных")
 		// Получение таблицы +
 		a.Get("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTable).
 			Name("Получение таблицы")
 		// Изменение таблицы +
 		a.Put("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewLongCustomerTable{}), controllers.UpdateTable).
+			middlewares.RequireEditableTable, binding.Json(models.ViewLongCustomerTable{}), controllers.UpdateTable).
 			Name("Изменение таблицы")
 		// Удаление таблицы +
-		a.Delete("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTable).
+		a.Delete("/:tid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			middlewares.RequireEditableTable, controllers.DeleteTable).
 			Name("Удаление таблицы")
 		// Создание колонки в таблице +
 		a.Post("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewApiTableColumn{}), controllers.CreateTableColumn).
+			middlewares.RequireEditableTable, binding.Json(models.ViewApiTableColumn{}), controllers.CreateTableColumn).
 			Name("Создание колонки в таблице")
 		// Получение списка колонок таблицы в порядке отображения +
 		a.Get("/:tid/field/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableColumns).
@@ -337,14 +434,15 @@ func Routes() martini.Router {
 			Name("Получение колонки таблицы")
 		// Изменение колонки в таблице +
 		a.Put("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewApiTableColumn{}), controllers.UpdateTableColumn).
+			middlewares.RequireEditableTable, binding.Json(models.ViewApiTableColumn{}), controllers.UpdateTableColumn).
 			Name("Изменение колонки в таблице")
 		// Удаление колонки в таблице +
-		a.Delete("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableColumn).
+		a.Delete("/:tid/field/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			middlewares.RequireEditableTable, controllers.DeleteTableColumn).
 			Name("Удаление колонки в таблице")
 		// Изменение порядка отображения колонки +
 		a.Put("/:tid/sequence/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewApiOrderTableColumns{}), controllers.UpdateOrderTableColumn).
+			middlewares.RequireEditableTable, binding.Json(models.ViewApiOrderTableColumns{}), controllers.UpdateOrderTableColumn).
 			Name("Изменение порядка отображения колонки")
 		// Получение информации о данных в таблице +
 		a.Options("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableMetaData).
@@ -357,14 +455,15 @@ func Routes() martini.Router {
 			Name("Получение строки данных таблицы")
 		// Внесение строки данных в таблицу +
 		a.Post("/:tid/data/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewApiTableRow{}), controllers.CreateTableRow).
+			middlewares.RequireEditableTable, binding.Json(models.ViewApiTableRow{}), controllers.CreateTableRow).
 			Name("Внесение строки данных в таблицу")
 		// Изменение строки данных в таблице +
 		a.Put("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewApiTableRow{}), controllers.UpdateTableRow).
+			middlewares.RequireEditableTable, binding.Json(models.ViewApiTableRow{}), controllers.UpdateTableRow).
 			Name("Изменение строки данных в таблице")
 		// Удаление строки данных из таблицы +
-		a.Delete("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableRow).
+		a.Delete("/:tid/data/:rid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			middlewares.RequireEditableTable, controllers.DeleteTableRow).
 			Name("Удаление строки данных из таблицы")
 		// Получение информации о данных в ячейке таблицы +
 		a.Options("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetTableMetaCell).
@@ -374,10 +473,11 @@ func Routes() martini.Router {
 			Name("Получение данных ячейки таблицы")
 		// Изменение данных ячейки таблицы +
 		a.Put("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
-			binding.Json(models.ViewTableCell{}), controllers.UpdateTableCell).
+			middlewares.RequireEditableTable, binding.Json(models.ViewTableCell{}), controllers.UpdateTableCell).
 			Name("Изменение данных ячейки таблицы")
 		// Удаление данных ячейки таблицы +
-		a.Delete("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.DeleteTableCell).
+		a.Delete("/:tid/cell/:rid/:cid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+			middlewares.RequireEditableTable, controllers.DeleteTableCell).
 			Name("Удаление данных ячейки таблицы")
 		// Экспорт таблицы +
 		a.Get("/:tid/export/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.ExportDataToFile).
@@ -386,7 +486,7 @@ func Routes() martini.Router {
 		a.Options("/:tid/export/:fid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights, controllers.GetExportDataStatus).
 			Name("Проверка статуса готовности экспортируемого файла")
 		// Изменение настроек для таблицы являющейся прайс-листом  +
-		a.Put("/:tid/price/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireTableRights,
+		a.Put("/:tid/price/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSupplierRights, middlewares.RequireTableRights,
 			binding.Json(models.ViewApiPriceProperties{}), controllers.UpdatePriceTable).
 			Name("Изменение настроек для таблицы являющейся прайс-листом")
 	})
@@ -422,19 +522,48 @@ func Routes() martini.Router {
 
 	router.Group("/api/v1.0/customers/services", func(a martini.Router) {
 		// Получение списка доступных услуг +
-		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetAvailableFacilities).
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetAvailableFacilities).
 			Name("Получение списка доступных услуг")
+	})
+
+	router.Group("/api/v1.0/customers/invoices", func(a martini.Router) {
+		// Получение общей информации о счетах +
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetMetaInvoices).
+			Name("Получение общей информации о счетах")
+		// Получение списка счетов +
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetInvoices).
+			Name("Получение списка счетов")
+		// Создание счёта на оплату +
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights,
+			binding.Json(models.ViewInvoice{}), controllers.CreateInvoice).
+			Name("Создание счёта на оплату")
+		// Получение подробной информации о счёте +
+		a.Get("/:iid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireInvoiceRights, controllers.GetInvoice).
+			Name("Получение подробной информации о счёте")
+		// Изменение информации о счёте +
+		a.Patch("/:iid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireInvoiceRights,
+			binding.Json(models.ViewInvoice{}), controllers.UpdateInvoice).
+			Name("Изменение информации о счёте")
+		// Отказ от оплаты счёта +
+		a.Delete("/:iid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireInvoiceRights, controllers.DeleteInvoice).
+			Name("Отказ от оплаты счёта")
 	})
 
 	router.Group("/api/v1.0/projects", func(a martini.Router) {
 		// Получение общей информации о проектах +
-		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetMetaProjects).
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetMetaProjects).
 			Name("Получение общей информации о проектах")
 		// Получение списка проектов +
-		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetProjects).
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetAllProjects).
 			Name("Получение списка проектов")
+		// Получение списка проектов находящихся в работе +
+		a.Get("/onthego/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetActiveProjects).
+			Name("Получение списка проектов находящихся в работе")
+		// Получение списка проектов находящихся в архиве +
+		a.Get("/wasarchived/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetArchiveProjects).
+			Name("Получение списка проектов находящихся в архиве")
 		// Создание проекта +
-		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights,
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights,
 			binding.Json(models.ViewProject{}), controllers.CreateProject).
 			Name("Создание проекта")
 		// Получение проекта +
@@ -461,12 +590,102 @@ func Routes() martini.Router {
 		a.Get("/:prid/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireProjectRights, controllers.GetProjectOrder).
 			Name("Получение полной информации о заказе проекта")
 		// Изменение информации о заказе проекта +
-		a.Put("/:prid/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireProjectRights,
-			binding.Json(models.ViewLongOrder{}), controllers.UpdateProjectOrder).
+		a.Patch("/:prid/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireProjectRights,
+			binding.Json(models.ViewMiddleOrder{}), controllers.UpdateProjectOrder).
 			Name("Изменение информации о заказе проекта")
 		// Удаление заказа проекта +
 		a.Delete("/:prid/orders/:oid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireProjectRights, controllers.DeleteProjectOrder).
 			Name("Удаление заказа проекта")
+		// Получение расширенной информации заказа - SMS рассылка +
+		a.Get("/:prid/orders/:oid/service/sms/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, controllers.GetProjectSMSOrder).
+			Name("Получение расширенной информации заказа - SMS рассылка")
+		// Внесение изменений в расширенную информацию заказа - SMS рассылка +
+		a.Put("/:prid/orders/:oid/service/sms/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, binding.Json(models.ViewSMSFacility{}), controllers.UpdateProjectSMSOrder).
+			Name("Внесение изменений в расширенную информацию заказа - SMS рассылка")
+		// Получение расширенной информации заказа - HLR запросы +
+		a.Get("/:prid/orders/:oid/service/hlr/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, controllers.GetProjectHLROrder).
+			Name("Получение расширенной информации заказа - HLR запросы")
+		// Внесение изменений в расширенную информацию заказа - HLR запросы +
+		a.Put("/:prid/orders/:oid/service/hlr/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, binding.Json(models.ViewHLRFacility{}), controllers.UpdateProjectHLROrder).
+			Name("Внесение изменений в расширенную информацию заказа - HLR запросы")
+		// Получение расширенной информации заказа - Ввод данных +
+		a.Get("/:prid/orders/:oid/service/recognize/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, controllers.GetProjectRecognizeOrder).
+			Name("Получение расширенной информации заказа - Ввод данных")
+		// Внесение изменений в расширенную информацию заказа - Ввод данных +
+		a.Put("/:prid/orders/:oid/service/recognize/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, binding.Json(models.ViewRecognizeFacility{}), controllers.UpdateProjectRecognizeOrder).
+			Name("Внесение изменений в расширенную информацию заказа - Ввод данных")
+		// Получение расширенной информации заказа - Верификация базы данных +
+		a.Get("/:prid/orders/:oid/service/verification/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, controllers.GetProjectVerifyOrder).
+			Name("Получение расширенной информации заказа - Верификация базы данных")
+		// Внесение изменений в расширенную информацию заказа - Верификация базы данных +
+		a.Put("/:prid/orders/:oid/service/verification/", middlewares.RequireSessionKeepWithoutRoute,
+			middlewares.RequireProjectRights, binding.Json(models.ViewVerifyFacility{}), controllers.UpdateProjectVerifyOrder).
+			Name("Внесение изменений в расширенную информацию заказа - Верификация базы данных")
+	})
+
+	router.Group("/api/v1.0/organisations", func(a martini.Router) {
+		// Получение общей информации о компаниях объединения +
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetMetaCompanies).
+			Name("Получение общей информации о компаниях объединения")
+		// Получение списка компаний объединения +
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights, controllers.GetCompanies).
+			Name("Получение списка компаний объединения")
+		// Получение подробной информации об организации объединения +
+		a.Get("/:orgid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCompanyRights, controllers.GetCompany).
+			Name("Получение подробной информации об организации объединения")
+		// Добавление новой организации объединения +
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireUserRights,
+			binding.Json(models.ViewCompany{}), controllers.CreateCompany).
+			Name("Добавление новой организации объединения")
+		// Изменение информации об организации объединения +
+		a.Put("/:orgid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCompanyRights,
+			binding.Json(models.ViewCompany{}), controllers.UpdateCompany).
+			Name("Изменение информации об организации объединения")
+		// Удаление организации объединения +
+		a.Delete("/:orgid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCompanyRights, controllers.DeleteCompany).
+			Name("Удаление организации объединения")
+	})
+
+	router.Group("/api/v1.0/subscriptions", func(a martini.Router) {
+		// Проверка подписки на новости +
+		a.Get("/news/:email/", controllers.GetNewsSubscription).
+			Name("Проверка подписки на новости")
+		// Подписка на новости +
+		a.Post("/news/", binding.Json(models.ViewSubscription{}), controllers.CreateSubscription).
+			Name("Подписка на новости")
+		// Подтверждение подписки на новостную рассылку +
+		a.Patch("/news/", binding.Json(models.SubscriptionConfirm{}), controllers.ConfirmSubscription).
+			Name("Подтверждение подписки на новостную рассылку")
+	})
+
+	router.Group("/api/v1.0/smsfrom", func(a martini.Router) {
+		// Получение общей информации по FROM для SMS +
+		a.Options("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetMetaSMSSenders).
+			Name("Получение общей информации по FROM для SMS")
+		// Получение списка зарегистрированных FROM для SMS +
+		a.Get("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights, controllers.GetSMSSenders).
+			Name("Получение списка зарегистрированных FROM для SMS")
+		// Получение FROM отправителя для SMS по id +
+		a.Get("/:frmid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSMSSenderRights, controllers.GetSMSSender).
+			Name("Получение FROM отправителя для SMS по id")
+		// Регистрация FROM отправителя для SMS +
+		a.Post("/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireCustomerRights,
+			binding.Json(models.ViewSMSSender{}), controllers.CreateSMSSender).
+			Name("Регистрация FROM отправителя для SMS")
+		// Изменение FROM отправителя для SMS +
+		a.Patch("/:frmid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSMSSenderRights,
+			binding.Json(models.ViewSMSSender{}), controllers.UpdateSMSSender).
+			Name("Изменение FROM отправителя для SMS")
+		// Удаление FROM отправителя для SMS +
+		a.Delete("/:frmid/", middlewares.RequireSessionKeepWithoutRoute, middlewares.RequireSMSSenderRights, controllers.DeleteSMSSender).
+			Name("Удаление FROM отправителя для SMS")
 	})
 
 	router.NotFound(middlewares.Default)

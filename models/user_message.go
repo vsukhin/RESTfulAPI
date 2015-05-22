@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-//Структура для организации статуса сообщения
+// Структура для организации статуса сообщения
 type DtoUserMessage struct {
 	User_ID    int64     `db:"user_id"`    // Идентификатор пользователя
 	Message_ID int64     `db:"message_id"` // Идентификатор сообщения

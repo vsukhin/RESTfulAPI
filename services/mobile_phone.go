@@ -2,16 +2,17 @@ package services
 
 import (
 	"application/models"
+	"github.com/coopernurse/gorp"
 )
 
 type MobilePhoneRepository interface {
 	Exists(phone string) (found bool, err error)
 	Get(phone string) (dtomobilephone *models.DtoMobilePhone, err error)
 	GetByUser(userid int64) (mobilephones *[]models.DtoMobilePhone, err error)
-	Create(mobilephone *models.DtoMobilePhone) (err error)
-	Update(mobilephone *models.DtoMobilePhone) (err error)
-	Delete(phone string) (err error)
-	DeleteByUser(userid int64) (err error)
+	Create(mobilephone *models.DtoMobilePhone, trans *gorp.Transaction) (err error)
+	Update(mobilephone *models.DtoMobilePhone, trans *gorp.Transaction) (err error)
+	Delete(phone string, trans *gorp.Transaction) (err error)
+	DeleteByUser(userid int64, trans *gorp.Transaction) (err error)
 }
 
 type MobilePhoneService struct {
@@ -58,8 +59,12 @@ func (mobilephoneservice *MobilePhoneService) GetByUser(userid int64) (mobilepho
 	return mobilephones, nil
 }
 
-func (mobilephoneservice *MobilePhoneService) Create(mobilephone *models.DtoMobilePhone) (err error) {
-	err = mobilephoneservice.DbContext.Insert(mobilephone)
+func (mobilephoneservice *MobilePhoneService) Create(mobilephone *models.DtoMobilePhone, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		err = trans.Insert(mobilephone)
+	} else {
+		err = mobilephoneservice.DbContext.Insert(mobilephone)
+	}
 	if err != nil {
 		log.Error("Error during creating mobile phone object in database %v", err)
 		return err
@@ -68,8 +73,12 @@ func (mobilephoneservice *MobilePhoneService) Create(mobilephone *models.DtoMobi
 	return nil
 }
 
-func (mobilephoneservice *MobilePhoneService) Update(mobilephone *models.DtoMobilePhone) (err error) {
-	_, err = mobilephoneservice.DbContext.Update(mobilephone)
+func (mobilephoneservice *MobilePhoneService) Update(mobilephone *models.DtoMobilePhone, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		_, err = trans.Update(mobilephone)
+	} else {
+		_, err = mobilephoneservice.DbContext.Update(mobilephone)
+	}
 	if err != nil {
 		log.Error("Error during updating mobile phone object in database %v with value %v", err, mobilephone.Phone)
 		return err
@@ -78,8 +87,12 @@ func (mobilephoneservice *MobilePhoneService) Update(mobilephone *models.DtoMobi
 	return nil
 }
 
-func (mobilephoneservice *MobilePhoneService) Delete(phone string) (err error) {
-	_, err = mobilephoneservice.DbContext.Exec("delete from "+mobilephoneservice.Table+" where phone = ?", phone)
+func (mobilephoneservice *MobilePhoneService) Delete(phone string, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		_, err = trans.Exec("delete from "+mobilephoneservice.Table+" where phone = ?", phone)
+	} else {
+		_, err = mobilephoneservice.DbContext.Exec("delete from "+mobilephoneservice.Table+" where phone = ?", phone)
+	}
 	if err != nil {
 		log.Error("Error during deleting mobile phone object in database %v with value %v", err, phone)
 		return err
@@ -88,8 +101,12 @@ func (mobilephoneservice *MobilePhoneService) Delete(phone string) (err error) {
 	return nil
 }
 
-func (mobilephoneservice *MobilePhoneService) DeleteByUser(userid int64) (err error) {
-	_, err = mobilephoneservice.DbContext.Exec("delete from "+mobilephoneservice.Table+" where user_id = ?", userid)
+func (mobilephoneservice *MobilePhoneService) DeleteByUser(userid int64, trans *gorp.Transaction) (err error) {
+	if trans != nil {
+		_, err = trans.Exec("delete from "+mobilephoneservice.Table+" where user_id = ?", userid)
+	} else {
+		_, err = mobilephoneservice.DbContext.Exec("delete from "+mobilephoneservice.Table+" where user_id = ?", userid)
+	}
 	if err != nil {
 		log.Error("Error during deleting mobile phone object in database %v with value %v", err, userid)
 		return err

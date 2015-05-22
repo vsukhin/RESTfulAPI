@@ -14,21 +14,8 @@ import (
 	"types"
 )
 
-// options /api/v1.0/services/
-// options /api/v1.0/suppliers/services/
-func GetFacilities(r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
-	facilities, err := facilityrepository.GetAll()
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-
-	r.JSON(http.StatusOK, facilities)
-}
-
 // get /api/v1.0/suppliers/services/
-func GetSupplierFacilities(r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
+func GetSupplierFacilities(w http.ResponseWriter, r render.Render, facilityrepository services.FacilityRepository, session *models.DtoSession) {
 	facilities, err := facilityrepository.GetByUser(session.UserID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -36,12 +23,12 @@ func GetSupplierFacilities(r render.Render, facilityrepository services.Facility
 		return
 	}
 
-	r.JSON(http.StatusOK, facilities)
+	helpers.RenderJSONArray(facilities, len(*facilities), w, r)
 }
 
 // put /api/v1.0/suppliers/services/
-func UpdateSupplierFacilities(errors binding.Errors, viewfacilities models.ViewFacilities, r render.Render,
-	facilityrepository services.FacilityRepository, session *models.DtoSession) {
+func UpdateSupplierFacilities(errors binding.Errors, viewfacilities models.ViewFacilities, w http.ResponseWriter, r render.Render,
+	facilityrepository services.FacilityRepository, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -64,7 +51,7 @@ func UpdateSupplierFacilities(errors binding.Errors, viewfacilities models.ViewF
 		*facilities = append(*facilities, dtofacility.ID)
 	}
 
-	err := facilityrepository.SetByUser(session.UserID, facilities, true)
+	err := supplierfacilityrepository.SetArrayByUser(session.UserID, facilities, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -78,7 +65,7 @@ func UpdateSupplierFacilities(errors binding.Errors, viewfacilities models.ViewF
 		return
 	}
 
-	r.JSON(http.StatusOK, apifacilities)
+	helpers.RenderJSONArray(apifacilities, len(*apifacilities), w, r)
 }
 
 // options /api/v1.0/suppliers/orders/
@@ -94,7 +81,7 @@ func GetMetaOrders(r render.Render, orderrepository services.OrderRepository, se
 }
 
 // get /api/v1.0/suppliers/orders/
-func GetOrders(request *http.Request, r render.Render, orderrepository services.OrderRepository, session *models.DtoSession) {
+func GetOrders(w http.ResponseWriter, request *http.Request, r render.Render, orderrepository services.OrderRepository, session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
 	filters, err := helpers.GetFilterArray(new(models.OrderSearch), nil, request, r, session.Language)
@@ -142,7 +129,7 @@ func GetOrders(request *http.Request, r render.Render, orderrepository services.
 		return
 	}
 
-	r.JSON(http.StatusOK, orders)
+	helpers.RenderJSONArray(orders, len(*orders), w, r)
 }
 
 // get /api/v1.0/suppliers/orders/:oid/
@@ -175,7 +162,7 @@ func UpdateOrder(errors binding.Errors, vieworder models.ViewLongOrder, r render
 		return
 	}
 
-	apiorder, err := helpers.UpdateOrder(dtoorder, &vieworder, r, params, orderrepository, unitrepository, facilityrepository, session.Language)
+	apiorder, err := helpers.UpdateLongOrder(dtoorder, &vieworder, r, params, orderrepository, unitrepository, facilityrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -192,7 +179,7 @@ func DeleteOrder(r render.Render, params martini.Params, orderrepository service
 	}
 
 	orderstatus := models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_CANCEL, true, "", time.Now())
-	err = orderstatusrepository.Save(orderstatus)
+	err = orderstatusrepository.Save(orderstatus, nil)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -202,14 +189,175 @@ func DeleteOrder(r render.Render, params martini.Params, orderrepository service
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
 }
 
-// get /api/v1.0/suppliers/orders/:oid/services/:sid/
-func GetOrderInfo(r render.Render, session *models.DtoSession) {
+// get /api/v1.0/suppliers/orders/:oid:/service/sms/
+func GetSMSOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, smsfacilityrepository services.SMSFacilityRepository,
+	mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
+	session *models.DtoSession) {
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apismsfacility, err := helpers.GetSMSOrder(dtoorder, r, facilityrepository, smsfacilityrepository, mobileoperatoroperationrepository,
+		resulttablerepository, worktablerepository, session.Language)
+	if err != nil {
+		return
+	}
 
-	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
+	r.JSON(http.StatusOK, apismsfacility)
 }
 
-// put /api/v1.0/suppliers/orders/:oid/services/:sid/
-func UpdateOrderInfo(r render.Render, session *models.DtoSession) {
+// put /api/v1.0/suppliers/orders/:oid:/service/sms/
+func UpdateSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMSFacility, r render.Render, params martini.Params,
+	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, smsfacilityrepository services.SMSFacilityRepository,
+	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
+	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
+	smssenderrepository services.SMSSenderRepository, mobileoperatorrepository services.MobileOperatorRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apismsfacility, err := helpers.UpdateSMSOrder(dtoorder, viewsmsfacility, r, facilityrepository, smsfacilityrepository,
+		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, smssenderrepository,
+		mobileoperatorrepository, resulttablerepository, worktablerepository, false, session.UserID, session.Language)
+	if err != nil {
+		return
+	}
 
-	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
+	r.JSON(http.StatusOK, apismsfacility)
+}
+
+// get /api/v1.0/suppliers/orders/:oid:/service/hlr/
+func GetHLROrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, hlrfacilityrepository services.HLRFacilityRepository,
+	mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
+	session *models.DtoSession) {
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apihlrfacility, err := helpers.GetHLROrder(dtoorder, r, facilityrepository, hlrfacilityrepository, mobileoperatoroperationrepository,
+		resulttablerepository, worktablerepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apihlrfacility)
+}
+
+// put /api/v1.0/suppliers/orders/:oid:/service/hlr/
+func UpdateHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLRFacility, r render.Render, params martini.Params,
+	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, hlrfacilityrepository services.HLRFacilityRepository,
+	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
+	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
+	mobileoperatorrepository services.MobileOperatorRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apihlrfacility, err := helpers.UpdateHLROrder(dtoorder, viewhlrfacility, r, facilityrepository, hlrfacilityrepository,
+		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, mobileoperatorrepository,
+		resulttablerepository, worktablerepository, false, session.UserID, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apihlrfacility)
+}
+
+// get /api/v1.0/suppliers/orders/:oid:/service/recognize/
+func GetRecognizeOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, recognizefacilityrepository services.RecognizeFacilityRepository,
+	inputfieldrepository services.InputFieldRepository, inputfilerepository services.InputFileRepository,
+	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
+	session *models.DtoSession) {
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apirecognizefacility, err := helpers.GetRecognizeOrder(dtoorder, r, facilityrepository, recognizefacilityrepository, inputfieldrepository,
+		inputfilerepository, supplierrequestrepository, inputftprepository, resulttablerepository, worktablerepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apirecognizefacility)
+}
+
+// put /api/v1.0/suppliers/orders/:oid:/service/recognize/
+func UpdateRecognizeOrder(errors binding.Errors, viewrecognizefacility models.ViewRecognizeFacility, r render.Render, params martini.Params,
+	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
+	recognizefacilityrepository services.RecognizeFacilityRepository, orderstatusrepository services.OrderStatusRepository,
+	columntyperepository services.ColumnTypeRepository, filerepository services.FileRepository,
+	inputfilerepository services.InputFileRepository, supplierrequestrepository services.SupplierRequestRepository,
+	inputftprepository services.InputFtpRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apirecognizefacility, err := helpers.UpdateRecognizeOrder(dtoorder, viewrecognizefacility, r, facilityrepository, recognizefacilityrepository,
+		orderstatusrepository, columntyperepository, filerepository, inputfilerepository, supplierrequestrepository, inputftprepository,
+		resulttablerepository, worktablerepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apirecognizefacility)
+}
+
+// get /api/v1.0/suppliers/orders/:oid:/service/verification/
+func GetVerifyOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, verifyfacilityrepository services.VerifyFacilityRepository,
+	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apiverifyfacility, err := helpers.GetVerifyOrder(dtoorder, r, facilityrepository, verifyfacilityrepository, datacolumnrepository,
+		resulttablerepository, worktablerepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiverifyfacility)
+}
+
+// put /api/v1.0/suppliers/orders/:oid:/service/verification/
+func UpdateVerifyOrder(errors binding.Errors, viewverifyfacility models.ViewVerifyFacility, r render.Render, params martini.Params,
+	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, verifyfacilityrepository services.VerifyFacilityRepository,
+	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
+	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
+	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apiverifyfacility, err := helpers.UpdateVerifyOrder(dtoorder, viewverifyfacility, r, facilityrepository, verifyfacilityrepository,
+		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, datacolumnrepository,
+		resulttablerepository, worktablerepository, false, session.UserID, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiverifyfacility)
 }

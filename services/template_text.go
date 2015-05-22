@@ -2,13 +2,12 @@ package services
 
 import (
 	"application/config"
-	"application/models"
 	"bytes"
 	"path/filepath"
 	"text/template"
 )
 
-func (templateservice *TemplateService) GenerateText(dtotemplate *models.DtoTemplate, name string, layout string) (buf *bytes.Buffer, err error) {
+func (templateservice *TemplateService) GenerateText(object interface{}, name string, layout string) (buf *bytes.Buffer, err error) {
 	var tpl *template.Template
 	buf = new(bytes.Buffer)
 	path := filepath.Join(config.Configuration.Server.TemplateStorage, "/mailers")
@@ -24,7 +23,7 @@ func (templateservice *TemplateService) GenerateText(dtotemplate *models.DtoTemp
 		return nil, err
 	}
 
-	if err = tpl.Execute(buf, dtotemplate); err != nil {
+	if err = tpl.Execute(buf, object); err != nil {
 		log.Error("Error during executing go template %v", err)
 		return nil, err
 	}

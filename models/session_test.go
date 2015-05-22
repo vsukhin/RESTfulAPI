@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestApiSession(t *testing.T) {
+func TestNewApiSession(t *testing.T) {
 	var timeout = time.Now()
 	var accesstoken = "1234567890"
 	var аpiSession *ApiSession

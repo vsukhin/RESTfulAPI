@@ -6,22 +6,22 @@ import (
 	"time"
 )
 
-//Структура для организации хранения колонок таблиц
+// Структура для организации хранения колонок таблиц
 type ViewApiTableColumn struct {
 	Name     string `json:"name" validate:"nonzero,min=1,max=255"` // Название колонки таблицы
-	TypeID   int64  `json:"typeId"`                                // Идентификатор типа
-	Position int64  `json:"position"`                              // Позиция
+	TypeID   int    `json:"typeId"`                                // Идентификатор типа
+	Position int64  `json:"position" validate:"min=0"`             // Позиция
 }
 
 type ViewApiOrderTableColumn struct {
-	ID       int64 `json:"id" db:"id" validate:"nonzero"` // Уникальный идентификатор колонки таблицы
-	Position int64 `json:"position" db:"position"`        // Позиция
+	ID       int64 `json:"id" db:"id" validate:"nonzero"`           // Уникальный идентификатор колонки таблицы
+	Position int64 `json:"position" db:"position" validate:"min=0"` // Позиция
 }
 
 type ApiTableColumn struct {
 	ID       int64  `json:"id" db:"id"`                 // Уникальный идентификатор временной колонки таблицы
 	Name     string `json:"name" db:"name"`             // Название
-	TypeID   int64  `json:"typeId" db:"column_type_id"` // Идентификатор типа
+	TypeID   int    `json:"typeId" db:"column_type_id"` // Идентификатор типа
 	Position int64  `json:"position" db:"position"`     // Позиция
 }
 
@@ -30,7 +30,7 @@ type ViewApiOrderTableColumns []ViewApiOrderTableColumn
 type DtoTableColumn struct {
 	ID                int64     `db:"id"`                // Уникальный идентификатор колонки таблицы
 	Name              string    `db:"name"`              // Название
-	Column_Type_ID    int64     `db:"column_type_id"`    // Идентификатор типа колонки
+	Column_Type_ID    int       `db:"column_type_id"`    // Идентификатор типа колонки
 	Customer_Table_ID int64     `db:"customer_table_id"` // Идентификатор пользовательской таблицы
 	Position          int64     `db:"position"`          // Позиция
 	Created           time.Time `db:"created"`           // Время создания
@@ -41,8 +41,8 @@ type DtoTableColumn struct {
 	FieldNum          byte      `db:"fieldnum"`          // Номер колонки
 }
 
-// Конструктор создания объекта коклонки таблицы в api
-func NewViewApiTableColumn(name string, typeid int64, position int64) *ViewApiTableColumn {
+// Конструктор создания объекта колонки таблицы в api
+func NewViewApiTableColumn(name string, typeid int, position int64) *ViewApiTableColumn {
 	return &ViewApiTableColumn{
 		Name:     name,
 		TypeID:   typeid,
@@ -57,7 +57,7 @@ func NewViewApiOrderTableColumn(id int64, position int64) *ViewApiOrderTableColu
 	}
 }
 
-func NewApiTableColumn(id int64, name string, typeid int64, position int64) *ApiTableColumn {
+func NewApiTableColumn(id int64, name string, typeid int, position int64) *ApiTableColumn {
 	return &ApiTableColumn{
 		ID:       id,
 		Name:     name,
@@ -67,7 +67,7 @@ func NewApiTableColumn(id int64, name string, typeid int64, position int64) *Api
 }
 
 // Конструктор создания объекта колонки таблицы в бд
-func NewDtoTableColumn(id int64, name string, column_type_id int64, customer_table_id int64, position int64,
+func NewDtoTableColumn(id int64, name string, column_type_id int, customer_table_id int64, position int64,
 	created time.Time, prebuilt bool, active bool, fieldnum byte, edition int64, original_id int64) *DtoTableColumn {
 	return &DtoTableColumn{
 		ID:                id,

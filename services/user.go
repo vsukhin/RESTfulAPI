@@ -14,7 +14,7 @@ type UserRepository interface {
 	GetAll(filter string) (users *[]models.ApiUserShort, err error)
 	GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error)
 	GetMeta() (usermeta *models.ApiUserMeta, err error)
-	InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error)
+	InitUnit(trans *gorp.Transaction) (unitid int64, err error)
 	Create(user *models.DtoUser, inTrans bool) (err error)
 	Update(user *models.DtoUser, briefly bool, inTrans bool) (err error)
 	Delete(userid int64, inTrans bool) (err error)
@@ -97,11 +97,8 @@ func (userservice *UserService) Get(userid int64) (user *models.DtoUser, err err
 
 func (userservice *UserService) GetAll(filter string) (users *[]models.ApiUserShort, err error) {
 	users = new([]models.ApiUserShort)
-	_, err = userservice.DbContext.Select(users, "select u.id, "+
-		"case when e.primary = 1 then e.email else case when m.primary = 1 then m.phone else '' end end as login,"+
-		" not u.active as blocked, u.confirmed, u.lastLogin as lastLoginAt, u.surname, u.name, u.middleName from "+userservice.Table+
-		" u left join emails e on u.id = e.user_id left join mobile_phones m on u.id = m.user_id"+
-		" where (e.primary = 1 or e.primary is null) or (m.primary = 1 or m.primary is null)"+filter)
+	_, err = userservice.DbContext.Select(users, "select id, not active as blocked, confirmed, lastLogin as lastLoginAt,"+
+		" surname, name, middleName from "+userservice.Table+filter)
 	if err != nil {
 		log.Error("Error during getting user objects from database %v", err)
 		return nil, err
@@ -132,15 +129,12 @@ func (userservice *UserService) GetMeta() (usermeta *models.ApiUserMeta, err err
 	return usermeta, nil
 }
 
-func (userservice *UserService) InitUnit(trans *gorp.Transaction, inTrans bool) (unitid int64, err error) {
+func (userservice *UserService) InitUnit(trans *gorp.Transaction) (unitid int64, err error) {
 	unit := new(models.DtoUnit)
 	unit.Created = time.Now()
 	unit.Active = true
-	err = userservice.UnitRepository.Create(unit)
+	err = userservice.UnitRepository.Create(unit, trans)
 	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
-		}
 		log.Error("Error during creating user object in database %v", err)
 		return 0, err
 	}
@@ -160,13 +154,20 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 	}
 
 	if user.UnitID == 0 {
-		user.UnitID, err = userservice.InitUnit(trans, inTrans)
+		user.UnitID, err = userservice.InitUnit(trans)
 		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
 			return err
 		}
 	}
 
-	err = userservice.DbContext.Insert(user)
+	if inTrans {
+		err = trans.Insert(user)
+	} else {
+		err = userservice.DbContext.Insert(user)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -178,9 +179,9 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 	for _, email := range *user.Emails {
 		email.UserID = user.ID
 		if !email.Exists {
-			err = userservice.EmailRepository.Create(&email)
+			err = userservice.EmailRepository.Create(&email, trans)
 		} else {
-			err = userservice.EmailRepository.Update(&email)
+			err = userservice.EmailRepository.Update(&email, trans)
 		}
 		if err != nil {
 			if inTrans {
@@ -194,9 +195,9 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 	for _, phone := range *user.MobilePhones {
 		phone.UserID = user.ID
 		if !phone.Exists {
-			err = userservice.MobilePhoneRepository.Create(&phone)
+			err = userservice.MobilePhoneRepository.Create(&phone, trans)
 		} else {
-			err = userservice.MobilePhoneRepository.Update(&phone)
+			err = userservice.MobilePhoneRepository.Update(&phone, trans)
 		}
 		if err != nil {
 			if inTrans {
@@ -207,7 +208,7 @@ func (userservice *UserService) Create(user *models.DtoUser, inTrans bool) (err 
 		}
 	}
 
-	err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, false)
+	err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -249,20 +250,30 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 	}
 
 	if user.UnitID == 0 {
-		user.UnitID, err = userservice.InitUnit(trans, inTrans)
+		user.UnitID, err = userservice.InitUnit(trans)
 		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
 			return err
 		}
 	}
 
-	_, err = userservice.DbContext.Update(user)
+	if inTrans {
+		_, err = trans.Update(user)
+	} else {
+		_, err = userservice.DbContext.Update(user)
+	}
 	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
 		log.Error("Error during updating user object in database %v with value %v", err, user.ID)
 		return err
 	}
 
 	if !briefly {
-		err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, false)
+		err = userservice.GroupRepository.SetByUser(user.ID, &user.Roles, trans)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -282,9 +293,9 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 
 			if !found {
 				if !updEmail.Exists {
-					err = userservice.EmailRepository.Create(&updEmail)
+					err = userservice.EmailRepository.Create(&updEmail, trans)
 				} else {
-					err = userservice.EmailRepository.Update(&updEmail)
+					err = userservice.EmailRepository.Update(&updEmail, trans)
 				}
 				if err != nil {
 					if inTrans {
@@ -294,7 +305,7 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 					return err
 				}
 			} else {
-				err = userservice.EmailRepository.Update(&updEmail)
+				err = userservice.EmailRepository.Update(&updEmail, trans)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
@@ -314,7 +325,7 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 				}
 			}
 			if !found {
-				err = userservice.EmailRepository.Delete(curEmail.Email)
+				err = userservice.EmailRepository.Delete(curEmail.Email, trans)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
@@ -336,9 +347,9 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 
 			if !found {
 				if !updPhone.Exists {
-					err = userservice.MobilePhoneRepository.Create(&updPhone)
+					err = userservice.MobilePhoneRepository.Create(&updPhone, trans)
 				} else {
-					err = userservice.MobilePhoneRepository.Update(&updPhone)
+					err = userservice.MobilePhoneRepository.Update(&updPhone, trans)
 				}
 				if err != nil {
 					if inTrans {
@@ -348,7 +359,7 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 					return err
 				}
 			} else {
-				err = userservice.MobilePhoneRepository.Update(&updPhone)
+				err = userservice.MobilePhoneRepository.Update(&updPhone, trans)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
@@ -368,7 +379,7 @@ func (userservice *UserService) Update(user *models.DtoUser, briefly bool, inTra
 				}
 			}
 			if !found {
-				err = userservice.MobilePhoneRepository.Delete(curPhone.Phone)
+				err = userservice.MobilePhoneRepository.Delete(curPhone.Phone, trans)
 				if err != nil {
 					if inTrans {
 						_ = trans.Rollback()
@@ -402,7 +413,11 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		}
 	}
 
-	_, err = userservice.DbContext.Exec("update orders set user_id = 0 where user_id = ?", userid)
+	if inTrans {
+		_, err = trans.Exec("update orders set user_id = 0 where user_id = ?", userid)
+	} else {
+		_, err = userservice.DbContext.Exec("update orders set user_id = 0 where user_id = ?", userid)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -411,7 +426,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.MobilePhoneRepository.DeleteByUser(userid)
+	err = userservice.MobilePhoneRepository.DeleteByUser(userid, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -420,7 +435,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.MessageRepository.DeleteByUser(userid, false)
+	err = userservice.MessageRepository.DeleteByUser(userid, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -429,7 +444,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.SessionRepository.DeleteByUser(userid, false)
+	err = userservice.SessionRepository.DeleteByUser(userid, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -438,7 +453,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.EmailRepository.DeleteByUser(userid)
+	err = userservice.EmailRepository.DeleteByUser(userid, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -447,7 +462,11 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	_, err = userservice.DbContext.Exec("update "+userservice.Table+" set user_id = 0 where user_id = ?", userid)
+	if inTrans {
+		_, err = trans.Exec("update "+userservice.Table+" set user_id = 0 where user_id = ?", userid)
+	} else {
+		_, err = userservice.DbContext.Exec("update "+userservice.Table+" set user_id = 0 where user_id = ?", userid)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -456,7 +475,7 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	err = userservice.GroupRepository.SetByUser(userid, &[]models.UserRole{}, false)
+	err = userservice.GroupRepository.SetByUser(userid, &[]models.UserRole{}, trans)
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -465,7 +484,11 @@ func (userservice *UserService) Delete(userid int64, inTrans bool) (err error) {
 		return err
 	}
 
-	_, err = userservice.DbContext.Exec("delete from "+userservice.Table+" where id = ?", userid)
+	if inTrans {
+		_, err = trans.Exec("delete from "+userservice.Table+" where id = ?", userid)
+	} else {
+		_, err = userservice.DbContext.Exec("delete from "+userservice.Table+" where id = ?", userid)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()

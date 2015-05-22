@@ -1,6 +1,6 @@
 package models
 
-//Структура для хранения группы доступа
+// Структура для хранения группы доступа
 type ApiGroup struct {
 	ID   int    `json:"id" db:"id"`     // Идентификатор группы доступа
 	Name string `json:"name" db:"name"` // Название группы доступа

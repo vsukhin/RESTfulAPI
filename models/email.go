@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения email
+// Структура для организации хранения email
 type UpdateEmail struct {
 	Email         string `json:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Уникальный email
 	Primary       bool   `json:"primary"`                                               // Основной
@@ -16,13 +16,13 @@ type UpdateEmail struct {
 	Classifier_ID int    `json:"contactClass" validate:"nonzero"`                       // Идентификатор классификатора
 }
 
-type ApiEmail struct {
-	Email         string `json:"email" db:"email"`                // Уникальный email
-	Primary       bool   `json:"primary" db:"primary"`            // Основной
-	Confirmed     bool   `json:"confirmed" db:"confirmed"`        // Подтвержден
-	Subscription  bool   `json:"subscription" db:"subscription"`  // Используется для рассылки
-	Language      string `json:"language" db:"language"`          // Язык рассылки
-	Classifier_ID int    `json:"contactClass" db:"classifier_id"` // Идентификатор классификатора
+type ViewApiEmail struct {
+	Email         string `json:"email" db:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Уникальный email
+	Primary       bool   `json:"primary" db:"primary"`                                             // Основной
+	Confirmed     bool   `json:"confirmed" db:"confirmed"`                                         // Подтвержден
+	Subscription  bool   `json:"subscription" db:"subscription"`                                   // Используется для рассылки
+	Language      string `json:"language" db:"language" validate:"nonzero,min=1,max=10"`           // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id" validate:"nonzero"`               // Идентификатор классификатора
 }
 
 type UpdateEmails []UpdateEmail
@@ -41,8 +41,8 @@ type DtoEmail struct {
 }
 
 // Конструктор создания объекта email в api
-func NewApiEmail(email string, primary bool, confirmed bool, subscription bool, language string, classifier_id int) *ApiEmail {
-	return &ApiEmail{
+func NewViewApiEmail(email string, primary bool, confirmed bool, subscription bool, language string, classifier_id int) *ViewApiEmail {
+	return &ViewApiEmail{
 		Email:         email,
 		Primary:       primary,
 		Confirmed:     confirmed,
@@ -71,4 +71,8 @@ func NewDtoEmail(email string, userid int64, classifier_id int, created time.Tim
 
 func (email UpdateEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	return ValidateWithLanguage(&email, errors, req, email.Language)
+}
+
+func (email *ViewApiEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+	return ValidateWithLanguage(email, errors, req, email.Language)
 }

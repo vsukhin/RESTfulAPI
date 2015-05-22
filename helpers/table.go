@@ -15,9 +15,9 @@ const (
 	PARAM_NAME_TABLE_ID = "tid"
 )
 
-func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam string, userid int64,
+func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam int, userid int64,
 	language string, userrepository services.UserRepository, unitrepository services.UnitRepository,
-	tabletyperepository services.TableTypeRepository) (unitid int64, typeid int64, err error) {
+	tabletyperepository services.TableTypeRepository) (unitid int64, typeid int, err error) {
 	if unitparam == 0 {
 		user, err := userrepository.Get(userid)
 		if err != nil {
@@ -36,12 +36,13 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam st
 		unitid = unit.ID
 	}
 
-	typeid, err = tabletyperepository.FindByName(typeparam)
+	dtotype, err := tabletyperepository.Get(typeparam)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return 0, 0, err
 	}
+	typeid = dtotype.ID
 
 	return unitid, typeid, nil
 }
@@ -94,4 +95,22 @@ func CheckTable(r render.Render, params martini.Params, customertablerepository 
 	}
 
 	return dtocustomertable, nil
+}
+
+func IsTableAccessible(table_id int64, user_id int64, r render.Render, customertablerepository services.CustomerTableRepository,
+	language string) (err error) {
+	allowed, err := customertablerepository.CheckUserAccess(user_id, table_id)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return err
+	}
+	if !allowed {
+		log.Error("Table %v is not accessible for user  %v", table_id, user_id)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return errors.New("Not accessible table")
+	}
+
+	return nil
 }

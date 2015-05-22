@@ -23,7 +23,7 @@ const (
 	ORDER_STATUS_DEL
 )
 
-//Структура для организации статуса заказа
+// Структура для организации статуса заказа
 type DtoOrderStatus struct {
 	Order_ID  int64       `db:"order_id"`  // Идентификатор заказа
 	Status_ID OrderStatus `db:"status_id"` // Идентификатор статуса

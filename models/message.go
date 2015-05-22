@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения сообщения
+// Структура для организации хранения сообщения
 type ViewMessage struct {
 	Content string `json:"message" validate:"max=255"` // Содержание
 }
@@ -125,7 +125,7 @@ func (message *MessageSearch) Extract(infield string, invalue string) (outfield 
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue

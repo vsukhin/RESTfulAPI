@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения пользовательских таблиц
+// Структура для организации хранения пользовательских таблиц
 type ViewShortCustomerTable struct {
 	Name   string `json:"name" validate:"nonzero,min=1,max=255"` // Название пользовательской таблицы
 	UnitID int64  `json:"unitId"`                                // Объединение
@@ -17,26 +17,26 @@ type ViewShortCustomerTable struct {
 
 type ViewLongCustomerTable struct {
 	Name   string `json:"name" validate:"nonzero,min=1,max=255"` // Название пользовательской таблицы
-	Type   string `json:"type" validate:"nonzero,min=1,max=255"` // Название пользовательской таблицы
+	Type   int    `json:"type"`                                  // Тип
 	UnitID int64  `json:"unitId" validate:"nonzero"`             // Объединение
 }
 
 type ApiShortCustomerTable struct {
 	Name   string `json:"name" db:"name"`      // Название пользовательской таблицы
-	Type   string `json:"type" db:"type"`      // Тип
+	Type   int    `json:"type" db:"type"`      // Тип
 	UnitID int64  `json:"unitId" db:"unit_id"` // Идентификатор объединения
 }
 
 type ApiMiddleCustomerTable struct {
 	ID   int64  `json:"id" db:"id"`     // Уникальный идентификатор пользовательской таблицы
 	Name string `json:"name" db:"name"` // Название пользовательской таблицы
-	Type string `json:"type" db:"type"` // Тип
+	Type int    `json:"type" db:"type"` // Тип
 }
 
 type ApiLongCustomerTable struct {
 	ID     int64  `json:"id" db:"id"`          // Уникальный идентификатор пользовательской таблицы
 	Name   string `json:"name" db:"name"`      // Название пользовательской таблицы
-	Type   string `json:"type" db:"type"`      // Тип
+	Type   int    `json:"type" db:"type"`      // Тип
 	UnitID int64  `json:"unitId" db:"unit_id"` // Идентификатор объединения
 }
 
@@ -51,7 +51,7 @@ type ApiMetaCustomerTable struct {
 type TableSearch struct {
 	ID     int64  `query:"id" search:"c.id"`          // Уникальный идентификатор пользовательской таблицы
 	Name   string `query:"name" search:"c.name"`      // Название пользовательской таблицыя
-	Type   string `query:"type" search:"t.name"`      // Тип
+	Type   int    `query:"type" search:"c.type_id"`   // Тип
 	UnitID int64  `query:"unitId" search:"c.unit_id"` // Идентификатор объединения
 }
 
@@ -59,7 +59,7 @@ type DtoCustomerTable struct {
 	ID                int64     `db:"id"`                // Уникальный идентификатор пользовательской таблицы
 	Name              string    `db:"name"`              // Название
 	Created           time.Time `db:"created"`           // Время создания
-	TypeID            int64     `db:"type_id"`           // Идентификатор типа
+	TypeID            int       `db:"type_id"`           // Идентификатор типа
 	UnitID            int64     `db:"unit_id"`           // Идентификатор объединения
 	Active            bool      `db:"active"`            // Активная
 	Permanent         bool      `db:"permanent"`         // Постоянная
@@ -71,22 +71,7 @@ type DtoCustomerTable struct {
 }
 
 // Конструктор создания объекта пользовательской таблицы в api
-func NewViewShortCustomerTable(name string, unitid int64) *ViewShortCustomerTable {
-	return &ViewShortCustomerTable{
-		Name:   name,
-		UnitID: unitid,
-	}
-}
-
-func NewViewLongCustomerTable(name string, typevalue string, unitid int64) *ViewLongCustomerTable {
-	return &ViewLongCustomerTable{
-		Name:   name,
-		Type:   typevalue,
-		UnitID: unitid,
-	}
-}
-
-func NewApiShortCustomerTable(name string, typevalue string, unitid int64) *ApiShortCustomerTable {
+func NewApiShortCustomerTable(name string, typevalue int, unitid int64) *ApiShortCustomerTable {
 	return &ApiShortCustomerTable{
 		Name:   name,
 		Type:   typevalue,
@@ -94,7 +79,7 @@ func NewApiShortCustomerTable(name string, typevalue string, unitid int64) *ApiS
 	}
 }
 
-func NewApiMiddleCustomerTable(id int64, name string, typevalue string) *ApiMiddleCustomerTable {
+func NewApiMiddleCustomerTable(id int64, name string, typevalue int) *ApiMiddleCustomerTable {
 	return &ApiMiddleCustomerTable{
 		ID:   id,
 		Name: name,
@@ -102,7 +87,7 @@ func NewApiMiddleCustomerTable(id int64, name string, typevalue string) *ApiMidd
 	}
 }
 
-func NewApiLongCustomerTable(id int64, name string, typevalue string, unitid int64) *ApiLongCustomerTable {
+func NewApiLongCustomerTable(id int64, name string, typevalue int, unitid int64) *ApiLongCustomerTable {
 	return &ApiLongCustomerTable{
 		ID:     id,
 		Name:   name,
@@ -122,7 +107,7 @@ func NewApiMetaCustomerTable(numofrows int64, numofcols int64, checked bool, qua
 }
 
 // Конструктор создания объекта пользовательской таблицы в бд
-func NewDtoCustomerTable(id int64, name string, created time.Time, typeid int64, unitid int64, active bool, permanent bool,
+func NewDtoCustomerTable(id int64, name string, created time.Time, typeid int, unitid int64, active bool, permanent bool,
 	import_ready bool, import_percentage byte, import_columns int64, import_rows int64, import_wrongrows int64) *DtoCustomerTable {
 	return &DtoCustomerTable{
 		ID:                id,
@@ -161,23 +146,28 @@ func (table *TableSearch) Extract(infield string, invalue string) (outfield stri
 	switch infield {
 	case "id":
 		fallthrough
+	case "type":
+		fallthrough
 	case "unitId":
-		_, errConv := strconv.ParseInt(invalue, 0, 64)
+		precision := 64
+		if infield == "type" {
+			precision = 32
+		}
+		_, errConv := strconv.ParseInt(invalue, 0, precision)
 		if errConv != nil {
 			errValue = errConv
 			break
 		}
 		outvalue = invalue
+
 	case "name":
-		fallthrough
-	case "type":
 		if strings.Contains(invalue, "'") {
 			errValue = errors.New("Wrong field value")
 			break
 		}
 		outvalue = "'" + invalue + "'"
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue

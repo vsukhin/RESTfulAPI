@@ -294,7 +294,11 @@ func (orderservice *OrderService) Create(order *models.DtoOrder, orderstatuses *
 		}
 	}
 
-	err = orderservice.DbContext.Insert(order)
+	if inTrans {
+		err = trans.Insert(order)
+	} else {
+		err = orderservice.DbContext.Insert(order)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -305,7 +309,11 @@ func (orderservice *OrderService) Create(order *models.DtoOrder, orderstatuses *
 
 	if order.Name == "" {
 		order.Name = fmt.Sprintf(ORDER_NAME_TEMPLATE, order.ID)
-		_, err = orderservice.DbContext.Update(order)
+		if inTrans {
+			_, err = trans.Update(order)
+		} else {
+			_, err = orderservice.DbContext.Update(order)
+		}
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -317,7 +325,8 @@ func (orderservice *OrderService) Create(order *models.DtoOrder, orderstatuses *
 
 	for _, orderstatus := range *orderstatuses {
 		orderstatus.Order_ID = order.ID
-		err = orderservice.OrderStatusRepository.Save(&orderstatus)
+
+		err = orderservice.OrderStatusRepository.Save(&orderstatus, trans)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -352,7 +361,11 @@ func (orderservice *OrderService) Update(order *models.DtoOrder, orderstatuses *
 	if order.Name == "" {
 		order.Name = fmt.Sprintf(ORDER_NAME_TEMPLATE, order.ID)
 	}
-	_, err = orderservice.DbContext.Update(order)
+	if inTrans {
+		_, err = trans.Update(order)
+	} else {
+		_, err = orderservice.DbContext.Update(order)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -362,7 +375,7 @@ func (orderservice *OrderService) Update(order *models.DtoOrder, orderstatuses *
 	}
 
 	for _, orderstatus := range *orderstatuses {
-		err = orderservice.OrderStatusRepository.Save(&orderstatus)
+		err = orderservice.OrderStatusRepository.Save(&orderstatus, trans)
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()

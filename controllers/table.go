@@ -4,6 +4,7 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
+	"application/server/middlewares"
 	"application/services"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -14,8 +15,12 @@ import (
 	"types"
 )
 
+const (
+	TIME_ONE_MONTH = 720
+)
+
 // options /api/v1.0/tables/
-func GetTableTypes(r render.Render, tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
+func GetTableTypes(w http.ResponseWriter, r render.Render, tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
 	tabletypes, err := tabletyperepository.GetAll()
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -23,11 +28,12 @@ func GetTableTypes(r render.Render, tabletyperepository services.TableTypeReposi
 		return
 	}
 
-	r.JSON(http.StatusOK, tabletypes)
+	helpers.RenderJSONArray(tabletypes, len(*tabletypes), w, r)
 }
 
 // get /api/v1.0/tables/
-func GetUnitTables(request *http.Request, r render.Render, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
+func GetUnitTables(w http.ResponseWriter, request *http.Request, r render.Render, customertablerepository services.CustomerTableRepository,
+	session *models.DtoSession) {
 	var err error
 	query := ""
 
@@ -71,14 +77,14 @@ func GetUnitTables(request *http.Request, r render.Render, customertablereposito
 	}
 	query += limit
 
-	customertables, err := customertablerepository.GetByUser(session.UserID, query)
+	customertables, err := customertablerepository.GetByUser(session.UserID, query, middlewares.IsAdmin(session.Roles))
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
 
-	r.JSON(http.StatusOK, customertables)
+	helpers.RenderJSONArray(customertables, len(*customertables), w, r)
 }
 
 // get /api/v1.0/tables/:tid/
@@ -127,7 +133,7 @@ func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustom
 		return
 	}
 
-	r.JSON(http.StatusOK, models.NewApiLongCustomerTable(dtocustomertable.ID, dtocustomertable.Name, models.TABLE_TYPE_DEFAULT, dtocustomertable.UnitID))
+	r.JSON(http.StatusOK, models.NewApiLongCustomerTable(dtocustomertable.ID, dtocustomertable.Name, dtocustomertable.TypeID, dtocustomertable.UnitID))
 }
 
 // put /api/v1.0/tables/:tid/
@@ -169,7 +175,6 @@ func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustome
 	}
 
 	r.JSON(http.StatusOK, models.NewApiShortCustomerTable(dtocustomertable.Name, viewcustomertable.Type, dtocustomertable.UnitID))
-
 }
 
 // delete /api/v1.0/tables/:tid/
@@ -224,13 +229,36 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
+	created := time.Now()
 	if found {
-		log.Error("Customer table is already linked to price table %v", dtocustomertable.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
+		priceproperties, err := pricepropertiesrepository.Get(dtocustomertable.ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		if !middlewares.IsAdmin(session.Roles) {
+			if priceproperties.Published {
+				if priceproperties.Facility_ID != viewpriceproperties.Facility_ID ||
+					priceproperties.After_ID != viewpriceproperties.After_ID ||
+					((viewpriceproperties.Begin.IsZero() &&
+						!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
+						(!viewpriceproperties.Begin.IsZero() &&
+							(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
+						(!viewpriceproperties.Begin.IsZero() &&
+							!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1) &&
+							viewpriceproperties.Begin.Sub(priceproperties.Begin) != 0)) ||
+					(!viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()).Hours() < TIME_ONE_MONTH) ||
+					priceproperties.Published != viewpriceproperties.Published {
+					log.Error("Can't change fields for published price list %v", dtocustomertable.ID)
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+					return
+				}
+			}
+		}
+		created = priceproperties.Created
 	}
-
 	facility, err := facilityrepository.Get(viewpriceproperties.Facility_ID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -245,18 +273,31 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 	}
 
 	if viewpriceproperties.After_ID != 0 {
-		_, err = helpers.IsTableAvailable(r, customertablerepository, viewpriceproperties.After_ID, session.Language)
+		customertable, err := helpers.IsTableAvailable(r, customertablerepository, viewpriceproperties.After_ID, session.Language)
 		if err != nil {
 			return
 		}
-		priceproperties, err := pricepropertiesrepository.Get(viewpriceproperties.After_ID)
+		if customertable.TypeID != models.TABLE_TYPE_PRICE {
+			log.Error("After price is not price type %v", customertable.ID)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+
+		priceproperties, err := pricepropertiesrepository.Get(customertable.ID)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
 		if priceproperties.Facility_ID != viewpriceproperties.Facility_ID {
-			log.Error("Service is not the same for after price %v", viewpriceproperties.After_ID)
+			log.Error("Service is not the same for after price %v", customertable.ID)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		if !priceproperties.Published {
+			log.Error("After price is not published %v", customertable.ID)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
@@ -286,8 +327,12 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 	}
 
 	dtopriceproperties := models.NewDtoPriceProperties(dtocustomertable.ID, viewpriceproperties.Facility_ID,
-		viewpriceproperties.After_ID, viewpriceproperties.Begin, viewpriceproperties.End, time.Now())
-	err = pricepropertiesrepository.Create(dtopriceproperties, true)
+		viewpriceproperties.After_ID, viewpriceproperties.Begin, viewpriceproperties.End, created, viewpriceproperties.Published)
+	if !found {
+		err = pricepropertiesrepository.Create(dtopriceproperties, true)
+	} else {
+		err = pricepropertiesrepository.Update(dtopriceproperties, true)
+	}
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -295,4 +340,40 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 	}
 
 	r.JSON(http.StatusOK, viewpriceproperties)
+}
+
+// get /api/v1.0/tables/services/sms/
+func GetSMSTables(w http.ResponseWriter, r render.Render, smstablerepository services.SMSTableRepository, session *models.DtoSession) {
+	smstables, err := smstablerepository.GetAll(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(smstables, len(*smstables), w, r)
+}
+
+// get /api/v1.0/tables/services/hlr/
+func GetHLRTables(w http.ResponseWriter, r render.Render, hlrtablerepository services.HLRTableRepository, session *models.DtoSession) {
+	hlrtables, err := hlrtablerepository.GetAll(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(hlrtables, len(*hlrtables), w, r)
+}
+
+// get /api/v1.0/tables/services/verification/
+func GetVerifyTables(w http.ResponseWriter, r render.Render, verifytablerepository services.VerifyTableRepository, session *models.DtoSession) {
+	verifytables, err := verifytablerepository.GetAll(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(verifytables, len(*verifytables), w, r)
 }

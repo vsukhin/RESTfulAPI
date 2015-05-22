@@ -27,7 +27,7 @@ func GetUnitMetaData(r render.Render, unitrepository services.UnitRepository, se
 }
 
 // get /api/v1.0/administration/units/
-func GetUnits(request *http.Request, r render.Render, unitrepository services.UnitRepository, session *models.DtoSession) {
+func GetUnits(w http.ResponseWriter, request *http.Request, r render.Render, unitrepository services.UnitRepository, session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
 	filters, err := helpers.GetFilterArray(new(models.UnitSearch), nil, request, r, session.Language)
@@ -75,7 +75,7 @@ func GetUnits(request *http.Request, r render.Render, unitrepository services.Un
 		return
 	}
 
-	r.JSON(http.StatusOK, units)
+	helpers.RenderJSONArray(units, len(*units), w, r)
 }
 
 // post /api/v1.0/administration/units/
@@ -90,7 +90,7 @@ func CreateUnit(errors binding.Errors, viewunit models.ViewShortUnit, r render.R
 	dtounit.Active = true
 	dtounit.Created = time.Now()
 
-	err := unitrepository.Create(dtounit)
+	err := unitrepository.Create(dtounit, nil)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -138,7 +138,8 @@ func UpdateUnit(errors binding.Errors, viewunit models.ViewLongUnit, r render.Re
 func DeleteUnit(r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
-	facilityrepository services.FacilityRepository, session *models.DtoSession) {
+	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository,
+	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
 		return
@@ -150,12 +151,17 @@ func DeleteUnit(r render.Render, params martini.Params, unitrepository services.
 		return
 	}
 
-	users, tables, projects, orders, facilities, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository, customertablerepository,
-		projectrepository, orderrepository, facilityrepository, session.Language)
+	users, tables, projects, orders, facilities, companies, smssenders, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository,
+		customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository, smssenderrepository,
+		session.Language)
+	if err != nil {
+		return
+	}
 
-	if len(*users) != 0 || len(*tables) != 0 || len(*projects) != 0 || len(*orders) != 0 || len(*facilities) != 0 {
-		log.Error("Can't delete unit %v with %v users, %v tables, %v projects, %v orders, %vfacilities",
-			dtounit.ID, len(*users), len(*tables), len(*projects), len(*orders), len(*facilities))
+	if len(*users) != 0 || len(*tables) != 0 || len(*projects) != 0 || len(*orders) != 0 || len(*facilities) != 0 || len(*companies) != 0 ||
+		len(*smssenders) != 0 {
+		log.Error("Can't delete unit %v with %v users, %v tables, %v projects, %v orders, %v facilities, %v organisations, %v smsfroms",
+			dtounit.ID, len(*users), len(*tables), len(*projects), len(*orders), len(*facilities), len(*companies), len(*smssenders))
 		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_DELETE_DENIED,
 			Message: config.Localization[session.Language].Errors.Api.Data_Delete_Denied})
 		return
@@ -175,13 +181,18 @@ func DeleteUnit(r render.Render, params martini.Params, unitrepository services.
 func GetUnitDependences(r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
-	facilityrepository services.FacilityRepository, session *models.DtoSession) {
+	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository,
+	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
 		return
 	}
-	users, tables, projects, orders, facilities, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository, customertablerepository,
-		projectrepository, orderrepository, facilityrepository, session.Language)
+	users, tables, projects, orders, facilities, companies, smssenders, err := helpers.GetUnitDependences(dtounit.ID, r,
+		userrepository, customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository,
+		smssenderrepository, session.Language)
+	if err != nil {
+		return
+	}
 
 	unitmeta := new(models.ApiLongMetaUnit)
 	unitmeta.NumOfUsers = int64(len(*users))
@@ -189,12 +200,14 @@ func GetUnitDependences(r render.Render, params martini.Params, unitrepository s
 	unitmeta.NumOfProjects = int64(len(*projects))
 	unitmeta.NumOfOrders = int64(len(*orders))
 	unitmeta.NumOfFacilities = int64(len(*facilities))
+	unitmeta.NumOfCompanies = int64(len(*companies))
+	unitmeta.NumOfSMSSenders = int64(len(*smssenders))
 
 	r.JSON(http.StatusOK, unitmeta)
 }
 
 // get /api/v1.0/administration/units/:unitId/users/
-func GetUnitUsers(r render.Render, params martini.Params, unitrepository services.UnitRepository,
+func GetUnitUsers(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	userrepository services.UserRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
@@ -208,11 +221,11 @@ func GetUnitUsers(r render.Render, params martini.Params, unitrepository service
 		return
 	}
 
-	r.JSON(http.StatusOK, users)
+	helpers.RenderJSONArray(users, len(*users), w, r)
 }
 
 // get /api/v1.0/administration/units/:unitId/tables/
-func GetUnitTables(r render.Render, params martini.Params, unitrepository services.UnitRepository,
+func GetUnitTables(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
@@ -226,11 +239,11 @@ func GetUnitTables(r render.Render, params martini.Params, unitrepository servic
 		return
 	}
 
-	r.JSON(http.StatusOK, tables)
+	helpers.RenderJSONArray(tables, len(*tables), w, r)
 }
 
 // get /api/v1.0/administration/units/:unitId/projects/
-func GetUnitProjects(r render.Render, params martini.Params, unitrepository services.UnitRepository,
+func GetUnitProjects(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	projectrepository services.ProjectRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
@@ -244,11 +257,11 @@ func GetUnitProjects(r render.Render, params martini.Params, unitrepository serv
 		return
 	}
 
-	r.JSON(http.StatusOK, projects)
+	helpers.RenderJSONArray(projects, len(*projects), w, r)
 }
 
 // get /api/v1.0/administration/units/:unitId/orders/
-func GetUnitOrders(r render.Render, params martini.Params, unitrepository services.UnitRepository,
+func GetUnitOrders(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	orderrepository services.OrderRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
@@ -262,11 +275,11 @@ func GetUnitOrders(r render.Render, params martini.Params, unitrepository servic
 		return
 	}
 
-	r.JSON(http.StatusOK, orders)
+	helpers.RenderJSONArray(orders, len(*orders), w, r)
 }
 
 // get /api/v1.0/administration/units/:unitId/services/
-func GetUnitFacilities(r render.Render, params martini.Params, unitrepository services.UnitRepository,
+func GetUnitFacilities(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
 	facilityrepository services.FacilityRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
@@ -280,7 +293,100 @@ func GetUnitFacilities(r render.Render, params martini.Params, unitrepository se
 		return
 	}
 
-	r.JSON(http.StatusOK, facilities)
+	helpers.RenderJSONArray(facilities, len(*facilities), w, r)
+}
+
+// get /api/v1.0/administration/units/:unitId/organisations/
+func GetUnitCompanies(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
+	companyrepository services.CompanyRepository, session *models.DtoSession) {
+	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	companies, err := companyrepository.GetByUnit(dtounit.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(companies, len(*companies), w, r)
+}
+
+// get /api/v1.0/administration/units/:unitId/smsfroms/
+func GetUnitSMSSenders(w http.ResponseWriter, r render.Render, params martini.Params, unitrepository services.UnitRepository,
+	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	smssenders, err := smssenderrepository.GetByUnit(dtounit.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(smssenders, len(*smssenders), w, r)
+}
+
+// get /api/v1.0/administration/units/:unitId/invoices/
+func GetUnitInvoices(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params,
+	unitrepository services.UnitRepository, invoicerepository services.InvoiceRepository, session *models.DtoSession) {
+	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
+	if err != nil {
+		return
+	}
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.InvoiceSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.InvoiceSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	invoices, err := invoicerepository.GetByUnit(dtounit.ID, query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(invoices, len(*invoices), w, r)
 }
 
 // options /api/v1.0/administration/orders/
@@ -296,7 +402,7 @@ func GetOrderMetaData(r render.Render, orderrepository services.OrderRepository,
 }
 
 // get /api/v1.0/administration/orders/
-func GetOrders(request *http.Request, r render.Render, orderrepository services.OrderRepository, session *models.DtoSession) {
+func GetOrders(w http.ResponseWriter, request *http.Request, r render.Render, orderrepository services.OrderRepository, session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
 	filters, err := helpers.GetFilterArray(new(models.OrderAdminSearch), nil, request, r, session.Language)
@@ -344,7 +450,7 @@ func GetOrders(request *http.Request, r render.Render, orderrepository services.
 		return
 	}
 
-	r.JSON(http.StatusOK, orders)
+	helpers.RenderJSONArray(orders, len(*orders), w, r)
 }
 
 // get /api/v1.0/administration/orders/:oid/
@@ -396,7 +502,7 @@ func DeleteOrder(r render.Render, params martini.Params, orderrepository service
 	}
 
 	orderstatus := models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_DEL, true, "", time.Now())
-	err = orderstatusrepository.Save(orderstatus)
+	err = orderstatusrepository.Save(orderstatus, nil)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

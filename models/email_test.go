@@ -5,35 +5,40 @@ import (
 	"time"
 )
 
-func TestViewApiEmail(t *testing.T) {
+func TestNewViewApiEmail(t *testing.T) {
 	var email = "test@email.com"
 	var primary = true
 	var confirmed = true
 	var subscription = true
 	var language = "eng"
-	var viewApiEmail *ViewApiEmail
+	var classifierid int = 1
+	var viewapiEmail *ViewApiEmail
 
-	viewApiEmail = NewViewApiEmail(email, primary, confirmed, subscription, language)
-	if viewApiEmail.Email != email {
+	viewapiEmail = NewViewApiEmail(email, primary, confirmed, subscription, language, classifierid)
+	if viewapiEmail.Email != email {
 		t.Error("Email field is not properly initialized")
 	}
-	if viewApiEmail.Primary != primary {
+	if viewapiEmail.Primary != primary {
 		t.Error("Primary field is not properly initialized")
 	}
-	if viewApiEmail.Confirmed != confirmed {
+	if viewapiEmail.Confirmed != confirmed {
 		t.Error("Confirmed field is not properly initialized")
 	}
-	if viewApiEmail.Subscription != subscription {
+	if viewapiEmail.Subscription != subscription {
 		t.Error("Subscription field is not properly initialized")
 	}
-	if viewApiEmail.Language != language {
+	if viewapiEmail.Language != language {
 		t.Error("Language field is not properly initialized")
+	}
+	if viewapiEmail.Classifier_ID != classifierid {
+		t.Error("Classifier id field is not properly initialized")
 	}
 }
 
 func TestNewDtoEmail(t *testing.T) {
 	var email = "test@email.com"
 	var userid int64 = 1
+	var classifierid int = 1
 	var created = time.Now()
 	var primary = true
 	var confirmed = true
@@ -43,12 +48,15 @@ func TestNewDtoEmail(t *testing.T) {
 	var exists = true
 	var dtoEmail *DtoEmail
 
-	dtoEmail = NewDtoEmail(email, userid, created, primary, confirmed, subscription, code, language, exists)
+	dtoEmail = NewDtoEmail(email, userid, classifierid, created, primary, confirmed, subscription, code, language, exists)
 	if dtoEmail.Email != email {
 		t.Error("Email field is not properly initialized")
 	}
 	if dtoEmail.UserID != userid {
 		t.Error("User id field is not properly initialized")
+	}
+	if dtoEmail.Classifier_ID != classifierid {
+		t.Error("Classifier id field is not properly initialized")
 	}
 	if dtoEmail.Created != created {
 		t.Error("Created field is not properly initialized")

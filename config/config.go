@@ -64,7 +64,7 @@ var (
 
 		Logger struct { // Система логирования
 			Mode    []string               `yaml:"Mode"`   // Режим логирования, перечисляются включенные режимы логирования
-			Levels  map[ModeName]LevelName `yaml:"Levels"` // Уровень логирования для каждого режима логигирования
+			Levels  map[ModeName]LevelName `yaml:"Levels"` // Уровень логирования для каждого режима логирования
 			Format  string                 `yaml:"Format"` // Формат строки лога
 			File    string                 `yaml:"File"`   // Режим вывода в файл, путь и имя файла лога
 			Graylog struct {               // Настройки подключения к graylog серверу
@@ -92,7 +92,7 @@ var (
 		Mail struct { //Реквизиты для почтовых отправлений
 			Host     string `yaml:"Host"`     // Ip адрес или имя хоста почтового сервера
 			Port     int    `yaml:"Port"`     // Порт почтового сервера
-			Sender   string `yaml:"Sender"`   // Название базы данных
+			Sender   string `yaml:"Sender"`   // Email рассылки
 			Login    string `yaml:"Login"`    // Логин подключения к почтовому серверу
 			Password string `yaml:"Password"` // Пароль подключения к почтовому серверу
 		} `yaml:"Mail"`

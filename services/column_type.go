@@ -2,12 +2,21 @@ package services
 
 import (
 	"application/models"
+	"regexp"
+	"strings"
+	"time"
+)
+
+var (
+	numberRegExp = regexp.MustCompile("[0-9]+")
 )
 
 type ColumnTypeRepository interface {
-	Get(id int64) (columntype *models.DtoColumnType, err error)
+	Validate(dtocolumntype *models.DtoColumnType, columnRegExp *regexp.Regexp, value string) (valid bool, corrected string, err error)
+	Get(id int) (columntype *models.DtoColumnType, err error)
 	GetAll() (columntypes *[]models.ApiColumnType, err error)
-	GetByTable(tableid int64) (columntypes map[int64]models.DtoColumnType, err error)
+	GetByTable(tableid int64) (columntypes map[int]models.DtoColumnType, err error)
+	FindByName(name string) (id int, err error)
 }
 
 type ColumnTypeService struct {
@@ -21,7 +30,57 @@ func NewColumnTypeService(repository *Repository) *ColumnTypeService {
 	}
 }
 
-func (columntypeservice *ColumnTypeService) Get(id int64) (columntype *models.DtoColumnType, err error) {
+func (columntypeservice *ColumnTypeService) Validate(dtocolumntype *models.DtoColumnType,
+	columnRegExp *regexp.Regexp, value string) (valid bool, corrected string, err error) {
+	valid = true
+	switch dtocolumntype.ID {
+	case models.COLUMN_TYPE_BIRTHDAY:
+		found := false
+		layouts := []string{"2006 Jan 02", "2006-Jan-02", "2006/Jan/02", "2006.Jan.02", "2006-01-02", "2006/01/02", "2006.01.02",
+			"02 Jan 2006", "02-Jan-2006", "02/Jan/2006", "02.Jan.2006", "02-01-2006", "02/01/2006", "02.01.2006",
+			"02 Jan 06", "02-Jan-06", "02/Jan/06", "02.Jan.06"}
+		for _, layout := range layouts {
+			_, err = time.Parse(layout, value)
+			if err == nil {
+				found = true
+				break
+			}
+		}
+		valid = found
+	case models.COLUMN_TYPE_MOBILE_PHONE:
+		numbers := numberRegExp.FindAllString(value, -1)
+		value = strings.Join(numbers, "")
+		runes := []rune(value)
+		if len(runes) != 0 {
+			if runes[0] == '8' {
+				runes[0] = '7'
+			}
+		}
+		value = string(runes)
+		fallthrough
+	default:
+		if dtocolumntype.Regexp != "" {
+			if columnRegExp == nil {
+				valid, err = regexp.MatchString(dtocolumntype.Regexp, value)
+				if err != nil {
+					log.Error("Error during running reg exp %v with value %v", err, dtocolumntype.Regexp)
+					return false, value, err
+				}
+			} else {
+				valid = columnRegExp.MatchString(value)
+			}
+		}
+	}
+	if dtocolumntype.Required {
+		if value == "" {
+			valid = false
+		}
+	}
+
+	return valid, value, nil
+}
+
+func (columntypeservice *ColumnTypeService) Get(id int) (columntype *models.DtoColumnType, err error) {
 	columntype = new(models.DtoColumnType)
 	err = columntypeservice.DbContext.SelectOne(columntype, "select * from "+columntypeservice.Table+" where id = ?", id)
 	if err != nil {
@@ -47,8 +106,8 @@ func (columntypeservice *ColumnTypeService) GetAll() (columntypes *[]models.ApiC
 	return columntypes, nil
 }
 
-func (columntypeservice *ColumnTypeService) GetByTable(tableid int64) (columntypes map[int64]models.DtoColumnType, err error) {
-	columntypes = make(map[int64]models.DtoColumnType)
+func (columntypeservice *ColumnTypeService) GetByTable(tableid int64) (columntypes map[int]models.DtoColumnType, err error) {
+	columntypes = make(map[int]models.DtoColumnType)
 
 	tempcolumntypes := new([]models.DtoColumnType)
 	_, err = columntypeservice.DbContext.Select(tempcolumntypes,
@@ -63,4 +122,14 @@ func (columntypeservice *ColumnTypeService) GetByTable(tableid int64) (columntyp
 	}
 
 	return columntypes, nil
+}
+
+func (columntypeservice *ColumnTypeService) FindByName(name string) (id int, err error) {
+	err = columntypeservice.DbContext.SelectOne(&id, "select id from "+columntypeservice.Table+" where name = ?", name)
+	if err != nil {
+		log.Error("Error during finding column type object from database %v with value %v", err, name)
+		return 0, err
+	}
+
+	return id, nil
 }

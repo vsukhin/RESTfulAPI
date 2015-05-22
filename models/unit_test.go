@@ -9,9 +9,10 @@ func TestNewDtoUnit(t *testing.T) {
 	var id int64 = 1
 	var created = time.Now()
 	var name = "Name"
+	var active = true
 	var dtoUnit *DtoUnit
 
-	dtoUnit = NewDtoUnit(id, created, name)
+	dtoUnit = NewDtoUnit(id, created, name, active)
 	if dtoUnit.ID != id {
 		t.Error("ID field is not properly initialized")
 	}
@@ -20,5 +21,8 @@ func TestNewDtoUnit(t *testing.T) {
 	}
 	if dtoUnit.Name != name {
 		t.Error("Name field is not properly initialized")
+	}
+	if dtoUnit.Active != active {
+		t.Error("Active field is not properly initialized")
 	}
 }

@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-//Структура для организации хранения мобильных телефонов
+// Структура для организации хранения мобильных телефонов
 type ViewApiMobilePhone struct {
-	Phone         string `json:"phone" db:"phone" validate:"nonzero,min=1,max=25,regexp=^[0-9]*$"` // Уникальный номер
-	Primary       bool   `json:"primary" db:"primary"`                                             // Основной
-	Confirmed     bool   `json:"confirmed" db:"confirmed"`                                         // Подтвержден
-	Subscription  bool   `json:"subscription" db:"subscription"`                                   // Используется для рассылки
-	Language      string `json:"language" db:"language" validate:"nonzero,min=1,max=10"`           // Язык рассылки
-	Classifier_ID int    `json:"contactClass" db:"classifier_id" validate:"nonzero"`               // Идентификатор классификатора
+	Phone         string `json:"phone" db:"phone" validate:"nonzero,min=1,max=25,regexp=^7[0-9]{10}$"` // Уникальный номер
+	Primary       bool   `json:"primary" db:"primary"`                                                 // Основной
+	Confirmed     bool   `json:"confirmed" db:"confirmed"`                                             // Подтвержден
+	Subscription  bool   `json:"subscription" db:"subscription"`                                       // Используется для рассылки
+	Language      string `json:"language" db:"language" validate:"nonzero,min=1,max=10"`               // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id" validate:"nonzero"`                   // Идентификатор классификатора
 }
 
 type UpdateMobilePhones []ViewApiMobilePhone

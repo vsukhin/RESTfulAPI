@@ -14,39 +14,49 @@ const (
 	MAX_STEP_NUMBER = 3
 )
 
-//Структура для организации хранения заказа
+// Структура для организации хранения заказа
+type ViewShortOrder struct {
+	Name string `json:"name" validate:"max=255"` // Название
+}
+
+type ViewMiddleOrder struct {
+	Name               string `json:"name" validate:"max=255"`  // Название
+	Step               byte   `json:"step" validate:"min=0"`    // Шаг
+	IsAssembled        bool   `json:"completed"`                // Собран
+	Facility_ID        int64  `json:"type"`                     // Идентификатор услуги
+	Supplier_ID        int64  `json:"supplierId"`               // Идентификатор поставщика
+	IsNewCostConfirmed bool   `json:"customerNewCostConfirmed"` // Новая цена утверждена
+}
+
 type ViewLongOrder struct {
-	Name               string  `json:"name" validate:"max=255"`              // Название
-	Step               byte    `json:"step"`                                 // Шаг
-	IsAssembled        bool    `json:"completed"`                            // Собран
-	IsConfirmed        bool    `json:"moderatorConfirmed"`                   // Утвержден
-	Facility_ID        int64   `json:"type"`                                 // Идентификатор услуги
-	Supplier_ID        int64   `json:"supplierId"`                           // Идентификатор поставщика
-	IsNew              bool    `json:"new"`                                  // Новый
-	IsOpen             bool    `json:"open"`                                 // Открыт
-	IsCancelled        bool    `json:"cancel"`                               // Отказ
-	Reason             string  `json:"cancelDescription" validate:"max=255"` // Причина отказа
-	Proposed_Price     float64 `json:"supplierCost"`                         // Предложенная цена
-	IsNewCost          bool    `json:"supplierCostNew"`                      // Новая цена
-	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed"`             // Новая цена утверждена
-	IsPaid             bool    `json:"paid"`                                 // Оплачен
-	IsStarted          bool    `json:"moderatorBegin"`                       // Запущен
-	Charged_Fee        float64 `json:"supplierFactualCost"`                  // Фактическая цена
-	IsExecuted         bool    `json:"supplierClose"`                        // Выполнен
-	IsDocumented       bool    `json:"moderatorDocumentsGotten"`             // Документы имеются
-	IsClosed           bool    `json:"moderatorClose"`                       // Закрыт
-	IsArchived         bool    `json:"archive"`                              // Архивирован
-	IsDeleted          bool    `json:"del"`                                  // Удален
+	Name               string  `json:"name" validate:"max=255"`                   // Название
+	Step               byte    `json:"step" validate:"min=0"`                     // Шаг
+	IsAssembled        bool    `json:"completed"`                                 // Собран
+	IsConfirmed        bool    `json:"moderatorConfirmed"`                        // Утвержден
+	Facility_ID        int64   `json:"type"`                                      // Идентификатор услуги
+	Supplier_ID        int64   `json:"supplierId"`                                // Идентификатор поставщика
+	IsNew              bool    `json:"new"`                                       // Новый
+	IsOpen             bool    `json:"open"`                                      // Открыт
+	IsCancelled        bool    `json:"cancel"`                                    // Отказ
+	Reason             string  `json:"cancelDescription" validate:"max=255"`      // Причина отказа
+	Execution_Forecast int     `json:"supplierForecastWorkDays" validate:"min=0"` // Прогноз исполнения
+	Proposed_Price     float64 `json:"supplierCost" validate:"min=0"`             // Предложенная цена
+	IsNewCost          bool    `json:"supplierCostNew"`                           // Новая цена
+	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed"`                  // Новая цена утверждена
+	IsPaid             bool    `json:"paid"`                                      // Оплачен
+	IsStarted          bool    `json:"moderatorBegin"`                            // Запущен
+	Charged_Fee        float64 `json:"supplierFactualCost" validate:"min=0"`      // Фактическая цена
+	IsExecuted         bool    `json:"supplierClose"`                             // Выполнен
+	IsDocumented       bool    `json:"moderatorDocumentsGotten"`                  // Документы имеются
+	IsClosed           bool    `json:"moderatorClose"`                            // Закрыт
+	IsArchived         bool    `json:"archive"`                                   // Архивирован
+	IsDeleted          bool    `json:"del"`                                       // Удален
 }
 
 type ViewFullOrder struct {
 	Creator_ID int64 `json:"userId"` // Идентификатор пользователя
 	Unit_ID    int64 `json:"unitId"` // Идентификатор объединения
 	ViewLongOrder
-}
-
-type ViewShortOrder struct {
-	Name string `json:"name" validate:"max=255"` // Название
 }
 
 type ApiMetaOrder struct {
@@ -119,6 +129,7 @@ type ApiLongOrder struct {
 	IsOpen             bool    `json:"open"`                     // Открыт
 	IsCancelled        bool    `json:"cancel"`                   // Отказ
 	Reason             string  `json:"cancelDescription"`        // Причина отказа
+	Execution_Forecast int     `json:"supplierForecastWorkDays"` // Прогноз исполнения
 	Proposed_Price     float64 `json:"supplierCost"`             // Предложенная цена
 	IsNewCost          bool    `json:"supplierCostNew"`          // Новая цена
 	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed"` // Новая цена утверждена
@@ -186,17 +197,18 @@ type OrderAdminSearch struct {
 }
 
 type DtoOrder struct {
-	ID             int64     `db:"id"`             // Уникальный идентификатор
-	Project_ID     int64     `db:"project_id"`     // Идентификатор проекта
-	Creator_ID     int64     `db:"user_id"`        // Идентификатор создателя
-	Unit_ID        int64     `db:"unit_id"`        // Идентификатор объединения
-	Supplier_ID    int64     `db:"supplier_id"`    // Идентификатор поставщика
-	Facility_ID    int64     `db:"service_id"`     // Идентификатор услуги
-	Name           string    `db:"name"`           // Название
-	Step           byte      `db:"step"`           // Шаг
-	Created        time.Time `db:"created"`        // Время создания
-	Proposed_Price float64   `db:"proposed_price"` // Предложенная цена
-	Charged_Fee    float64   `db:"charged_fee"`    // Фактическая цена
+	ID                 int64     `db:"id"`                 // Уникальный идентификатор
+	Project_ID         int64     `db:"project_id"`         // Идентификатор проекта
+	Creator_ID         int64     `db:"user_id"`            // Идентификатор создателя
+	Unit_ID            int64     `db:"unit_id"`            // Идентификатор объединения
+	Supplier_ID        int64     `db:"supplier_id"`        // Идентификатор поставщика
+	Facility_ID        int64     `db:"service_id"`         // Идентификатор услуги
+	Name               string    `db:"name"`               // Название
+	Step               byte      `db:"step"`               // Шаг
+	Created            time.Time `db:"created"`            // Время создания
+	Proposed_Price     float64   `db:"proposed_price"`     // Предложенная цена
+	Charged_Fee        float64   `db:"charged_fee"`        // Фактическая цена
+	Execution_Forecast int       `db:"execution_forecast"` // Прогноз исполнения
 }
 
 // Конструктор создания объекта заказа в api
@@ -275,7 +287,7 @@ func NewApiBriefOrder(id int64, name string, ispaid bool, isarchived bool, isdel
 }
 
 func NewApiLongOrder(id int64, name string, step byte, isassembled bool, isconfirmed bool, facility_id int64,
-	supplier_id int64, isnew bool, isopen bool, iscancelled bool, reason string, proposed_price float64,
+	supplier_id int64, isnew bool, isopen bool, iscancelled bool, reason string, execution_forecast int, proposed_price float64,
 	isnewcost bool, isnewcostconfirmed bool, ispaid bool, isstarted bool, charged_fee float64, isexecuted bool,
 	isdocumented bool, isclosed bool, isarchived bool, isdeleted bool) *ApiLongOrder {
 	return &ApiLongOrder{
@@ -290,6 +302,7 @@ func NewApiLongOrder(id int64, name string, step byte, isassembled bool, isconfi
 		IsOpen:             isopen,
 		IsCancelled:        iscancelled,
 		Reason:             reason,
+		Execution_Forecast: execution_forecast,
 		Proposed_Price:     proposed_price,
 		IsNewCost:          isnewcost,
 		IsNewCostConfirmed: isnewcostconfirmed,
@@ -336,19 +349,20 @@ func NewApiFullOrder(user_id int64, unit_id int64, created time.Time, apilongord
 
 // Конструктор создания объекта заказа в бд
 func NewDtoOrder(id int64, project_id int64, creator_id int64, unit_id int64, supplier_id int64, facility_id int64,
-	name string, step byte, created time.Time, proposed_price float64, charged_fee float64) *DtoOrder {
+	name string, step byte, created time.Time, proposed_price float64, charged_fee float64, execution_forecast int) *DtoOrder {
 	return &DtoOrder{
-		ID:             id,
-		Project_ID:     project_id,
-		Creator_ID:     creator_id,
-		Unit_ID:        unit_id,
-		Supplier_ID:    supplier_id,
-		Facility_ID:    facility_id,
-		Name:           name,
-		Step:           step,
-		Created:        created,
-		Proposed_Price: proposed_price,
-		Charged_Fee:    charged_fee,
+		ID:                 id,
+		Project_ID:         project_id,
+		Creator_ID:         creator_id,
+		Unit_ID:            unit_id,
+		Supplier_ID:        supplier_id,
+		Facility_ID:        facility_id,
+		Name:               name,
+		Step:               step,
+		Created:            created,
+		Proposed_Price:     proposed_price,
+		Charged_Fee:        charged_fee,
+		Execution_Forecast: execution_forecast,
 	}
 }
 
@@ -391,7 +405,7 @@ func (order *OrderSearch) Extract(infield string, invalue string) (outfield stri
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue
@@ -399,6 +413,10 @@ func (order *OrderSearch) Extract(infield string, invalue string) (outfield stri
 
 func (order *OrderSearch) GetAllFields(parameter interface{}) (fields *[]string) {
 	return GetAllSearchTags(order)
+}
+
+func (order *ViewMiddleOrder) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+	return Validate(order, errors, req)
 }
 
 func (order *ViewLongOrder) Validate(errors binding.Errors, req *http.Request) binding.Errors {
@@ -437,6 +455,7 @@ func NewApiLongOrderFromDto(dtoorder *DtoOrder, dtoorderstatuses *[]DtoOrderStat
 	apiorder.Supplier_ID = dtoorder.Supplier_ID
 	apiorder.Proposed_Price = dtoorder.Proposed_Price
 	apiorder.Charged_Fee = dtoorder.Charged_Fee
+	apiorder.Execution_Forecast = dtoorder.Execution_Forecast
 	for _, dtoorderstatus := range *dtoorderstatuses {
 		switch dtoorderstatus.Status_ID {
 		case ORDER_STATUS_COMPLETED:
@@ -544,7 +563,7 @@ func (order *OrderAdminSearch) Extract(infield string, invalue string) (outfield
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue

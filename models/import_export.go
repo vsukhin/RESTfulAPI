@@ -20,7 +20,7 @@ const (
 	EXPORT_DATA_VALID   = "correct"
 )
 
-//Структура для организации хранения импорта-экспорта
+// Структура для организации хранения импорта-экспорта
 type ViewImportTable struct {
 	File_ID   string `json:"fileId" validate:"nonzero,min=1,max=255"` // Уникальный идентификатор файла
 	HasHeader bool   `json:"names"`                                   // Есть строка заголовка
@@ -29,8 +29,8 @@ type ViewImportTable struct {
 type ViewImportColumn struct {
 	ID       int64  `json:"id" db:"id" validate:"nonzero"`         // Уникальный идентификатор временной колонки таблицы
 	Name     string `json:"name" validate:"nonzero,min=1,max=255"` // Название колонки таблицы
-	Position int64  `json:"position"`                              // Позиция
-	TypeID   int64  `json:"typeId"`                                // Идентификатор типа
+	Position int64  `json:"position" validate:"min=0"`             // Позиция
+	TypeID   int    `json:"typeId"`                                // Идентификатор типа
 	Use      bool   `json:"pass"`                                  // Импортируется
 }
 
@@ -46,12 +46,12 @@ type ApiImportTable struct {
 }
 
 type ApiImportStatus struct {
-	Ready          bool            `json:"ready" `    // Готова
-	Percentage     byte            `json:"percent"`   // Процент готовности
-	Percentages    []ApiImportStep `json:"percents"`  // Процент готовности по шагам
-	NumOfCols      int64           `json:"columns"`   // Число колонок
-	NumOfRows      int64           `json:"rows"`      // Число строк
-	NumOfWrongRows int64           `json:"errorRows"` // Количество строк с неверным числом столбцов
+	Ready          bool            `json:"ready" `             // Готова
+	Percentage     byte            `json:"percent"`            // Процент готовности
+	Percentages    []ApiImportStep `json:"percents,omitempty"` // Процент готовности по шагам
+	NumOfCols      int64           `json:"columns"`            // Число колонок
+	NumOfRows      int64           `json:"rows"`               // Число строк
+	NumOfWrongRows int64           `json:"errorRows"`          // Количество строк с неверным числом столбцов
 }
 
 type ApiImportColumn struct {
@@ -61,8 +61,8 @@ type ApiImportColumn struct {
 }
 
 type ApiMetaExportTable struct {
-	Formats []ApiDataFormat `json:"formats" ` // Список форматов для выгрузки данных
-	URL     string          `json:"url" `     // URL для выгрузки данных
+	Formats []ApiDataFormat `json:"formats,omitempty" ` // Список форматов для выгрузки данных
+	URL     string          `json:"url" `               // URL для выгрузки данных
 }
 
 type ApiExportStatus struct {

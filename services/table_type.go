@@ -5,9 +5,9 @@ import (
 )
 
 type TableTypeRepository interface {
-	Get(id int64) (tabletype *models.DtoTableType, err error)
-	GetAll() (tabletypes *[]string, err error)
-	FindByName(name string) (id int64, err error)
+	Get(id int) (tabletype *models.DtoTableType, err error)
+	GetAll() (tabletypes *[]models.ApiTableType, err error)
+	FindByName(name string) (id int, err error)
 }
 
 type TableTypeService struct {
@@ -21,7 +21,7 @@ func NewTableTypeService(repository *Repository) *TableTypeService {
 	}
 }
 
-func (tabletypeservice *TableTypeService) Get(id int64) (tabletype *models.DtoTableType, err error) {
+func (tabletypeservice *TableTypeService) Get(id int) (tabletype *models.DtoTableType, err error) {
 	tabletype = new(models.DtoTableType)
 	err = tabletypeservice.DbContext.SelectOne(tabletype, "select * from "+tabletypeservice.Table+" where id = ?", id)
 	if err != nil {
@@ -32,9 +32,9 @@ func (tabletypeservice *TableTypeService) Get(id int64) (tabletype *models.DtoTa
 	return tabletype, nil
 }
 
-func (tabletypeservice *TableTypeService) GetAll() (tabletypes *[]string, err error) {
-	tabletypes = new([]string)
-	_, err = tabletypeservice.DbContext.Select(tabletypes, "select name from "+tabletypeservice.Table)
+func (tabletypeservice *TableTypeService) GetAll() (tabletypes *[]models.ApiTableType, err error) {
+	tabletypes = new([]models.ApiTableType)
+	_, err = tabletypeservice.DbContext.Select(tabletypes, "select id, name from "+tabletypeservice.Table)
 	if err != nil {
 		log.Error("Error during getting all table type object from database %v", err)
 		return nil, err
@@ -43,7 +43,7 @@ func (tabletypeservice *TableTypeService) GetAll() (tabletypes *[]string, err er
 	return tabletypes, nil
 }
 
-func (tabletypeservice *TableTypeService) FindByName(name string) (id int64, err error) {
+func (tabletypeservice *TableTypeService) FindByName(name string) (id int, err error) {
 	err = tabletypeservice.DbContext.SelectOne(&id, "select id from "+tabletypeservice.Table+" where name = ?", name)
 	if err != nil {
 		log.Error("Error during finding table type object from database %v with value %v", err, name)

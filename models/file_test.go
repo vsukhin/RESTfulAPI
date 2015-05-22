@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestApiFile(t *testing.T) {
+func TestNewApiFile(t *testing.T) {
 	var id int64 = 1
 	var apiFile *ApiFile
 
@@ -15,7 +15,7 @@ func TestApiFile(t *testing.T) {
 	}
 }
 
-func TestApiImage(t *testing.T) {
+func TestNewApiImage(t *testing.T) {
 	var id int64 = 1
 	var apiImage *ApiImage
 

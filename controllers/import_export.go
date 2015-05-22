@@ -10,6 +10,7 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"time"
@@ -23,7 +24,8 @@ const (
 // post /api/v1.0/tables/import/
 func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImportTable, r render.Render, userrepository services.UserRepository,
 	filerepository services.FileRepository, unitrepository services.UnitRepository, tabletyperepository services.TableTypeRepository,
-	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository, session *models.DtoSession) {
+	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository,
+	columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
 	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
@@ -74,13 +76,13 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 		return
 	}
 
-	go helpers.ImportData(viewimporttable, file, dtocustomertable, customertablerepository, importsteprepository)
+	go helpers.ImportData(viewimporttable, file, dtocustomertable, customertablerepository, importsteprepository, columntyperepository)
 
 	r.JSON(http.StatusOK, models.NewApiImportTable(dtocustomertable.ID))
 }
 
 // get /api/v1.0/tables/import/:tmpid/columns/
-func GetImportDataColumns(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+func GetImportDataColumns(w http.ResponseWriter, r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
 	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TEMPORABLE_TABLE_ID], session.Language)
 	if err != nil {
@@ -108,7 +110,7 @@ func GetImportDataColumns(r render.Render, params martini.Params, customertabler
 		*importcolumns = append(*importcolumns, *models.NewApiImportColumn(tablecolumn.ID, tablecolumn.Name, tablecolumn.Position))
 	}
 
-	r.JSON(http.StatusOK, importcolumns)
+	helpers.RenderJSONArray(importcolumns, len(*importcolumns), w, r)
 }
 
 // put /api/v1.0/tables/import/:tmpid/columns/
@@ -163,14 +165,11 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 
 		dtotablecolumn.Name = viewimportcolumn.Name
 		dtotablecolumn.Position = viewimportcolumn.Position
-		var typeid int64 = 0
-		if viewimportcolumn.TypeID != 0 {
-			if helpers.IsColumnTypeActive(r, columntyperepository, viewimportcolumn.TypeID, session.Language) != nil {
-				return
-			}
-			typeid = viewimportcolumn.TypeID
+		if helpers.IsColumnTypeActive(r, columntyperepository, viewimportcolumn.TypeID, session.Language) != nil {
+			return
 		}
-		dtotablecolumn.Column_Type_ID = typeid
+
+		dtotablecolumn.Column_Type_ID = viewimportcolumn.TypeID
 		if viewimportcolumn.Use {
 			dtotablecolumn.Active = true
 		} else {
@@ -201,7 +200,7 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 
 	go helpers.CheckTableCells(dtocustomertable, tablecolumnrepository, columntyperepository, tablerowrepository, importsteprepository)
 
-	r.JSON(http.StatusOK, models.NewApiLongCustomerTable(dtocustomertable.ID, dtocustomertable.Name, models.TABLE_TYPE_DEFAULT, dtocustomertable.UnitID))
+	r.JSON(http.StatusOK, models.NewApiLongCustomerTable(dtocustomertable.ID, dtocustomertable.Name, dtocustomertable.TypeID, dtocustomertable.UnitID))
 }
 
 // options /api/v1.0/tables/import/:tmpid/
@@ -277,7 +276,14 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 		return
 	}
 
-	format := request.URL.Query().Get(helpers.PARAM_QUERY_FORMAT)
+	format, err := url.QueryUnescape(request.URL.Query().Get(helpers.PARAM_QUERY_FORMAT))
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
 	formatid, err := strconv.Atoi(format)
 	if err != nil {
 		log.Error("Can't convert data format to number %v with value %v", err, format)
@@ -293,7 +299,14 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 		return
 	}
 
-	rowtype := request.URL.Query().Get(helpers.PARAM_QUERY_TYPE)
+	rowtype, err := url.QueryUnescape(request.URL.Query().Get(helpers.PARAM_QUERY_TYPE))
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
 	if rowtype != models.EXPORT_DATA_ALL && rowtype != models.EXPORT_DATA_VALID && rowtype != models.EXPORT_DATA_INVALID {
 		log.Error("Error during looking up for existing export type %v", rowtype)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,

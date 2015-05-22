@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"types"
@@ -41,7 +42,13 @@ const (
 
 func GetLimitQuery(request *http.Request, r render.Render, language string) (query string, err error) {
 	query = ""
-	limit := request.URL.Query().Get(PARAM_QUERY_LIMIT)
+	limit, err := url.QueryUnescape(request.URL.Query().Get(PARAM_QUERY_LIMIT))
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return "", errors.New("Wrong data")
+	}
 	if limit != "" {
 		var offset int64
 		var count int64
@@ -87,7 +94,13 @@ func GetLimitQuery(request *http.Request, r render.Render, language string) (que
 }
 
 func GetOrderArray(checker models.Checker, request *http.Request, r render.Render, language string) (sorts *[]models.OrderExp, err error) {
-	order := request.URL.Query().Get(PARAM_QUERY_ORDER)
+	order, err := url.QueryUnescape(request.URL.Query().Get(PARAM_QUERY_ORDER))
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return nil, errors.New("Wrong data")
+	}
 	sorts = new([]models.OrderExp)
 	if order != "" {
 		orders := strings.Split(order, ",")
@@ -106,7 +119,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 				log.Error("Unknown field name %v", elements[PARAM_SORT_FIELD])
 				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return nil, errors.New("Uknown field")
+				return nil, errors.New("Unknown field")
 			}
 
 			if strings.ToLower(elements[PARAM_SORT_ORDER]) != PARAM_SORT_ASC &&
@@ -114,7 +127,7 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 				log.Error("Unknown sort operation %v", elements[PARAM_SORT_ORDER])
 				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return nil, errors.New("Uknown sort")
+				return nil, errors.New("Unknown sort")
 			}
 			*sorts = append(*sorts, models.OrderExp{Field: elements[PARAM_SORT_FIELD], Order: elements[PARAM_SORT_ORDER]})
 		}
@@ -131,7 +144,13 @@ func GetOrderArray(checker models.Checker, request *http.Request, r render.Rende
 
 func GetFilterArray(extractor models.Extractor, parameter interface{}, request *http.Request, r render.Render,
 	language string) (filters *[]models.FilterExp, err error) {
-	filter := request.URL.Query().Get(PARAM_QUERY_FILTER)
+	filter, err := url.QueryUnescape(request.URL.Query().Get(PARAM_QUERY_FILTER))
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return nil, errors.New("Wrong data")
+	}
 	filters = new([]models.FilterExp)
 	if filter != "" {
 		cons := strings.Split(filter, ",")
@@ -201,7 +220,7 @@ func GetFilterArray(extractor models.Extractor, parameter interface{}, request *
 				log.Error("Unknown filter operation %v", elements[PARAM_FILTER_OP])
 				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return nil, errors.New("Uknown filter")
+				return nil, errors.New("Unknown filter")
 			}
 
 			if allfields {

@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-//Структура для организации хранения классификатора
+const (
+	CLASSIFIER_TYPE_UNKNOWN = 0
+)
+
+// Структура для организации хранения классификатора
 type ViewClassifier struct {
 	Name string `json:"name" validate:"nonzero,min=1,max=255"` // Название
 }
@@ -102,7 +106,7 @@ func (classifier *ClassifierSearch) Extract(infield string, invalue string) (out
 		}
 		outvalue = fmt.Sprintf("%v", val)
 	default:
-		errField = errors.New("Uknown field")
+		errField = errors.New("Unknown field")
 	}
 
 	return outfield, outvalue, errField, errValue

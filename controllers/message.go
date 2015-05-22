@@ -34,7 +34,7 @@ func GetMetaMessages(r render.Render, params martini.Params, orderrepository ser
 }
 
 // get /api/v1.0/messages/orders/:oid/
-func GetMessages(request *http.Request, r render.Render, params martini.Params, orderrepository services.OrderRepository,
+func GetMessages(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params, orderrepository services.OrderRepository,
 	messagerepository services.MessageRepository, session *models.DtoSession) {
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
 	if err != nil {
@@ -95,7 +95,7 @@ func GetMessages(request *http.Request, r render.Render, params martini.Params, 
 		return
 	}
 
-	r.JSON(http.StatusOK, messages)
+	helpers.RenderJSONArray(messages, len(*messages), w, r)
 }
 
 // post /api/v1.0/messages/order/:oid/

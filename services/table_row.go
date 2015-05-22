@@ -213,8 +213,13 @@ func (tablerowservice *TableRowService) Create(tablerow *models.DtoTableRow, inT
 		}
 	}
 
-	_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position + 1"+
-		" where customer_table_id = ? and position >= ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	if inTrans {
+		_, err = trans.Exec("update "+tablerowservice.Table+" set position = position + 1"+
+			" where customer_table_id = ? and position >= ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	} else {
+		_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position + 1"+
+			" where customer_table_id = ? and position >= ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -223,7 +228,11 @@ func (tablerowservice *TableRowService) Create(tablerow *models.DtoTableRow, inT
 		return err
 	}
 
-	err = tablerowservice.DbContext.Insert(tablerow)
+	if inTrans {
+		err = trans.Insert(tablerow)
+	} else {
+		err = tablerowservice.DbContext.Insert(tablerow)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -255,7 +264,11 @@ func (tablerowservice *TableRowService) Update(newtablerow *models.DtoTableRow, 
 	}
 
 	if !briefly {
-		err = tablerowservice.DbContext.Insert(oldtablerow)
+		if inTrans {
+			err = trans.Insert(oldtablerow)
+		} else {
+			err = tablerowservice.DbContext.Insert(oldtablerow)
+		}
 		if err != nil {
 			if inTrans {
 				_ = trans.Rollback()
@@ -265,7 +278,11 @@ func (tablerowservice *TableRowService) Update(newtablerow *models.DtoTableRow, 
 		}
 	}
 
-	_, err = tablerowservice.DbContext.Update(newtablerow)
+	if inTrans {
+		_, err = trans.Update(newtablerow)
+	} else {
+		_, err = tablerowservice.DbContext.Update(newtablerow)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -296,8 +313,13 @@ func (tablerowservice *TableRowService) Deactivate(tablerow *models.DtoTableRow,
 		}
 	}
 
-	_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position - 1"+
-		" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	if inTrans {
+		_, err = trans.Exec("update "+tablerowservice.Table+" set position = position - 1"+
+			" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	} else {
+		_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position - 1"+
+			" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -306,7 +328,11 @@ func (tablerowservice *TableRowService) Deactivate(tablerow *models.DtoTableRow,
 		return err
 	}
 
-	_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set active = 0 where id = ?", tablerow.ID)
+	if inTrans {
+		_, err = trans.Exec("update "+tablerowservice.Table+" set active = 0 where id = ?", tablerow.ID)
+	} else {
+		_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set active = 0 where id = ?", tablerow.ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -337,8 +363,13 @@ func (tablerowservice *TableRowService) Delete(tablerow *models.DtoTableRow, inT
 		}
 	}
 
-	_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position - 1"+
-		" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	if inTrans {
+		_, err = trans.Exec("update "+tablerowservice.Table+" set position = position - 1"+
+			" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	} else {
+		_, err = tablerowservice.DbContext.Exec("update "+tablerowservice.Table+" set position = position - 1"+
+			" where customer_table_id = ? and position > ? and active = 1", tablerow.Customer_Table_ID, tablerow.Position)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()
@@ -347,7 +378,11 @@ func (tablerowservice *TableRowService) Delete(tablerow *models.DtoTableRow, inT
 		return err
 	}
 
-	_, err = tablerowservice.DbContext.Exec("delete from "+tablerowservice.Table+" where id = ?", tablerow.ID)
+	if inTrans {
+		_, err = trans.Exec("delete from "+tablerowservice.Table+" where id = ?", tablerow.ID)
+	} else {
+		_, err = tablerowservice.DbContext.Exec("delete from "+tablerowservice.Table+" where id = ?", tablerow.ID)
+	}
 	if err != nil {
 		if inTrans {
 			_ = trans.Rollback()

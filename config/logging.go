@@ -83,8 +83,8 @@ func InitLogging() (err error) {
 				backends = append(backends, leveledgelf)
 			*/
 		default:
-			logger.Fatalf("Uknown logging mode %v", mode)
-			return errors.New("Uknown logging mode")
+			logger.Fatalf("Unknown logging mode %v", mode)
+			return errors.New("Unknown logging mode")
 		}
 		logging.SetBackend(backends...)
 		logFormatter := logging.MustStringFormatter(Configuration.Logger.Format)

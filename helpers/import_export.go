@@ -54,7 +54,8 @@ func DetectDataFormat(fullpath string) (dataformat models.DataFormat, err error)
 }
 
 func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dtocustomertable *models.DtoCustomerTable,
-	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository) {
+	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository,
+	columntyperepository services.ColumnTypeRepository) {
 	dtoimportstep := models.NewDtoImportStep(dtocustomertable.ID, 2, false, 0, time.Now(), time.Now())
 	err := importsteprepository.Save(dtoimportstep)
 	if err != nil {
@@ -103,6 +104,14 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 		log.Error("So many columns are not supported %v", columncount)
 		return
 	}
+	dtocolumntype, err := columntyperepository.Get(models.COLUMN_TYPE_DEFAULT)
+	if err != nil {
+		return
+	}
+	if !dtocolumntype.Active {
+		log.Error("Column type is not active %v", dtocolumntype.ID)
+		return
+	}
 
 	dtotablecolumns := new([]models.DtoTableColumn)
 	position := 0
@@ -116,7 +125,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 			dtotablecolumn.Name = fmt.Sprintf("Column %v", position)
 		}
 		dtotablecolumn.Customer_Table_ID = dtocustomertable.ID
-		dtotablecolumn.Column_Type_ID = 0
+		dtotablecolumn.Column_Type_ID = models.COLUMN_TYPE_DEFAULT
 		dtotablecolumn.Prebuilt = false
 		dtotablecolumn.FieldNum = byte(position) + 1
 		dtotablecolumn.Active = true
@@ -278,7 +287,7 @@ func CheckTableCells(dtocustomertable *models.DtoCustomerTable, tablecolumnrepos
 		return
 	}
 
-	regexps := make(map[int64]*regexp.Regexp)
+	regexps := make(map[int]*regexp.Regexp)
 	for _, columntype := range columntypes {
 		var r *regexp.Regexp = nil
 		if columntype.Regexp != "" {
@@ -311,19 +320,8 @@ func CheckTableCells(dtocustomertable *models.DtoCustomerTable, tablecolumnrepos
 				if err != nil {
 					return
 				}
-				valid := true
-				if tablecolumn.Column_Type_ID != 0 {
-					columntype := columntypes[tablecolumn.Column_Type_ID]
-					if columntype.Regexp != "" {
-						valid = regexps[columntype.ID].MatchString(tablecell.Value)
-					}
-					if columntype.Required {
-						if tablecell.Value == "" {
-							valid = false
-						}
-					}
-				}
-				tablecell.Valid = valid
+				columntype := columntypes[tablecolumn.Column_Type_ID]
+				tablecell.Valid, _, _ = columntyperepository.Validate(&columntype, regexps[columntype.ID], tablecell.Value)
 				err = (&(*dtotablerows)[i]).DtoTableCellToTableRow(tablecell, &tablecolumn)
 				if err != nil {
 					return

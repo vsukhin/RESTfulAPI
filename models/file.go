@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения файлов
+// Структура для организации хранения файлов
 type ViewFile struct {
 	FileData *multipart.FileHeader `form:"filename"` // Содержание файла
 }

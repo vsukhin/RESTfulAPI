@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-//Структура для организации хранения капчи
+// Структура для организации хранения капчи
 type ApiCaptcha struct {
 	Hash  string `json:"captchaHash"`  // Уникальный hash капчи
 	Image string `json:"captchaImage"` // Картинка капчи

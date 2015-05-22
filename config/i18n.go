@@ -17,6 +17,10 @@ type Resource struct {
 		PasswordSubject     string `yaml:"PasswordSubject"`     // Подтверждение смены пароля
 		EmailSubject        string `yaml:"EmailSubject"`        // Подтверждение email
 		OK                  string `yaml:"OK"`                  // Все в порядке
+		NewsHeader          string `yaml:"NewsHeader"`          // Заголовок новостей
+		SubscriptionSubject string `yaml:"SubscriptionSubject"` // Подтверждение подписки
+		SubscribeCode       string `yaml:"SubscribeCode"`       // Код для подписки на новости
+		UnsubscribeCode     string `yaml:"UnsubscribeCode"`     // Код для отписки от новостей
 
 	} `yaml:"Messages"` // Общая информация
 
@@ -48,6 +52,10 @@ type Resource struct {
 			Email_InUse             string `yaml:"Email_InUse"`             // Ошибка уже используемого email
 			Data_Changes_Denied     string `yaml:"Data_Changes_Denied"`     // Ошибка изменения данных
 			Data_Delete_Denied      string `yaml:"Data_Delete_Denied"`      // Ошибка удаления данных
+			MobilePhone_InUse       string `yaml:"MobilePhone_InUse"`       // Ошибка уже используемого мобильного телефона
+			Token_Hash_Wrong        string `yaml:"Token_Hash_Wrong"`        // Ошибка декодирования хэша токена
+			Device_Wrong            string `yaml:"Device_Wrong"`            // Ошибка невернoго устройства
+			SMSSender_InUse         string `yaml:"SMSSender_InUse"`         // Ошибка уже используемого отправителя
 		} `yaml:"Api"` // Ошибки API
 
 	} `yaml:"Errors"` // Сообщения об ошибках

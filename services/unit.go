@@ -2,6 +2,7 @@ package services
 
 import (
 	"application/models"
+	"github.com/coopernurse/gorp"
 )
 
 type UnitRepository interface {
@@ -9,7 +10,7 @@ type UnitRepository interface {
 	Get(unitid int64) (unit *models.DtoUnit, err error)
 	GetMeta() (unit *models.ApiShortMetaUnit, err error)
 	GetAll(filter string) (units *[]models.ApiShortUnit, err error)
-	Create(unit *models.DtoUnit) (err error)
+	Create(unit *models.DtoUnit, trans *gorp.Transaction) (err error)
 	Update(unit *models.DtoUnit) (err error)
 	Deactivate(*models.DtoUnit) (err error)
 }
@@ -71,12 +72,16 @@ func (unitservice *UnitService) GetAll(filter string) (units *[]models.ApiShortU
 	return units, nil
 }
 
-func (unitservice *UnitService) Create(unit *models.DtoUnit) (err error) {
+func (unitservice *UnitService) Create(unit *models.DtoUnit, trans *gorp.Transaction) (err error) {
 	if unit.Name == "" {
 		unit.Name = models.UNIT_NAME_DEFAULT
 	}
 
-	err = unitservice.DbContext.Insert(unit)
+	if trans != nil {
+		err = trans.Insert(unit)
+	} else {
+		err = unitservice.DbContext.Insert(unit)
+	}
 	if err != nil {
 		log.Error("Error during creating unit object in database %v", err)
 		return err
