@@ -2,22 +2,19 @@ package main
 
 import (
 	"application/server"
-	"github.com/alecthomas/kingpin"
-	"os"
+	"flag"
 )
 
 var (
-	app      = kingpin.New("application", "RESTful web API application")
-	cmdPrint = app.Command("print-routes", "Print all supported routes")
-	command  = kingpin.MustParse(app.Parse(os.Args[1:]))
+	boolPtr = flag.Bool("print-routes", false, "Print all supported routes")
 )
 
 func main() {
-	switch command {
-	case cmdPrint.FullCommand():
+	flag.Parse()
+
+	if *boolPtr {
 		server.PrintRoutes(server.Routes())
-	default:
-		app.Usage(os.Stdout)
+	} else {
 		server.Start()
 		server.Stop()
 	}

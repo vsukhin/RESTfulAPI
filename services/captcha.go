@@ -1,19 +1,10 @@
 package services
 
 import (
-	"application/config"
 	"application/models"
-	"errors"
-	"github.com/martini-contrib/render"
-	"types"
-)
-
-const (
-	HTTP_STATUS_CAPTCHA_REQUIRED = 449
 )
 
 type CaptchaRepository interface {
-	Check(hash string, value string, r render.Render) (err error)
 	Get(hash string) (captcha *models.DtoCaptcha, err error)
 	Create(captcha *models.DtoCaptcha) (err error)
 	Update(captcha *models.DtoCaptcha) (err error)
@@ -29,44 +20,6 @@ func NewCaptchaService(repository *Repository) *CaptchaService {
 	return &CaptchaService{
 		repository,
 	}
-}
-
-func (captchaservice *CaptchaService) Check(hash string, value string, r render.Render) (err error) {
-	if hash != "" {
-		if value != "" {
-			var captcha *models.DtoCaptcha
-			captcha, err = captchaservice.Get(hash)
-			if err != nil {
-				r.JSON(HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_WRONG,
-					Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Captcha_Wrong})
-				return err
-			}
-			if captcha.InUse {
-				r.JSON(HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_REQUIRED,
-					Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Captcha_Required})
-				return errors.New("Captcha is required")
-			}
-			if value != captcha.Value {
-				r.JSON(HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_WRONG,
-					Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Captcha_Wrong})
-				return errors.New("Not matched captchas")
-			} else {
-				captcha.InUse = true
-				err = captchaservice.Update(captcha)
-				if err != nil {
-					r.JSON(HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_WRONG,
-						Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Captcha_Wrong})
-					return err
-				}
-			}
-		} else {
-			r.JSON(HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_REQUIRED,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Captcha_Required})
-			return errors.New("Captcha is required")
-		}
-	}
-
-	return nil
 }
 
 func (captchaservice *CaptchaService) Get(hash string) (captcha *models.DtoCaptcha, err error) {

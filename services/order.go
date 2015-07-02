@@ -12,6 +12,7 @@ const (
 
 type OrderRepository interface {
 	CheckUserAccess(user_id int64, id int64) (allowed bool, err error)
+	CheckUnitAccess(unit_id int64, id int64) (allowed bool, err error)
 	CheckSupplierAccess(user_id int64, id int64) (allowed bool, err error)
 	IsConfirmed(id int64) (confirmed bool, err error)
 	Get(id int64) (order *models.DtoOrder, err error)
@@ -39,8 +40,9 @@ func NewOrderService(repository *Repository) *OrderService {
 func (orderservice *OrderService) CheckUserAccess(user_id int64, id int64) (allowed bool, err error) {
 	count, err := orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
 		" where id = ? and (unit_id = (select unit_id from users where id = ?)"+
-		" or supplier_id = (select unit_id from users where id = ?))",
-		id, user_id, user_id)
+		" or (supplier_id != 0 and supplier_id = (select unit_id from users where id = ?))"+
+		" or (supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = id)))",
+		id, user_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during checking order object from database %v with value %v, %v", err, user_id, id)
 		return false, err
@@ -49,9 +51,24 @@ func (orderservice *OrderService) CheckUserAccess(user_id int64, id int64) (allo
 	return count != 0, nil
 }
 
+func (orderservice *OrderService) CheckUnitAccess(unit_id int64, id int64) (allowed bool, err error) {
+	count, err := orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
+		" where id = ? and (unit_id = ? or (supplier_id != 0 and supplier_id = ?)"+
+		" or (supplier_id = 0 and ? in (select supplier_id from supplier_requests where order_id = id)))",
+		id, unit_id, unit_id, unit_id)
+	if err != nil {
+		log.Error("Error during checking order object from database %v with value %v, %v", err, unit_id, id)
+		return false, err
+	}
+
+	return count != 0, nil
+}
+
 func (orderservice *OrderService) CheckSupplierAccess(user_id int64, id int64) (allowed bool, err error) {
 	count, err := orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
-		" where id = ? and supplier_id = (select unit_id from users where id = ?)", id, user_id)
+		" where id = ? and ((supplier_id != 0 and supplier_id = (select unit_id from users where id = ?))"+
+		" or (supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = id)))",
+		id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during checking order object from database %v with value %v, %v", err, user_id, id)
 		return false, err
@@ -90,7 +107,9 @@ func (orderservice *OrderService) GetByUser(user_id int64, filter string) (order
 		" left join order_statuses c on o.id = c.order_id and c.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_COMPLETED)+
 		" left join order_statuses n on o.id = n.order_id and n.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_NEW)+
 		" left join order_statuses p on o.id = p.order_id and p.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_OPEN)+
-		" where o.supplier_id = (select unit_id from users where id = ?)"+filter, user_id)
+		" where ((o.supplier_id != 0 and o.supplier_id = (select unit_id from users where id = ?))"+
+		" or (o.supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = o.id)))"+filter,
+		user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting all order object from database %v with value %v", err, user_id)
 		return nil, err
@@ -125,7 +144,8 @@ func (orderservice *OrderService) GetByUnit(unit_id int64) (orders *[]models.Api
 		" left join order_statuses p on o.id = p.order_id and p.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_PAID)+
 		" left join order_statuses a on o.id = a.order_id and a.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_ARCHIVE)+
 		" left join order_statuses d on o.id = d.order_id and d.status_id = "+fmt.Sprintf("%v", models.ORDER_STATUS_DEL)+
-		" where o.unit_id = ? or o.supplier_id = ?", unit_id, unit_id)
+		" where o.unit_id = ? or (o.supplier_id != 0 and o.supplier_id = ?)"+
+		" or (o.supplier_id = 0 and ? in (select supplier_id from supplier_requests where order_id = o.id))", unit_id, unit_id, unit_id)
 	if err != nil {
 		log.Error("Error during getting all order object from database %v with value %v", err, unit_id)
 		return nil, err
@@ -159,31 +179,36 @@ func (orderservice *OrderService) GetAll(filter string) (orders *[]models.ApiLis
 func (orderservice *OrderService) GetMeta(user_id int64) (order *models.ApiMetaOrder, err error) {
 	order = new(models.ApiMetaOrder)
 	order.Total, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
-		" where supplier_id = (select unit_id from users where id = ?)", user_id)
+		" where (supplier_id != 0 and supplier_id = (select unit_id from users where id = ?))"+
+		" or (supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = id))",
+		user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
 		return nil, err
 	}
 	order.NumOfNew, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
 		" o inner join order_statuses s on o.id = s.order_id "+
-		" where o.supplier_id = (select unit_id from users where id = ?)"+
-		" and s.status_id = ? and s.value = 1", user_id, models.ORDER_STATUS_NEW)
+		" where ((o.supplier_id != 0 and o.supplier_id = (select unit_id from users where id = ?))"+
+		" or (o.supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = o.id)))"+
+		" and s.status_id = ? and s.value = 1", user_id, user_id, models.ORDER_STATUS_NEW)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
 		return nil, err
 	}
 	order.NumOfOpen, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
 		" o inner join order_statuses s on o.id = s.order_id "+
-		" where o.supplier_id = (select unit_id from users where id = ?)"+
-		" and s.status_id = ? and s.value = 1", user_id, models.ORDER_STATUS_OPEN)
+		" where ((o.supplier_id != 0 and o.supplier_id = (select unit_id from users where id = ?))"+
+		" or (o.supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = o.id)))"+
+		" and s.status_id = ? and s.value = 1", user_id, user_id, models.ORDER_STATUS_OPEN)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
 		return nil, err
 	}
 	order.NumOfClosed, err = orderservice.DbContext.SelectInt("select count(distinct o.id) from "+orderservice.Table+
 		" o inner join order_statuses s on o.id = s.order_id "+
-		" where o.supplier_id = (select unit_id from users where id = ?)"+
-		" and s.status_id in (?, ?, ?) and s.value = 1", user_id, models.ORDER_STATUS_CANCEL,
+		" where ((o.supplier_id != 0 and o.supplier_id = (select unit_id from users where id = ?))"+
+		" or (o.supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = o.id)))"+
+		" and s.status_id in (?, ?, ?) and s.value = 1", user_id, user_id, models.ORDER_STATUS_CANCEL,
 		models.ORDER_STATUS_SUPPLIER_CLOSE, models.ORDER_STATUS_MODERATOR_CLOSE)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
@@ -191,17 +216,19 @@ func (orderservice *OrderService) GetMeta(user_id int64) (order *models.ApiMetaO
 	}
 	order.NumOfArchived, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
 		" o inner join order_statuses s on o.id = s.order_id "+
-		" where o.supplier_id = (select unit_id from users where id = ?)"+
-		" and s.status_id = ? and s.value = 1", user_id, models.ORDER_STATUS_ARCHIVE)
+		" where ((o.supplier_id != 0 and o.supplier_id = (select unit_id from users where id = ?))"+
+		" or (o.supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = o.id)))"+
+		" and s.status_id = ? and s.value = 1", user_id, user_id, models.ORDER_STATUS_ARCHIVE)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
 		return nil, err
 	}
 	order.NumOfAlert, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
-		" o where id in (select order_id from messages m where m.user_id in (select id from users where unit_id = o.unit_id)"+
-		" and m.id not in (select message_id from user_messages um where um.user_id in"+
-		" (select id from users where unit_id = o.supplier_id))) and o.supplier_id ="+
-		" (select unit_id from users where id = ?)", user_id)
+		" where id in (select order_id from messages where receiver_id = (select unit_id from users where id = ?)"+
+		" and id not in (select message_id from user_messages where user_id in (select id from users where unit_id = receiver_id)))"+
+		" and ((supplier_id != 0 and supplier_id = (select unit_id from users where id = ?))"+
+		" or (supplier_id = 0 and (select unit_id from users where id = ?) in (select supplier_id from supplier_requests where order_id = id)))",
+		user_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting meta order object from database %v with value %v", err, user_id)
 		return nil, err
@@ -219,9 +246,9 @@ func (orderservice *OrderService) GetMetaByProject(project_id int64) (order *mod
 		return nil, err
 	}
 	order.NumOfAlert, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
-		" o where id in (select order_id from messages m where m.user_id in (select id from users where unit_id = o.supplier_id)"+
-		" and m.id not in (select message_id from user_messages um where um.user_id in "+
-		"(select id from users where unit_id = o.unit_id))) and o.project_id = ?", project_id)
+		" o where id in (select order_id from messages where receiver_id = unit_id"+
+		" and id not in (select message_id from user_messages where user_id in"+
+		" (select id from users where unit_id = o.unit_id))) and project_id = ?", project_id)
 	if err != nil {
 		log.Error("Error during getting meta project object from database %v with value %v", err, project_id)
 		return nil, err
@@ -270,12 +297,8 @@ func (orderservice *OrderService) GetFullMeta() (order *models.ApiFullMetaOrder,
 		" o inner join order_statuses s on o.id = s.order_id "+
 		" where s.status_id = ? and s.value = 1", models.ORDER_STATUS_ARCHIVE)
 	order.NumOfAlert, err = orderservice.DbContext.SelectInt("select count(*) from " + orderservice.Table +
-		" o where id in (select order_id from messages m where m.user_id in (select id from users where unit_id = o.supplier_id)" +
-		" and m.id not in (select message_id from user_messages um where um.user_id in" +
-		" (select id from users where unit_id = o.unit_id)))" +
-		" or id in (select order_id from messages m where m.user_id in (select id from users where unit_id = o.unit_id)" +
-		" and m.id not in (select message_id from user_messages um where um.user_id in" +
-		" (select id from users where unit_id = o.supplier_id)))")
+		" where id in (select order_id from messages where id not in (select message_id from user_messages where user_id in" +
+		" (select id from users where unit_id = receiver_id)))")
 	order.NumOfDeleted, err = orderservice.DbContext.SelectInt("select count(*) from "+orderservice.Table+
 		" o inner join order_statuses s on o.id = s.order_id "+
 		" where s.status_id = ? and s.value = 1", models.ORDER_STATUS_DEL)

@@ -33,6 +33,36 @@ func CheckProject(r render.Render, params martini.Params, projectrepository serv
 	return dtoproject, nil
 }
 
+func CheckProjectValidity(project_id int64, r render.Render, projectrepository services.ProjectRepository,
+	language string) (dtoproject *models.DtoProject, err error) {
+	dtoproject, err = projectrepository.Get(project_id)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	return dtoproject, nil
+}
+
+func CheckProjectAccess(project_id int64, user_id int64, r render.Render, projectrepository services.ProjectRepository,
+	language string) (err error) {
+	allowed, err := projectrepository.CheckCustomerAccess(user_id, project_id)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return err
+	}
+	if !allowed {
+		log.Error("Project %v is not accessible for user %v", project_id, user_id)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return errors.New("Project not accessible")
+	}
+
+	return nil
+}
+
 func CheckProjectOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository,
 	orderrepository services.OrderRepository, language string) (dtoproject *models.DtoProject, dtoorder *models.DtoOrder, err error) {
 	dtoproject, err = CheckProject(r, params, projectrepository, language)

@@ -3,6 +3,7 @@ package services
 import (
 	"application/models"
 	"github.com/coopernurse/gorp"
+	"time"
 )
 
 type InvoiceRepository interface {
@@ -12,13 +13,18 @@ type InvoiceRepository interface {
 	GetByUser(userid int64, filter string) (invoices *[]models.ApiShortInvoice, err error)
 	GetByUnit(unitid int64, filter string) (invoices *[]models.ApiShortInvoice, err error)
 	SetArrays(invoice *models.DtoInvoice, trans *gorp.Transaction) (err error)
-	Create(invoice *models.DtoInvoice, inTrans bool) (err error)
-	Update(invoice *models.DtoInvoice, inTrans bool) (err error)
+	PaidForOrder(order_id int64, dtoinvoice *models.DtoInvoice, dtotransaction *models.DtoTransaction, inTrans bool) (err error)
+	Create(invoice *models.DtoInvoice, trans *gorp.Transaction, inTrans bool) (err error)
+	Update(invoice *models.DtoInvoice, trans *gorp.Transaction, inTrans bool) (err error)
 	Deactivate(invoice *models.DtoInvoice) (err error)
 }
 
 type InvoiceService struct {
-	InvoiceItemRepository InvoiceItemRepository
+	InvoiceItemRepository  InvoiceItemRepository
+	TransactionRepository  TransactionRepository
+	OperationRepository    OperationRepository
+	OrderInvoiceRepository OrderInvoiceRepository
+	OrderStatusRepository  OrderStatusRepository
 
 	*Repository
 }
@@ -124,9 +130,93 @@ func (invoiceservice *InvoiceService) SetArrays(invoice *models.DtoInvoice, tran
 	return nil
 }
 
-func (invoiceservice *InvoiceService) Create(invoice *models.DtoInvoice, inTrans bool) (err error) {
+func (invoiceservice *InvoiceService) PaidForOrder(order_id int64, dtoinvoice *models.DtoInvoice, dtotransaction *models.DtoTransaction,
+	inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
+	if inTrans {
+		trans, err = invoiceservice.DbContext.Begin()
+		if err != nil {
+			log.Error("Error during paying invoice in database %v", err)
+			return err
+		}
+	}
+
+	err = invoiceservice.Create(dtoinvoice, trans, false)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+
+	dtoorderinvoice := new(models.DtoOrderInvoice)
+	dtoorderinvoice.Order_ID = order_id
+	dtoorderinvoice.Invoice_ID = dtoinvoice.ID
+	err = invoiceservice.OrderInvoiceRepository.Create(dtoorderinvoice, trans)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+
+	err = invoiceservice.TransactionRepository.Create(dtotransaction, trans)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+
+	dtocredit := new(models.DtoOperation)
+	dtocredit.Transaction_ID = dtotransaction.ID
+	dtocredit.Invoice_ID = dtoinvoice.ID
+	dtocredit.Money = dtoinvoice.Total
+	dtocredit.Type_ID = models.OPERATION_TYPE_WITHDRAW
+	dtocredit.Created = time.Now()
+	err = invoiceservice.OperationRepository.Create(dtocredit, trans)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+	dtodebet := new(models.DtoOperation)
+	dtodebet.Transaction_ID = dtotransaction.ID
+	dtodebet.Invoice_ID = dtoinvoice.ID
+	dtodebet.Money = dtoinvoice.Total
+	dtodebet.Type_ID = models.OPERATION_TYPE_RECEIVE
+	dtodebet.Created = time.Now()
+	err = invoiceservice.OperationRepository.Create(dtodebet, trans)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+
+	dtoorderstatus := models.NewDtoOrderStatus(order_id, models.ORDER_STATUS_PAID, true, "", time.Now())
+	err = invoiceservice.OrderStatusRepository.Save(dtoorderstatus, trans)
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		return err
+	}
+
+	if inTrans {
+		err = trans.Commit()
+		if err != nil {
+			log.Error("Error during paying invoice in database %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (invoiceservice *InvoiceService) Create(invoice *models.DtoInvoice, trans *gorp.Transaction, inTrans bool) (err error) {
 	if inTrans {
 		trans, err = invoiceservice.DbContext.Begin()
 		if err != nil {
@@ -135,7 +225,7 @@ func (invoiceservice *InvoiceService) Create(invoice *models.DtoInvoice, inTrans
 		}
 	}
 
-	if inTrans {
+	if trans != nil {
 		err = trans.Insert(invoice)
 	} else {
 		err = invoiceservice.DbContext.Insert(invoice)
@@ -167,9 +257,7 @@ func (invoiceservice *InvoiceService) Create(invoice *models.DtoInvoice, inTrans
 	return nil
 }
 
-func (invoiceservice *InvoiceService) Update(invoice *models.DtoInvoice, inTrans bool) (err error) {
-	var trans *gorp.Transaction
-
+func (invoiceservice *InvoiceService) Update(invoice *models.DtoInvoice, trans *gorp.Transaction, inTrans bool) (err error) {
 	if inTrans {
 		trans, err = invoiceservice.DbContext.Begin()
 		if err != nil {
@@ -178,7 +266,7 @@ func (invoiceservice *InvoiceService) Update(invoice *models.DtoInvoice, inTrans
 		}
 	}
 
-	if inTrans {
+	if trans != nil {
 		_, err = trans.Update(invoice)
 	} else {
 		_, err = invoiceservice.DbContext.Update(invoice)

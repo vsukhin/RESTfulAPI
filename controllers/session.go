@@ -43,12 +43,9 @@ func Ping(request *http.Request, r render.Render, params martini.Params, session
 }
 
 // post /api/v1.0/session/user/
-func CreateSession(errors binding.Errors, viewsession models.ViewSession, r render.Render, params martini.Params,
+func CreateSession(errors binding.Errors, viewsession models.ViewSession, r render.Render,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, captcharepository services.CaptchaRepository) {
-	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
-		return
-	}
-	if captcharepository.Check(viewsession.CaptchaHash, viewsession.CaptchaValue, r) != nil {
+	if helpers.CheckValidation(&viewsession, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
@@ -59,18 +56,22 @@ func CreateSession(errors binding.Errors, viewsession models.ViewSession, r rend
 		language = config.Configuration.Server.DefaultLanguage
 	}
 
-	token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return
-	}
-
 	viewsession.Login = strings.ToLower(viewsession.Login)
 	user, err := userrepository.FindByLogin(viewsession.Login)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_LOGIN_OR_PASSWORD_WRONG,
 			Message: config.Localization[language].Errors.Api.Login_Or_Password_Wrong})
+		return
+	}
+
+	if user.CaptchaRequired && viewsession.CaptchaHash == "" {
+		r.JSON(helpers.HTTP_STATUS_CAPTCHA_REQUIRED, types.Error{Code: types.TYPE_ERROR_CAPTCHA_WRONG,
+			Message: config.Localization[language].Errors.Api.Captcha_Wrong})
+		return
+	}
+	if helpers.Check(viewsession.CaptchaHash, viewsession.CaptchaValue, r, captcharepository) != nil {
+		user.CaptchaRequired = true
+		err = userrepository.Update(user, true, false)
 		return
 	}
 
@@ -88,6 +89,12 @@ func CreateSession(errors binding.Errors, viewsession models.ViewSession, r rend
 		return
 	}
 
+	token, err := sessionrepository.GenerateToken(helpers.TOKEN_LENGTH)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return
+	}
 	dtosession := models.NewDtoSession(token, user.ID, user.Roles, time.Now(), language)
 
 	err = sessionrepository.Create(dtosession, true)
@@ -98,6 +105,7 @@ func CreateSession(errors binding.Errors, viewsession models.ViewSession, r rend
 	}
 
 	user.LastLogin = dtosession.LastActivity
+	user.CaptchaRequired = false
 	err = userrepository.Update(user, true, false)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -109,7 +117,7 @@ func CreateSession(errors binding.Errors, viewsession models.ViewSession, r rend
 }
 
 // delete /api/v1.0/session/:token
-func DeleteSession(r render.Render, params martini.Params, sessionrepository services.SessionRepository, session *models.DtoSession) {
+func DeleteSession(r render.Render, sessionrepository services.SessionRepository, session *models.DtoSession) {
 	err := sessionrepository.Delete(session.AccessToken, true)
 	if err != nil {
 		middlewares.GeneratingSessionErrorResponse(r, session.AccessToken)

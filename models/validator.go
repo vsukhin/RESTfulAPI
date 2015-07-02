@@ -17,8 +17,8 @@ var (
 
 const (
 	VALIDATE_FIELD_EMPTY = iota + 1
-	VALIDATE_FIELD_SHORT
-	VALIDATE_FIELD_LONG
+	VALIDATE_FIELD_SMALL
+	VALIDATE_FIELD_BIG
 	VALIDATE_LANGUAGE_WRONG
 	VALIDATE_FIELD_REGEXP
 )
@@ -38,9 +38,9 @@ func Validate(object interface{}, errors binding.Errors, req *http.Request) bind
 				case validator.ErrZeroValue:
 					code = strconv.Itoa(VALIDATE_FIELD_EMPTY)
 				case validator.ErrMin:
-					code = strconv.Itoa(VALIDATE_FIELD_SHORT)
+					code = strconv.Itoa(VALIDATE_FIELD_SMALL)
 				case validator.ErrMax:
-					code = strconv.Itoa(VALIDATE_FIELD_LONG)
+					code = strconv.Itoa(VALIDATE_FIELD_BIG)
 				case validator.ErrRegexp:
 					code = strconv.Itoa(VALIDATE_FIELD_REGEXP)
 				}
@@ -95,10 +95,10 @@ func ConvertErrors(language string, errors binding.Errors) (fielderrors *[]types
 				switch coderr {
 				case VALIDATE_FIELD_EMPTY:
 					message = config.Localization[language].Errors.Binding.Field_Empty
-				case VALIDATE_FIELD_SHORT:
-					message = config.Localization[language].Errors.Binding.Field_Short
-				case VALIDATE_FIELD_LONG:
-					message = config.Localization[language].Errors.Binding.Field_Long
+				case VALIDATE_FIELD_SMALL:
+					message = config.Localization[language].Errors.Binding.Field_Small
+				case VALIDATE_FIELD_BIG:
+					message = config.Localization[language].Errors.Binding.Field_Big
 				case VALIDATE_FIELD_REGEXP:
 					message = config.Localization[language].Errors.Binding.Field_Regexp
 				case VALIDATE_LANGUAGE_WRONG:

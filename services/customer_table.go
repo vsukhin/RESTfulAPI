@@ -12,6 +12,7 @@ import (
 )
 
 type CustomerTableRepository interface {
+	Copy(srccustomertable *models.DtoCustomerTable, inTrans bool) (destcustomertable *models.DtoCustomerTable, err error)
 	ImportDataStructure(dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
 	UpdateImportStructure(customertable *models.DtoCustomerTable, dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error)
 	ImportData(file *models.DtoFile, dtocustomertable *models.DtoCustomerTable, dataformat models.DataFormat,
@@ -40,6 +41,90 @@ type CustomerTableService struct {
 func NewCustomerTableService(repository *Repository) *CustomerTableService {
 	repository.DbContext.AddTableWithName(models.DtoCustomerTable{}, repository.Table).SetKeys(true, "id")
 	return &CustomerTableService{Repository: repository}
+}
+
+func (customertableservice *CustomerTableService) Copy(srccustomertable *models.DtoCustomerTable,
+	inTrans bool) (destcustomertable *models.DtoCustomerTable, err error) {
+	var trans *gorp.Transaction
+
+	destcustomertable = new(models.DtoCustomerTable)
+	*destcustomertable = *srccustomertable
+	destcustomertable.ID = 0
+	destcustomertable.Created = time.Now()
+
+	if inTrans {
+		trans, err = customertableservice.DbContext.Begin()
+		if err != nil {
+			log.Error("Error during creating customer table object in database %v", err)
+			return nil, err
+		}
+	}
+
+	if inTrans {
+		err = trans.Insert(destcustomertable)
+	} else {
+		err = customertableservice.DbContext.Insert(destcustomertable)
+	}
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during creating customer table object in database %v", err)
+		return nil, err
+	}
+
+	if inTrans {
+		_, err = trans.Exec(
+			"insert into table_columns (name, column_type_id, customer_table_id, position, created, prebuilt, active, edition, original_id, fieldnum)"+
+				" select name, column_type_id, ?, position, ?, prebuilt, active, 0, 0, fieldnum from table_columns where customer_table_id = ? and active = 1",
+			destcustomertable.ID, time.Now(), srccustomertable.ID)
+	} else {
+		_, err = customertableservice.DbContext.Exec(
+			"insert into table_columns (name, column_type_id, customer_table_id, position, created, prebuilt, active, edition, original_id, fieldnum)"+
+				" select name, column_type_id, ?, position, ?, prebuilt, active, 0, 0, fieldnum from table_columns where customer_table_id = ? and active = 1",
+			destcustomertable.ID, time.Now(), srccustomertable.ID)
+	}
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during creating customer table object in database %v", err)
+		return nil, err
+	}
+
+	query := ""
+	for i := 0; i < models.MAX_COLUMN_NUMBER; i++ {
+		query += fmt.Sprintf(", field%v, checked%v, valid%v", i+1, i+1, i+1)
+	}
+
+	if inTrans {
+		_, err = trans.Exec(
+			"insert into table_data (customer_table_id, position, created, active, wrong, edition, original_id"+query+
+				" select ?, position, ?, active, wrong, 0, 0"+query+" from table_columns where customer_table_id = ? and active = 1",
+			destcustomertable.ID, time.Now(), srccustomertable.ID)
+	} else {
+		_, err = customertableservice.DbContext.Exec(
+			"insert into table_data (customer_table_id, position, created, active, wrong, edition, original_id"+query+
+				" select ?, position, ?, active, wrong, 0, 0"+query+" from table_columns where customer_table_id = ? and active = 1",
+			destcustomertable.ID, time.Now(), srccustomertable.ID)
+	}
+	if err != nil {
+		if inTrans {
+			_ = trans.Rollback()
+		}
+		log.Error("Error during creating customer table object in database %v", err)
+		return nil, err
+	}
+
+	if inTrans {
+		err = trans.Commit()
+		if err != nil {
+			log.Error("Error during creating customer table object in database %v", err)
+			return nil, err
+		}
+	}
+
+	return destcustomertable, nil
 }
 
 func (customertableservice *CustomerTableService) ImportDataStructure(dtotablecolumns *[]models.DtoTableColumn, inTrans bool) (err error) {
@@ -130,7 +215,7 @@ func (customertableservice *CustomerTableService) ImportData(file *models.DtoFil
 		return errors.New("Empty table")
 	}
 
-	query := "load data infile '" + filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)+version) +
+	query := "load data infile '" + filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)+version) +
 		"' into table table_data fields terminated by '" +
 		string(models.GetDataSeparator(models.DataFormat(dataformat))) +
 		"'  escaped by '' lines terminated by '\n'"
@@ -219,7 +304,7 @@ func (customertableservice *CustomerTableService) ExportData(viewexporttable *mo
 
 func (customertableservice *CustomerTableService) ClearExpiredTables() {
 	for {
-		tables, err := customertableservice.GetExpired(config.Configuration.Server.TableTimeout)
+		tables, err := customertableservice.GetExpired(config.Configuration.TableTimeout)
 		if err == nil {
 			for _, table := range *tables {
 				err = customertableservice.Deactivate(&table)

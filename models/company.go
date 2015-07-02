@@ -12,18 +12,19 @@ import (
 
 // Структура для организации хранения компании
 type ViewCompany struct {
-	Primary          bool                     `json:"primary"`                                                          // Основной
-	Company_Type_ID  int                      `json:"legalFormId" validate:"nonzero"`                                   // Идентификатор типа компании
-	FullName_Rus     string                   `json:"nameLongRus" validate:"nonzero,min=1,max=255"`                     // Полное русское название
-	FullName_Eng     string                   `json:"nameLongEng" db:"fullname_eng" validate:"nonzero,min=1,max=255"`   // Полное английское название
-	ShortName_Rus    string                   `json:"nameShortRus" db:"shortname_rus" validate:"nonzero,min=1,max=255"` // Краткое русское название
-	ShortName_Eng    string                   `json:"nameShortEng" db:"shortname_eng" validate:"nonzero,min=1,max=255"` // Краткое английское название
-	Resident         bool                     `json:"resident"`                                                         // Резидент
-	CompanyCodes     []ViewApiCompanyCode     `json:"codes"`                                                            // Коды компании
-	CompanyAddresses []ViewApiCompanyAddress  `json:"addresses"`                                                        // Адреса компании
-	CompanyBanks     []ViewApiCompanyBank     `json:"banks"`                                                            // Банки компании
-	CompanyStaff     []ViewApiCompanyEmployee `json:"staff"`                                                            // Сотрудники компании
-	Deleted          bool                     `json:"del"`                                                              // Удален
+	Primary          bool                     `json:"primary"`                                                  // Основной
+	Company_Type_ID  int                      `json:"legalFormId" validate:"nonzero"`                           // Идентификатор типа компании
+	FullName_Rus     string                   `json:"nameLongRus" validate:"min=1,max=255"`                     // Полное русское название
+	FullName_Eng     string                   `json:"nameLongEng" db:"fullname_eng" validate:"min=1,max=255"`   // Полное английское название
+	ShortName_Rus    string                   `json:"nameShortRus" db:"shortname_rus" validate:"min=1,max=255"` // Краткое русское название
+	ShortName_Eng    string                   `json:"nameShortEng" db:"shortname_eng" validate:"min=1,max=255"` // Краткое английское название
+	Resident         bool                     `json:"resident"`                                                 // Резидент
+	CompanyCodes     []ViewApiCompanyCode     `json:"codes"`                                                    // Коды компании
+	CompanyAddresses []ViewApiCompanyAddress  `json:"addresses"`                                                // Адреса компании
+	CompanyBanks     []ViewApiCompanyBank     `json:"banks"`                                                    // Банки компании
+	CompanyStaff     []ViewApiCompanyEmployee `json:"staff"`                                                    // Сотрудники компании
+	VAT              byte                     `json:"vat" validate:"min=0,max=100"`                             // НДС компании
+	Deleted          bool                     `json:"del"`                                                      // Удален
 }
 
 type ApiMetaCompany struct {
@@ -50,7 +51,9 @@ type ApiMiddleCompany struct {
 	CompanyAddresses []ViewApiCompanyAddress  `json:"addresses,omitempty" db:"-"`       // Адреса компании
 	CompanyBanks     []ViewApiCompanyBank     `json:"banks,omitempty" db:"-"`           // Банки компании
 	CompanyStaff     []ViewApiCompanyEmployee `json:"staff,omitempty" db:"-"`           // Сотрудники компании
+	VAT              byte                     `json:"vat" db:"vat"`                     // НДС компании
 	Deleted          bool                     `json:"del" db:"del"`                     // Удален
+
 }
 
 type ApiLongCompany struct {
@@ -66,6 +69,7 @@ type ApiLongCompany struct {
 	CompanyAddresses []ViewApiCompanyAddress  `json:"addresses,omitempty" db:"-"`       // Адреса компании
 	CompanyBanks     []ViewApiCompanyBank     `json:"banks,omitempty" db:"-"`           // Банки компании
 	CompanyStaff     []ViewApiCompanyEmployee `json:"staff,omitempty" db:"-"`           // Сотрудники компании
+	VAT              byte                     `json:"vat" db:"vat"`                     // НДС компании
 	Deleted          bool                     `json:"del" db:"del"`                     // Удален
 }
 
@@ -89,6 +93,7 @@ type DtoCompany struct {
 	Active           bool                 `db:"active"`          // Aктивен
 	Company_Type_ID  int                  `db:"company_type_id"` // Идентификатор типа компании
 	Resident         bool                 `db:"resident"`        // Резидент
+	VAT              byte                 `db:"vat"`             // НДС компании
 	CompanyCodes     []DtoCompanyCode     `db:"-"`               // Коды компании
 	CompanyAddresses []DtoCompanyAddress  `db:"-"`               // Адреса компании
 	CompanyBanks     []DtoCompanyBank     `db:"-"`               // Банки компании
@@ -114,7 +119,7 @@ func NewApiShortCompany(id int64, shortname_rus string, shortname_eng string, un
 
 func NewApiMiddleCompany(primary bool, company_type_id int, fullname_rus string, fullname_eng string, shortname_rus string,
 	shortname_eng string, resident bool, companycodes []ViewApiCompanyCode, companyaddresses []ViewApiCompanyAddress,
-	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, deleted bool) *ApiMiddleCompany {
+	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, deleted bool) *ApiMiddleCompany {
 	return &ApiMiddleCompany{
 		Primary:          primary,
 		Company_Type_ID:  company_type_id,
@@ -127,13 +132,14 @@ func NewApiMiddleCompany(primary bool, company_type_id int, fullname_rus string,
 		CompanyAddresses: companyaddresses,
 		CompanyBanks:     companybanks,
 		CompanyStaff:     companystaff,
+		VAT:              vat,
 		Deleted:          deleted,
 	}
 }
 
 func NewApiLongCompany(id int64, primary bool, company_type_id int, fullname_rus string, fullname_eng string, shortname_rus string,
 	shortname_eng string, resident bool, companycodes []ViewApiCompanyCode, companyaddresses []ViewApiCompanyAddress,
-	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, deleted bool) *ApiLongCompany {
+	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, deleted bool) *ApiLongCompany {
 	return &ApiLongCompany{
 		ID:               id,
 		Primary:          primary,
@@ -147,13 +153,14 @@ func NewApiLongCompany(id int64, primary bool, company_type_id int, fullname_rus
 		CompanyAddresses: companyaddresses,
 		CompanyBanks:     companybanks,
 		CompanyStaff:     companystaff,
+		VAT:              vat,
 		Deleted:          deleted,
 	}
 }
 
 // Конструктор создания объекта компании в бд
 func NewDtoCompany(id int64, unit_id int64, shortname_rus string, shortname_eng string, fullname_rus string, fullname_eng string,
-	created time.Time, primary bool, active bool, company_type_id int, resident bool, companycodes []DtoCompanyCode,
+	created time.Time, primary bool, active bool, company_type_id int, resident bool, vat byte, companycodes []DtoCompanyCode,
 	companyaddresses []DtoCompanyAddress, companybanks []DtoCompanyBank, companystaff []DtoCompanyEmployee) *DtoCompany {
 	return &DtoCompany{
 		ID:               id,
@@ -167,6 +174,7 @@ func NewDtoCompany(id int64, unit_id int64, shortname_rus string, shortname_eng 
 		Active:           active,
 		Company_Type_ID:  company_type_id,
 		Resident:         resident,
+		VAT:              vat,
 		CompanyCodes:     companycodes,
 		CompanyAddresses: companyaddresses,
 		CompanyBanks:     companybanks,

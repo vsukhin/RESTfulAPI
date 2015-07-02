@@ -17,6 +17,13 @@ import (
 	"types"
 )
 
+const (
+	NEWS_NUMBER                 = 10
+	NEWS_VERSION                = "2.0"
+	METHOD_NAME_SUBSCRIPTION    = "/api/v1.0/feedbacks/news/:email/"
+	METHOD_TIMEOUT_SUBSCRIPTION = time.Second
+)
+
 // get /subscriptions/news/rss/
 func GetNewsRss(w http.ResponseWriter, request *http.Request, r render.Render, newsrepository services.NewsRepository) {
 	news, err := newsrepository.GetAll(config.Configuration.Server.DefaultLanguage, NEWS_NUMBER)
@@ -48,61 +55,40 @@ func GetNewsRss(w http.ResponseWriter, request *http.Request, r render.Render, n
 
 // get /api/v1.0/subscriptions/news/:email/
 func GetNewsSubscription(request *http.Request, r render.Render, params martini.Params, subscriptionrepository services.SubscriptionRepository,
-	requestrepository services.RequestRepository) {
-	host, _, err := net.SplitHostPort(request.RemoteAddr)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
-		return
+	requestrepository services.RequestRepository, sessionrepository services.SessionRepository) {
+	var user_id int64 = 0
+	var language = config.Configuration.Server.DefaultLanguage
+
+	session, _, err := sessionrepository.GetAndSaveSession(request, r, nil, false, false, true)
+	if err == nil {
+		user_id = session.UserID
+		language = session.Language
 	}
-	exists, err := requestrepository.Exists(host, SUBSCRIPTION_METHOD_NAME)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
-		return
-	}
-	var hits int64 = 0
-	if exists {
-		request, err := requestrepository.Get(host, SUBSCRIPTION_METHOD_NAME)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
+
+	if user_id == 0 {
+		if helpers.CheckFrequence(METHOD_NAME_SUBSCRIPTION, METHOD_TIMEOUT_SUBSCRIPTION, request, r, requestrepository, language) != nil {
 			return
 		}
-		if time.Now().Sub(request.LastUpdated) < time.Second {
-			log.Error("Requests are too frequent for method %v", request.Method)
-			r.JSON(http.StatusServiceUnavailable, types.Error{Code: types.TYPE_ERROR_REQUEST_TOOFREQUENT,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Request_Too_Often})
-			return
-		}
-		hits = request.Hits
-	}
-	dtorequest := models.NewDtoRequest(host, SUBSCRIPTION_METHOD_NAME, time.Now(), hits+1)
-	err = requestrepository.Save(dtorequest)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
-		return
 	}
 
 	email, err := url.QueryUnescape(params[helpers.PARAMETER_NAME_SUBSCRIBТION_EMAIL])
 	if err != nil {
 		log.Error("Can't unescape %v url data", err)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
 		return
 	}
 	if email == "" || len([]rune(email)) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", email)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
 		return
 	}
 
 	found, err := subscriptionrepository.Exists(email)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return
 	}
 
@@ -111,23 +97,25 @@ func GetNewsSubscription(request *http.Request, r render.Render, params martini.
 		dtosubscription, err := subscriptionrepository.Get(email)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
 			return
 		}
 		confirmed = dtosubscription.Confirmed
 	}
 
-	r.JSON(http.StatusOK, models.NewApiLongSubscription(email, confirmed, found))
+	valid := strings.Contains(email, "@")
+
+	r.JSON(http.StatusOK, models.NewApiLongSubscription(email, confirmed, valid))
 }
 
-// patch /api/v1.0/subscriptions/news/
+// post /api/v1.0/subscriptions/news/
 func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubscription, request *http.Request, r render.Render,
 	subscriptionrepository services.SubscriptionRepository, captcharepository services.CaptchaRepository,
 	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, templaterepository services.TemplateRepository) {
-	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(&viewsubscription, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if captcharepository.Check(viewsubscription.CaptchaHash, viewsubscription.CaptchaValue, r) != nil {
+	if helpers.Check(viewsubscription.CaptchaHash, viewsubscription.CaptchaValue, r, captcharepository) != nil {
 		return
 	}
 
@@ -206,15 +194,15 @@ func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubsc
 
 	subject := config.Localization[dtosubscription.Language].Messages.SubscriptionSubject
 	buf, err := templaterepository.GenerateText(models.NewDtoDualCodeTemplate(models.NewDtoTemplate(dtosubscription.Email, dtosubscription.Language,
-		request.Host), dtosubscription.Subscr_Code, dtosubscription.Unsubscr_Code), services.TEMPLATE_SUBSCRIPTION, services.TEMPLATE_LAYOUT)
+		request.Host), dtosubscription.Subscr_Code, dtosubscription.Unsubscr_Code), services.TEMPLATE_SUBSCRIPTION, "")
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
 
 	headers := "List-Unsubscribe: <http://" + request.Host + "/subscriptions/unsubscribe/" + dtosubscription.Unsubscr_Code + "/>"
-	err = emailrepository.SendEmail(dtosubscription.Email, subject, buf.String(), headers)
+	err = emailrepository.SendHTML(dtosubscription.Email, subject, buf.String(), headers, "")
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
@@ -227,7 +215,7 @@ func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubsc
 // patch /api/v1.0/subscriptions/news/
 func ConfirmSubscription(errors binding.Errors, confirm models.SubscriptionConfirm, request *http.Request, r render.Render,
 	subscriptionrepository services.SubscriptionRepository) {
-	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(&confirm, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
@@ -296,4 +284,57 @@ func UnsubscribeFromNews(r render.Render, params martini.Params, subscriptionrep
 	}
 
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[config.Configuration.Server.DefaultLanguage].Messages.OK})
+}
+
+// delete /api/v1.0/subscriptions/news/:email/
+func DeleteSubscription(r render.Render, params martini.Params, subscriptionrepository services.SubscriptionRepository,
+	emailrepository services.EmailRepository, session *models.DtoSession) {
+	email, err := url.QueryUnescape(params[helpers.PARAMETER_NAME_SUBSCRIBТION_EMAIL])
+	if err != nil {
+		log.Error("Can't unescape %v url data", err)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+	if email == "" || len([]rune(email)) > helpers.PARAM_LENGTH_MAX {
+		log.Error("Wrong parameter length %v", email)
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	found, err := subscriptionrepository.Exists(email)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	if !found {
+		log.Error("Can't find email in subscription %v", email)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	dtoemail, err := emailrepository.Get(email)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	if dtoemail.UserID != session.UserID {
+		log.Error("Email %v doesn't belong to user %v", email, session.UserID)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	err = subscriptionrepository.Delete(email)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
 }

@@ -11,24 +11,29 @@ type Resource struct {
 		User_Email          string `yaml:"User_Email"`          // Email пользователя
 		Greetings           string `yaml:"Greetings"`           // Приветствие письма
 		Signature           string `yaml:"Signature"`           // Подпись письма
-		PasswordCode        string `yaml:"PasswordCode"`        // Код подтверждения пароля
+		PasswordCode        string `yaml:"PasswordCode"`        // Смена пароля
+		PasswordCodeCancel  string `yaml:"PasswordCodeCancel"`  // Отказ от смены пароля
 		EmailCode           string `yaml:"EmailCode"`           // Код подтверждения email
 		RegistrationSubject string `yaml:"RegistrationSubject"` // Подтверждение регистрации
 		PasswordSubject     string `yaml:"PasswordSubject"`     // Подтверждение смены пароля
 		EmailSubject        string `yaml:"EmailSubject"`        // Подтверждение email
+		ConfirmationSubject string `yaml:"ConfirmationSubject"` // Подтверждение успешности
 		OK                  string `yaml:"OK"`                  // Все в порядке
 		NewsHeader          string `yaml:"NewsHeader"`          // Заголовок новостей
 		SubscriptionSubject string `yaml:"SubscriptionSubject"` // Подтверждение подписки
 		SubscribeCode       string `yaml:"SubscribeCode"`       // Код для подписки на новости
 		UnsubscribeCode     string `yaml:"UnsubscribeCode"`     // Код для отписки от новостей
+		FeedbackSubject     string `yaml:"FeedbackSubject"`     // Запрос помощи
+		FeedbackGreetings   string `yaml:"FeedbackGreetings"`   // Приветствие пользователя
+		FeedbackSignature   string `yaml:"FeedbackSignature"`   // Подпись пользователя
 
 	} `yaml:"Messages"` // Общая информация
 
 	Errors struct {
 		Binding struct {
 			Field_Empty    string `yaml:"Field_Empty"`    // Ошибка незаполненного поля
-			Field_Short    string `yaml:"Field_Short"`    // Ошибка короткого поля
-			Field_Long     string `yaml:"Field_Long"`     // Ошибка длинного поля
+			Field_Small    string `yaml:"Field_Small"`    // Ошибка маленького поля
+			Field_Big      string `yaml:"Field_Big"`      // Ошибка большого поля
 			Language_Wrong string `yaml:"Language_Wrong"` // Ошибка неверного языка
 			Field_Regexp   string `yaml:"Field_Regexp"`   // Ошибка неверной маски
 		} `yaml:"Binding"` // Ошибки привязки
@@ -56,6 +61,7 @@ type Resource struct {
 			Token_Hash_Wrong        string `yaml:"Token_Hash_Wrong"`        // Ошибка декодирования хэша токена
 			Device_Wrong            string `yaml:"Device_Wrong"`            // Ошибка невернoго устройства
 			SMSSender_InUse         string `yaml:"SMSSender_InUse"`         // Ошибка уже используемого отправителя
+			Bcrypt_Wrong            string `yaml:"Bcrypt_Wrong"`            // Ошибка сложности bcrypt
 		} `yaml:"Api"` // Ошибки API
 
 	} `yaml:"Errors"` // Сообщения об ошибках
@@ -68,7 +74,7 @@ var (
 func InitI18n() (err error) {
 	Localization = make(map[string]Resource)
 	for _, lang := range Configuration.Server.AvailableLanguages {
-		resourcefile, err := ioutil.ReadFile(filepath.Join(Configuration.Server.ResourceStorage, lang+".yml"))
+		resourcefile, err := ioutil.ReadFile(filepath.Join(Configuration.ResourceStorage, lang+".yml"))
 		if err != nil {
 			logger.Fatalf("Can't read data from resource file: %v", err)
 			return err

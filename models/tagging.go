@@ -4,6 +4,21 @@ import (
 	"reflect"
 )
 
+func GetFieldValue(field string, object interface{}) (value interface{}, found bool) {
+	found = false
+	value = nil
+	structAddr := reflect.ValueOf(object).Elem()
+	for i := 0; i < structAddr.NumField(); i++ {
+		if field == structAddr.Type().Field(i).Tag.Get("json") {
+			found = true
+			value = structAddr.Field(i).Interface()
+			break
+		}
+	}
+
+	return value, found
+}
+
 func GetSearchTag(param string, object interface{}) (search string) {
 	search = ""
 	structAddr := reflect.ValueOf(object).Elem()

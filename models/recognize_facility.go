@@ -7,37 +7,39 @@ import (
 
 // Структура для организации хранения сервиса ввода анкет заказа
 type ViewRecognizeFacility struct {
-	EstimatedNumbersForm         int                 `json:"estimatedNumbersForm" validate:"min=0"` // Предполагаемое количество анкет
-	EstimatedCalculationOnFields bool                `json:"estimatedCalculationOnFields"`          // Расчёт предварительной стоимости на основе полей
-	EstimatedFields              []ViewApiInputField `json:"estimatedFields"`                       // Прогноз количества вводимых типов полей
-	PriceIncreaseUrgent          bool                `json:"priceIncreaseUrgent"`                   // Заказ является срочным
-	PriceIncreaseNano            bool                `json:"priceIncreaseNano"`                     // Маленький формат анкеты
-	PriceIncreaseBackgroundBlack bool                `json:"priceIncreaseBackgroundBlack"`          // Чёрный фон анкеты
-	RequiredFields               string              `json:"requiredFields"`                        // Перечисление названий полей анкеты которые не должны быть пустыми
-	LoadDefectiveForms           bool                `json:"loadDefectiveForms"`                    // Что делать с бракованными анкетами
-	CommentsForSupplier          string              `json:"commentsForSupplier"`                   // Комментарии
-	EstimatedFromFiles           []ApiInputFile      `json:"estimatedFromFiles"`                    // Примеры загруженных анкет
+	EstimatedNumbersForm         int                   `json:"estimatedNumbersForm" validate:"min=0"` // Предполагаемое количество анкет
+	EstimatedCalculationOnFields bool                  `json:"estimatedCalculationOnFields"`          // Расчёт предварительной стоимости на основе полей
+	EstimatedFields              []ViewApiInputField   `json:"estimatedFields"`                       // Прогноз количества вводимых типов полей
+	InputProducts                []ViewApiInputProduct `json:"priceIncrease"`                         // Позиции прайс листа
+	PriceIncreaseUrgent          bool                  `json:"priceIncreaseUrgent"`                   // Заказ является срочным
+	PriceIncreaseNano            bool                  `json:"priceIncreaseNano"`                     // Маленький формат анкеты
+	PriceIncreaseBackgroundBlack bool                  `json:"priceIncreaseBackgroundBlack"`          // Чёрный фон анкеты
+	RequiredFields               string                `json:"requiredFields"`                        // Перечисление названий полей анкеты которые не должны быть пустыми
+	LoadDefectiveForms           bool                  `json:"loadDefectiveForms"`                    // Что делать с бракованными анкетами
+	CommentsForSupplier          string                `json:"commentsForSupplier"`                   // Комментарии
+	EstimatedFromFiles           []ApiInputFile        `json:"estimatedFromFiles"`                    // Примеры загруженных анкет
 }
 
 type ApiRecognizeFacility struct {
-	EstimatedNumbersForm         int                  `json:"estimatedNumbersForm" db:"estimatedNumbersForm"`                 // Предполагаемое количество анкет
-	EstimatedCalculationOnFields bool                 `json:"estimatedCalculationOnFields" db:"estimatedCalculationOnFields"` // Расчёт предварительной стоимости на основе полей
-	EstimatedFields              []ViewApiInputField  `json:"estimatedFields,omitempty" db:"-"`                               // Прогноз количества вводимых типов полей
-	PriceIncreaseUrgent          bool                 `json:"priceIncreaseUrgent" db:"priceIncreaseUrgent"`                   // Заказ является срочным
-	PriceIncreaseNano            bool                 `json:"priceIncreaseNano" db:"priceIncreaseNano"`                       // Маленький формат анкеты
-	PriceIncreaseBackgroundBlack bool                 `json:"priceIncreaseBackgroundBlack" db:"priceIncreaseBackgroundBlack"` // Чёрный фон анкеты
-	RequiredFields               string               `json:"requiredFields" db:"requiredFields"`                             // Перечисление названий полей анкеты которые не должны быть пустыми
-	LoadDefectiveForms           bool                 `json:"loadDefectiveForms" db:"loadDefectiveForms"`                     // Что делать с бракованными анкетами
-	CommentsForSupplier          string               `json:"commentsForSupplier" db:"commentsForSupplier"`                   // Комментарии
-	EstimatedFromFiles           []ApiInputFile       `json:"estimatedFromFiles,omitempty" db:"-"`                            // Примеры загруженных анкет
-	RequestsSend                 bool                 `json:"requestsSend" db:"requestsSend"`                                 // Можно высылать
-	RequestsCancel               bool                 `json:"requestsCancel" db:"requestsCancel"`                             // Пользователь отменил заказ или выбрал поставщика
-	SupplierRequests             []ApiSupplierRequest `json:"supplierRequests,omitempty" db:"-"`                              // Запросы/ответы поставщикам услуг
-	Cost                         float64              `json:"cost" db:"cost"`                                                 // Сумма заказа исходя из расчётных показателей заказа
-	CostFactual                  float64              `json:"costFactual" db:"costFactual"`                                   // Текущая стоимость заказа
-	Ftp                          ApiInputFtp          `json:"ftp" db:"-"`                                                     // Реквизиты ftp доступа
-	ResultTables                 []ApiResultTable     `json:"resultTables,omitempty" db:"-"`                                  // Таблицы результатов
-	WorkTables                   []ApiWorkTable       `json:"workTables,omitempty" db:"-"`                                    // Рабочие таблицы
+	EstimatedNumbersForm         int                   `json:"estimatedNumbersForm" db:"estimatedNumbersForm"`                 // Предполагаемое количество анкет
+	EstimatedCalculationOnFields bool                  `json:"estimatedCalculationOnFields" db:"estimatedCalculationOnFields"` // Расчёт предварительной стоимости на основе полей
+	EstimatedFields              []ViewApiInputField   `json:"estimatedFields,omitempty" db:"-"`                               // Прогноз количества вводимых типов полей
+	InputProducts                []ViewApiInputProduct `json:"priceIncrease,omitempty" db:"-"`                                 // Позиции прайс листа
+	PriceIncreaseUrgent          bool                  `json:"priceIncreaseUrgent" db:"priceIncreaseUrgent"`                   // Заказ является срочным
+	PriceIncreaseNano            bool                  `json:"priceIncreaseNano" db:"priceIncreaseNano"`                       // Маленький формат анкеты
+	PriceIncreaseBackgroundBlack bool                  `json:"priceIncreaseBackgroundBlack" db:"priceIncreaseBackgroundBlack"` // Чёрный фон анкеты
+	RequiredFields               string                `json:"requiredFields" db:"requiredFields"`                             // Перечисление названий полей анкеты которые не должны быть пустыми
+	LoadDefectiveForms           bool                  `json:"loadDefectiveForms" db:"loadDefectiveForms"`                     // Что делать с бракованными анкетами
+	CommentsForSupplier          string                `json:"commentsForSupplier" db:"commentsForSupplier"`                   // Комментарии
+	EstimatedFromFiles           []ApiInputFile        `json:"estimatedFromFiles,omitempty" db:"-"`                            // Примеры загруженных анкет
+	RequestsSend                 bool                  `json:"requestsSend" db:"requestsSend"`                                 // Можно высылать
+	RequestsCancel               bool                  `json:"requestsCancel" db:"requestsCancel"`                             // Пользователь отменил заказ или выбрал поставщика
+	SupplierRequests             []ApiSupplierRequest  `json:"supplierRequests,omitempty" db:"-"`                              // Запросы/ответы поставщикам услуг
+	Cost                         float64               `json:"cost" db:"cost"`                                                 // Сумма заказа исходя из расчётных показателей заказа
+	CostFactual                  float64               `json:"costFactual" db:"costFactual"`                                   // Текущая стоимость заказа
+	Ftp                          ApiInputFtp           `json:"ftp" db:"-"`                                                     // Реквизиты ftp доступа
+	ResultTables                 []ApiResultTable      `json:"resultTables,omitempty" db:"-"`                                  // Таблицы результатов
+	WorkTables                   []ApiWorkTable        `json:"workTables,omitempty" db:"-"`                                    // Рабочие таблицы
 }
 
 type DtoRecognizeFacility struct {
@@ -45,6 +47,7 @@ type DtoRecognizeFacility struct {
 	EstimatedNumbersForm         int                  `db:"estimatedNumbersForm"`         // Предполагаемое количество анкет
 	EstimatedCalculationOnFields bool                 `db:"estimatedCalculationOnFields"` // Расчёт предварительной стоимости на основе полей
 	EstimatedFields              []DtoInputField      `db:"-"`                            // Прогноз количества вводимых типов полей
+	InputProducts                []DtoInputProduct    `db:"-"`                            // Позиции прайс листа
 	PriceIncreaseUrgent          bool                 `db:"priceIncreaseUrgent"`          // Заказ является срочным
 	PriceIncreaseNano            bool                 `db:"priceIncreaseNano"`            // Маленький формат анкеты
 	PriceIncreaseBackgroundBlack bool                 `db"priceIncreaseBackgroundBlack"`  // Чёрный фон анкеты
@@ -64,7 +67,7 @@ type DtoRecognizeFacility struct {
 
 // Конструктор создания объекта сервиса ввода анкет заказа в api
 func NewApiRecognizeFacility(estimatedNumbersForm int, estimatedCalculationOnFields bool, estimatedFields []ViewApiInputField,
-	priceIncreaseUrgent bool, priceIncreaseNano bool, priceIncreaseBackgroundBlack bool, requiredFields string,
+	inputProducts []ViewApiInputProduct, priceIncreaseUrgent bool, priceIncreaseNano bool, priceIncreaseBackgroundBlack bool, requiredFields string,
 	loadDefectiveForms bool, commentsForSupplier string, estimatedFromFiles []ApiInputFile, requestsSend bool,
 	requestsCancel bool, supplierRequests []ApiSupplierRequest, cost float64, costFactual float64, ftp ApiInputFtp,
 	resultTables []ApiResultTable, workTables []ApiWorkTable) *ApiRecognizeFacility {
@@ -72,6 +75,7 @@ func NewApiRecognizeFacility(estimatedNumbersForm int, estimatedCalculationOnFie
 		EstimatedNumbersForm:         estimatedNumbersForm,
 		EstimatedCalculationOnFields: estimatedCalculationOnFields,
 		EstimatedFields:              estimatedFields,
+		InputProducts:                inputProducts,
 		PriceIncreaseUrgent:          priceIncreaseUrgent,
 		PriceIncreaseNano:            priceIncreaseNano,
 		PriceIncreaseBackgroundBlack: priceIncreaseBackgroundBlack,
@@ -92,7 +96,7 @@ func NewApiRecognizeFacility(estimatedNumbersForm int, estimatedCalculationOnFie
 
 // Конструктор создания объекта сервиса ввода анкет заказа в бд
 func NewDtoRecognizeFacility(order_id int64, estimatedNumbersForm int, estimatedCalculationOnFields bool, estimatedFields []DtoInputField,
-	priceIncreaseUrgent bool, priceIncreaseNano bool, priceIncreaseBackgroundBlack bool, requiredFields string,
+	inputProducts []DtoInputProduct, priceIncreaseUrgent bool, priceIncreaseNano bool, priceIncreaseBackgroundBlack bool, requiredFields string,
 	loadDefectiveForms bool, commentsForSupplier string, estimatedFromFiles []DtoInputFile, requestsSend bool,
 	requestsCancel bool, supplierRequests []DtoSupplierRequest, cost float64, costFactual float64, ftp DtoInputFtp,
 	resultTables []DtoResultTable, workTables []DtoWorkTable) *DtoRecognizeFacility {
@@ -101,6 +105,7 @@ func NewDtoRecognizeFacility(order_id int64, estimatedNumbersForm int, estimated
 		EstimatedNumbersForm:         estimatedNumbersForm,
 		EstimatedCalculationOnFields: estimatedCalculationOnFields,
 		EstimatedFields:              estimatedFields,
+		InputProducts:                inputProducts,
 		PriceIncreaseUrgent:          priceIncreaseUrgent,
 		PriceIncreaseNano:            priceIncreaseNano,
 		PriceIncreaseBackgroundBlack: priceIncreaseBackgroundBlack,
@@ -122,6 +127,9 @@ func NewDtoRecognizeFacility(order_id int64, estimatedNumbersForm int, estimated
 func (facility *ViewRecognizeFacility) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	for _, field := range facility.EstimatedFields {
 		errors = Validate(&field, errors, req)
+	}
+	for _, product := range facility.InputProducts {
+		errors = Validate(&product, errors, req)
 	}
 	for _, file := range facility.EstimatedFromFiles {
 		errors = Validate(&file, errors, req)

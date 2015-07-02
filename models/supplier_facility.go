@@ -1,6 +1,6 @@
 package models
 
-// Структура для организации хранения сервиса поставщикс
+// Структура для организации хранения сервиса поставщика
 type ApiSupplierFacility struct {
 	Supplier_ID int64  `json:"id" db:"supplier_id"`        // Идентификатор поставщика
 	Name        string `json:"name" db:"name"`             // Название

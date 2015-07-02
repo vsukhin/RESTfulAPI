@@ -60,6 +60,14 @@ type TestUserRepository struct {
 	DelErr error
 }
 
+func (testUserRepository *TestUserRepository) CheckReportAccess(user_id int64) (allowed bool, err error) {
+	return true, nil
+}
+
+func (testUserRepository *TestUserRepository) CheckUnitAccess(user_id int64) (allowed bool, err error) {
+	return true, nil
+}
+
 func (testUserRepository *TestUserRepository) GetUserArrays(user *models.DtoUser) (*models.DtoUser, error) {
 	return nil, nil
 }
@@ -80,12 +88,20 @@ func (testUserRepository *TestUserRepository) GetAll(filter string) (users *[]mo
 	return nil, nil
 }
 
+func (testUserRepository *TestUserRepository) GetAllByUser(user_id int64, filter string) (users *[]models.ApiSearchUnitUser, err error) {
+	return nil, nil
+}
+
 func (testUserRepository *TestUserRepository) GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error) {
 	return nil, nil
 }
 
 func (testUserRepository *TestUserRepository) GetMeta() (usermeta *models.ApiUserMeta, err error) {
 	return testUserRepository.Meta, testUserRepository.GetErr
+}
+
+func (testUserRepository *TestUserRepository) GetMetaByUser(user_id int64) (metaunituser *models.ApiMetaUnitUser, err error) {
+	return nil, nil
 }
 
 func (testUserRepository *TestUserRepository) InitUnit(trans *gorp.Transaction) (unitid int64, err error) {

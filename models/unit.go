@@ -10,17 +10,17 @@ import (
 )
 
 const (
-	UNIT_NAME_DEFAULT = "Название объединения по умолчанию"
+	UNIT_NAME_DEFAULT = "Название компании"
 )
 
 // Структура для организации хранения объединений
 type ViewShortUnit struct {
-	Name string `json:"name" validate:"nonzero,min=1,max=255"` // Название объединения
+	Name string `json:"name" validate:"min=1,max=255"` // Название объединения
 }
 
 type ViewLongUnit struct {
-	Name    string `json:"name" validate:"nonzero,min=1,max=255"` // Название объединения
-	Deleted bool   `json:"del"`                                   // Удален
+	Name    string `json:"name" validate:"min=1,max=255"` // Название объединения
+	Deleted bool   `json:"del"`                           // Удален
 }
 
 type ApiShortMetaUnit struct {
@@ -35,6 +35,7 @@ type ApiLongMetaUnit struct {
 	NumOfFacilities int64 `json:"services"`      // Общее количество услуг
 	NumOfCompanies  int64 `json:"organisations"` // Общее количество компаний
 	NumOfSMSSenders int64 `json:"smsfroms"`      // Общее количество отправителей
+	NumOfInvoices   int64 `json:"invoices"`      // Общее количество счетов
 }
 
 type ApiShortUnit struct {
@@ -49,11 +50,25 @@ type ApiLongUnit struct {
 	Deleted bool      `json:"del"`     // Удален
 }
 
+type ApiFullUnit struct {
+	ID         int64     `json:"id" db:"id"`                   // Уникальный идентификатор объединения
+	Name       string    `json:"name" db:"name"`               // Название объединения
+	Created    time.Time `json:"created" db:"created"`         // Время создания объединения
+	Subscribed bool      `json:"subscription" db:"subscribed"` // Платный режим
+	Paid       bool      `json:"paid" db:"paid"`               // Оплачен
+	Begin_Paid time.Time `json:"paidBegin" db:"begin_paid"`    // Начало оплаченного периода
+	End_Paid   time.Time `json:"paidEnd" db:"end_paid"`        // Окончание оплаченного периода
+}
+
 type DtoUnit struct {
-	ID      int64     `db:"id"`      // Уникальный идентификатор объединения
-	Created time.Time `db:"created"` // Время создания объединения
-	Name    string    `db:"name"`    // Название объединения
-	Active  bool      `db:"active"`  // Активен
+	ID         int64     `db:"id"`         // Уникальный идентификатор объединения
+	Created    time.Time `db:"created"`    // Время создания объединения
+	Name       string    `db:"name"`       // Название объединения
+	Active     bool      `db:"active"`     // Активен
+	Subscribed bool      `db:subscribed`   // Платный режим
+	Paid       bool      `db:paid`         // Оплачен
+	Begin_Paid time.Time `db:"begin_paid"` // Начало оплаченного периода
+	End_Paid   time.Time `db:"end_paid"`   // Окончание оплаченного периода
 }
 
 // Конструктор создания объекта объединения в api
@@ -64,7 +79,7 @@ func NewApiShortMetaUnit(total int64) *ApiShortMetaUnit {
 }
 
 func NewApiLongMetaUnit(numofusers int64, numoftables int64, numofprojects int64, numoforders int64,
-	numoffacilities int64, numofcompanies int64, numofsmssenders int64) *ApiLongMetaUnit {
+	numoffacilities int64, numofcompanies int64, numofsmssenders int64, numofinvoices int64) *ApiLongMetaUnit {
 	return &ApiLongMetaUnit{
 		NumOfUsers:      numofusers,
 		NumOfTables:     numoftables,
@@ -73,6 +88,7 @@ func NewApiLongMetaUnit(numofusers int64, numoftables int64, numofprojects int64
 		NumOfFacilities: numoffacilities,
 		NumOfCompanies:  numofcompanies,
 		NumOfSMSSenders: numofsmssenders,
+		NumOfInvoices:   numofinvoices,
 	}
 }
 
@@ -92,18 +108,34 @@ func NewApiLongUnit(id int64, created time.Time, name string, deleted bool) *Api
 	}
 }
 
+func NewApiFullUnit(id int64, name string, created time.Time, subscribed bool, paid bool, begin_paid time.Time, end_paid time.Time) *ApiFullUnit {
+	return &ApiFullUnit{
+		ID:         id,
+		Name:       name,
+		Created:    created,
+		Subscribed: subscribed,
+		Paid:       paid,
+		Begin_Paid: begin_paid,
+		End_Paid:   end_paid,
+	}
+}
+
 type UnitSearch struct {
 	ID   int64  `query:"id" search:"id"`     // Уникальный идентификатор объединения
 	Name string `query:"name" search:"name"` // Название
 }
 
 // Конструктор создания объекта объединения в бд
-func NewDtoUnit(id int64, created time.Time, name string, active bool) *DtoUnit {
+func NewDtoUnit(id int64, created time.Time, name string, active bool, subscribed bool, paid bool, begin_paid time.Time, end_paid time.Time) *DtoUnit {
 	return &DtoUnit{
-		ID:      id,
-		Created: created,
-		Name:    name,
-		Active:  active,
+		ID:         id,
+		Created:    created,
+		Name:       name,
+		Active:     active,
+		Subscribed: subscribed,
+		Paid:       paid,
+		Begin_Paid: begin_paid,
+		End_Paid:   end_paid,
 	}
 }
 

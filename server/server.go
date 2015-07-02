@@ -1,77 +1,105 @@
 package server
 
 import (
-	"application/config"
-	"application/db"
-	"application/services"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
 	"net/http"
 	"os"
 	"runtime"
+
+	"application/communication"
+	"application/config"
+	"application/db"
+	"application/services"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/render"
 )
 
-var userservice *services.UserService
-var sessionservice *services.SessionService
-var groupservice *services.GroupService
-var fileservice *services.FileService
-var emailservice *services.EmailService
-var captchaservice *services.CaptchaService
-var unitservice *services.UnitService
-var templateservice *services.TemplateService
-var customertableservice *services.CustomerTableService
-var tabletypeservice *services.TableTypeService
-var columntypeservice *services.ColumnTypeService
-var tablecolumnservice *services.TableColumnService
-var tablerowservice *services.TableRowService
-var facilityservice *services.FacilityService
-var pricepropertiesservice *services.PricePropertiesService
-var dataformatservice *services.DataFormatService
-var virtualdirservice *services.VirtualDirService
-var importstepservice *services.ImportStepService
-var orderservice *services.OrderService
-var statusservice *services.StatusService
-var orderstatusservice *services.OrderStatusService
-var messageservice *services.MessageService
-var projectservice *services.ProjectService
-var classifierservice *services.ClassifierService
-var mobilephoneservice *services.MobilePhoneService
-var companyservice *services.CompanyService
-var periodservice *services.PeriodService
-var eventservice *services.EventService
-var mobileoperatorservice *services.MobileOperatorService
-var newsservice *services.NewsService
-var subscriptionservice *services.SubscriptionService
-var requestservice *services.RequestService
-var smssenderservice *services.SMSSenderService
-var facilitytypeservice *services.FacilityTypeService
-var smsfacilityservice *services.SMSFacilityService
-var hlrfacilityservice *services.HLRFacilityService
-var recognizefacilityservice *services.RecognizeFacilityService
-var verifyfacilityservice *services.VerifyFacilityService
-var mobileoperatoroperationservice *services.MobileOperatorOperationService
-var resulttableservice *services.ResultTableService
-var worktableservice *services.WorkTableService
-var datacolumnservice *services.DataColumnService
-var inputfieldservice *services.InputFieldService
-var inputfileservice *services.InputFileService
-var supplierrequestservice *services.SupplierRequestService
-var inputftpservice *services.InputFtpService
-var companytypeservice *services.CompanyTypeService
-var companyclassservice *services.CompanyClassService
-var addresstypeservice *services.AddressTypeService
-var companycodeservice *services.CompanyCodeService
-var companyaddressservice *services.CompanyAddressService
-var companybankservice *services.CompanyBankService
-var companyemployeeservice *services.CompanyEmployeeService
-var facilitytableservice *services.FacilityTableService
-var smstableservice *services.SMSTableService
-var hlrtableservice *services.HLRTableService
-var verifytableservice *services.VerifyTableService
-var supplierfacilityservice *services.SupplierFacilityService
-var complexstatusservice *services.ComplexStatusService
-var invoiceservice *services.InvoiceService
-var invoiceitemservice *services.InvoiceItemService
+var (
+	userservice                    *services.UserService
+	sessionservice                 *services.SessionService
+	groupservice                   *services.GroupService
+	fileservice                    *services.FileService
+	emailservice                   *services.EmailService
+	captchaservice                 *services.CaptchaService
+	unitservice                    *services.UnitService
+	templateservice                *services.TemplateService
+	customertableservice           *services.CustomerTableService
+	tabletypeservice               *services.TableTypeService
+	columntypeservice              *services.ColumnTypeService
+	tablecolumnservice             *services.TableColumnService
+	tablerowservice                *services.TableRowService
+	facilityservice                *services.FacilityService
+	pricepropertiesservice         *services.PricePropertiesService
+	dataformatservice              *services.DataFormatService
+	virtualdirservice              *services.VirtualDirService
+	importstepservice              *services.ImportStepService
+	orderservice                   *services.OrderService
+	statusservice                  *services.StatusService
+	orderstatusservice             *services.OrderStatusService
+	messageservice                 *services.MessageService
+	projectservice                 *services.ProjectService
+	classifierservice              *services.ClassifierService
+	mobilephoneservice             *services.MobilePhoneService
+	companyservice                 *services.CompanyService
+	periodservice                  *services.PeriodService
+	eventservice                   *services.EventService
+	mobileoperatorservice          *services.MobileOperatorService
+	newsservice                    *services.NewsService
+	subscriptionservice            *services.SubscriptionService
+	requestservice                 *services.RequestService
+	smssenderservice               *services.SMSSenderService
+	facilitytypeservice            *services.FacilityTypeService
+	smsfacilityservice             *services.SMSFacilityService
+	hlrfacilityservice             *services.HLRFacilityService
+	recognizefacilityservice       *services.RecognizeFacilityService
+	verifyfacilityservice          *services.VerifyFacilityService
+	mobileoperatoroperationservice *services.MobileOperatorOperationService
+	resulttableservice             *services.ResultTableService
+	worktableservice               *services.WorkTableService
+	datacolumnservice              *services.DataColumnService
+	inputfieldservice              *services.InputFieldService
+	inputfileservice               *services.InputFileService
+	supplierrequestservice         *services.SupplierRequestService
+	inputftpservice                *services.InputFtpService
+	companytypeservice             *services.CompanyTypeService
+	companyclassservice            *services.CompanyClassService
+	addresstypeservice             *services.AddressTypeService
+	companycodeservice             *services.CompanyCodeService
+	companyaddressservice          *services.CompanyAddressService
+	companybankservice             *services.CompanyBankService
+	companyemployeeservice         *services.CompanyEmployeeService
+	facilitytableservice           *services.FacilityTableService
+	smstableservice                *services.SMSTableService
+	hlrtableservice                *services.HLRTableService
+	verifytableservice             *services.VerifyTableService
+	supplierfacilityservice        *services.SupplierFacilityService
+	complexstatusservice           *services.ComplexStatusService
+	invoiceservice                 *services.InvoiceService
+	invoiceitemservice             *services.InvoiceItemService
+	priceservice                   *services.PriceService
+	recognizeproductservice        *services.RecognizeProductService
+	verifyproductservice           *services.VerifyProductService
+	inputproductservice            *services.InputProductService
+	dataproductservice             *services.DataProductService
+	feedbackservice                *services.FeedbackService
+	deviceservice                  *services.DeviceService
+	smsperiodservice               *services.SMSPeriodService
+	smseventservice                *services.SMSEventService
+	reportservice                  *services.ReportService
+	reportperiodservice            *services.ReportPeriodService
+	reportprojectservice           *services.ReportProjectService
+	reportorderservice             *services.ReportOrderService
+	reportfacilityservice          *services.ReportFacilityService
+	reportcomplexstatusservice     *services.ReportComplexStatusService
+	reportsupplierservice          *services.ReportSupplierService
+	reportsettingsservice          *services.ReportSettingsService
+	complexreportservice           *services.ComplexReportService
+	transactionservice             *services.TransactionService
+	operationservice               *services.OperationService
+	transactiontypeservice         *services.TransactionTypeService
+	operationtypeservice           *services.OperationTypeService
+	orderinvoiceservice            *services.OrderInvoiceService
+)
 
 func Start() {
 	var err error
@@ -89,6 +117,12 @@ func Start() {
 		return
 	}
 	if db.InitDB() != nil {
+		return
+	}
+	if err = communication.Init(communication.ModeClient); err != nil {
+		return
+	}
+	if config.InitDbCassandra() != nil {
 		return
 	}
 
@@ -161,6 +195,29 @@ func Start() {
 	complexstatusservice = services.NewComplexStatusService(services.NewRepository(db.DbMap, db.TABLE_COMPLEX_STATUSES))
 	invoiceservice = services.NewInvoiceService(services.NewRepository(db.DbMap, db.TABLE_INVOICES))
 	invoiceitemservice = services.NewInvoiceItemService(services.NewRepository(db.DbMap, db.TABLE_INVOICE_ITEMS))
+	priceservice = services.NewPriceService(services.NewRepository(db.DbMap, ""))
+	recognizeproductservice = services.NewRecognizeProductService(services.NewRepository(db.DbMap, db.TABLE_RECOGNIZE_PRODUCTS))
+	verifyproductservice = services.NewVerifyProductService(services.NewRepository(db.DbMap, db.TABLE_VERIFY_PRODUCTS))
+	inputproductservice = services.NewInputProductService(services.NewRepository(db.DbMap, db.TABLE_INPUT_PRODUCTS))
+	dataproductservice = services.NewDataProductService(services.NewRepository(db.DbMap, db.TABLE_DATA_PRODUCTS))
+	feedbackservice = services.NewFeedbackService(services.NewRepository(db.DbMap, db.TABLE_FEEDBACK))
+	deviceservice = services.NewDeviceService(services.NewRepository(db.DbMap, db.TABLE_DEVICES))
+	smsperiodservice = services.NewSMSPeriodService(services.NewRepository(db.DbMap, db.TABLE_SMS_PERIODS))
+	smseventservice = services.NewSMSEventService(services.NewRepository(db.DbMap, db.TABLE_SMS_EVENTS))
+	reportservice = services.NewReportService(services.NewRepository(db.DbMap, db.TABLE_REPORTS))
+	reportperiodservice = services.NewReportPeriodService(services.NewRepository(db.DbMap, db.TABLE_REPORT_PERIODS))
+	reportprojectservice = services.NewReportProjectService(services.NewRepository(db.DbMap, db.TABLE_REPORT_PROJECTS))
+	reportorderservice = services.NewReportOrderService(services.NewRepository(db.DbMap, db.TABLE_REPORT_ORDERS))
+	reportfacilityservice = services.NewReportFacilityService(services.NewRepository(db.DbMap, db.TABLE_REPORT_FACILITIES))
+	reportcomplexstatusservice = services.NewReportComplexStatusService(services.NewRepository(db.DbMap, db.TABLE_REPORT_COMPLEX_STATUSES))
+	reportsupplierservice = services.NewReportSupplierService(services.NewRepository(db.DbMap, db.TABLE_REPORT_SUPPLIERS))
+	reportsettingsservice = services.NewReportSettingsService(services.NewRepository(db.DbMap, db.TABLE_REPORT_SETTINGS))
+	complexreportservice = services.NewComplexReportService(services.NewRepository(db.DbMap, ""))
+	transactionservice = services.NewTransactionService(services.NewRepository(db.DbMap, db.TABLE_TRANSACTIONS))
+	operationservice = services.NewOperationService(services.NewRepository(db.DbMap, db.TABLE_OPERATIONS))
+	transactiontypeservice = services.NewTransactionTypeService(services.NewRepository(db.DbMap, db.TABLE_TRANSACTION_TYPES))
+	operationtypeservice = services.NewOperationTypeService(services.NewRepository(db.DbMap, db.TABLE_OPERATION_TYPES))
+	orderinvoiceservice = services.NewOrderInvoiceService(services.NewRepository(db.DbMap, db.TABLE_ORDER_INVOICES))
 
 	userservice.SessionRepository = sessionservice
 	userservice.EmailRepository = emailservice
@@ -168,6 +225,7 @@ func Start() {
 	userservice.UnitRepository = unitservice
 	userservice.MessageRepository = messageservice
 	userservice.MobilePhoneRepository = mobilephoneservice
+	userservice.DeviceRepository = deviceservice
 
 	sessionservice.GroupRepository = groupservice
 
@@ -177,6 +235,8 @@ func Start() {
 	orderservice.OrderStatusRepository = orderstatusservice
 
 	smsfacilityservice.MobileOperatorOperationRepository = mobileoperatoroperationservice
+	smsfacilityservice.SMSPeriodRepository = smsperiodservice
+	smsfacilityservice.SMSEventRepository = smseventservice
 	smsfacilityservice.ResultTableRepository = resulttableservice
 	smsfacilityservice.WorkTableRepository = worktableservice
 
@@ -190,10 +250,12 @@ func Start() {
 	recognizefacilityservice.InputFtpRepository = inputftpservice
 	recognizefacilityservice.ResultTableRepository = resulttableservice
 	recognizefacilityservice.WorkTableRepository = worktableservice
+	recognizefacilityservice.InputProductRepository = inputproductservice
 
 	verifyfacilityservice.DataColumnRepository = datacolumnservice
 	verifyfacilityservice.ResultTableRepository = resulttableservice
 	verifyfacilityservice.WorkTableRepository = worktableservice
+	verifyfacilityservice.DataProductRepository = dataproductservice
 
 	companyservice.CompanyCodeRepository = companycodeservice
 	companyservice.CompanyAddressRepository = companyaddressservice
@@ -207,6 +269,19 @@ func Start() {
 	verifytableservice.FacilityTableRepository = facilitytableservice
 
 	invoiceservice.InvoiceItemRepository = invoiceitemservice
+	invoiceservice.TransactionRepository = transactionservice
+	invoiceservice.OperationRepository = operationservice
+	invoiceservice.OrderInvoiceRepository = orderinvoiceservice
+	invoiceservice.OrderStatusRepository = orderstatusservice
+
+	reportservice.UserRepository = userservice
+	reportservice.ReportPeriodRepository = reportperiodservice
+	reportservice.ReportProjectRepository = reportprojectservice
+	reportservice.ReportOrderRepository = reportorderservice
+	reportservice.ReportFacilityRepository = reportfacilityservice
+	reportservice.ReportComplexStatusRepository = reportcomplexstatusservice
+	reportservice.ReportSupplierRepository = reportsupplierservice
+	reportservice.ReportSettingsRepository = reportsettingsservice
 
 	go fileservice.ClearExpiredFiles()
 	go customertableservice.ClearExpiredTables()
@@ -308,5 +383,28 @@ func bootstrap() martini.Handler {
 		context.Map(complexstatusservice)
 		context.Map(invoiceservice)
 		context.Map(invoiceitemservice)
+		context.Map(priceservice)
+		context.Map(recognizeproductservice)
+		context.Map(verifyproductservice)
+		context.Map(inputproductservice)
+		context.Map(dataproductservice)
+		context.Map(feedbackservice)
+		context.Map(deviceservice)
+		context.Map(smsperiodservice)
+		context.Map(smseventservice)
+		context.Map(reportservice)
+		context.Map(reportperiodservice)
+		context.Map(reportprojectservice)
+		context.Map(reportorderservice)
+		context.Map(reportfacilityservice)
+		context.Map(reportcomplexstatusservice)
+		context.Map(reportsupplierservice)
+		context.Map(reportsettingsservice)
+		context.Map(complexreportservice)
+		context.Map(transactionservice)
+		context.Map(operationservice)
+		context.Map(transactiontypeservice)
+		context.Map(operationtypeservice)
+		context.Map(orderinvoiceservice)
 	}
 }

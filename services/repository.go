@@ -21,6 +21,7 @@ type DbMap interface {
 	SelectInt(query string, args ...interface{}) (int64, error)
 	SelectStr(query string, args ...interface{}) (string, error)
 	SelectOne(holder interface{}, query string, args ...interface{}) error
+	SelectFloat(query string, args ...interface{}) (float64, error)
 }
 
 type Repository struct {

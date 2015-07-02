@@ -45,6 +45,7 @@ type ViewLongOrder struct {
 	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed"`                  // Новая цена утверждена
 	IsPaid             bool    `json:"paid"`                                      // Оплачен
 	IsStarted          bool    `json:"moderatorBegin"`                            // Запущен
+	IsNewCharge        bool    `json:"supplierFactualCostNew"`                    // Предложена фактическая цена
 	Charged_Fee        float64 `json:"supplierFactualCost" validate:"min=0"`      // Фактическая цена
 	IsExecuted         bool    `json:"supplierClose"`                             // Выполнен
 	IsDocumented       bool    `json:"moderatorDocumentsGotten"`                  // Документы имеются
@@ -135,6 +136,7 @@ type ApiLongOrder struct {
 	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed"` // Новая цена утверждена
 	IsPaid             bool    `json:"paid"`                     // Оплачен
 	IsStarted          bool    `json:"moderatorBegin"`           // Запущен
+	IsNewCharge        bool    `json:"supplierFactualCostNew"`   // Предложена фактическая цена
 	Charged_Fee        float64 `json:"supplierFactualCost"`      // Фактическая цена
 	IsExecuted         bool    `json:"supplierClose"`            // Выполнен
 	IsDocumented       bool    `json:"moderatorDocumentsGotten"` // Документы имеются
@@ -209,6 +211,8 @@ type DtoOrder struct {
 	Proposed_Price     float64   `db:"proposed_price"`     // Предложенная цена
 	Charged_Fee        float64   `db:"charged_fee"`        // Фактическая цена
 	Execution_Forecast int       `db:"execution_forecast"` // Прогноз исполнения
+	Begin_Date         time.Time `db:"begin_date"`         // Дата начала работ
+	End_Date           time.Time `db:"end_date"`           // Дата окончания работ
 }
 
 // Конструктор создания объекта заказа в api
@@ -288,7 +292,7 @@ func NewApiBriefOrder(id int64, name string, ispaid bool, isarchived bool, isdel
 
 func NewApiLongOrder(id int64, name string, step byte, isassembled bool, isconfirmed bool, facility_id int64,
 	supplier_id int64, isnew bool, isopen bool, iscancelled bool, reason string, execution_forecast int, proposed_price float64,
-	isnewcost bool, isnewcostconfirmed bool, ispaid bool, isstarted bool, charged_fee float64, isexecuted bool,
+	isnewcost bool, isnewcostconfirmed bool, ispaid bool, isstarted bool, isnewcharge bool, charged_fee float64, isexecuted bool,
 	isdocumented bool, isclosed bool, isarchived bool, isdeleted bool) *ApiLongOrder {
 	return &ApiLongOrder{
 		ID:                 id,
@@ -308,6 +312,7 @@ func NewApiLongOrder(id int64, name string, step byte, isassembled bool, isconfi
 		IsNewCostConfirmed: isnewcostconfirmed,
 		IsPaid:             ispaid,
 		IsStarted:          isstarted,
+		IsNewCharge:        isnewcharge,
 		Charged_Fee:        charged_fee,
 		IsExecuted:         isexecuted,
 		IsDocumented:       isdocumented,
@@ -349,7 +354,8 @@ func NewApiFullOrder(user_id int64, unit_id int64, created time.Time, apilongord
 
 // Конструктор создания объекта заказа в бд
 func NewDtoOrder(id int64, project_id int64, creator_id int64, unit_id int64, supplier_id int64, facility_id int64,
-	name string, step byte, created time.Time, proposed_price float64, charged_fee float64, execution_forecast int) *DtoOrder {
+	name string, step byte, created time.Time, proposed_price float64, charged_fee float64, execution_forecast int,
+	begin_date time.Time, end_date time.Time) *DtoOrder {
 	return &DtoOrder{
 		ID:                 id,
 		Project_ID:         project_id,
@@ -363,6 +369,8 @@ func NewDtoOrder(id int64, project_id int64, creator_id int64, unit_id int64, su
 		Proposed_Price:     proposed_price,
 		Charged_Fee:        charged_fee,
 		Execution_Forecast: execution_forecast,
+		Begin_Date:         begin_date,
+		End_Date:           end_date,
 	}
 }
 
@@ -438,6 +446,7 @@ func (order *ViewLongOrder) ToOrderStatuses(id int64) (orderstatuses *[]DtoOrder
 		{Order_ID: id, Status_ID: ORDER_STATUS_CUSTOMER_NEW_COST_CONFIRMED, Value: order.IsNewCostConfirmed, Created: time.Now()},
 		{Order_ID: id, Status_ID: ORDER_STATUS_PAID, Value: order.IsPaid, Created: time.Now()},
 		{Order_ID: id, Status_ID: ORDER_STATUS_MODERATOR_BEGIN, Value: order.IsStarted, Created: time.Now()},
+		{Order_ID: id, Status_ID: ORDER_STATUS_SUPPLIER_FACTUAL_COST_NEW, Value: order.IsNewCharge, Created: time.Now()},
 		{Order_ID: id, Status_ID: ORDER_STATUS_SUPPLIER_CLOSE, Value: order.IsExecuted, Created: time.Now()},
 		{Order_ID: id, Status_ID: ORDER_STATUS_MODERATOR_DOCUMENTS_GOTTEN, Value: order.IsDocumented, Created: time.Now()},
 		{Order_ID: id, Status_ID: ORDER_STATUS_MODERATOR_CLOSE, Value: order.IsClosed, Created: time.Now()},
@@ -477,6 +486,8 @@ func NewApiLongOrderFromDto(dtoorder *DtoOrder, dtoorderstatuses *[]DtoOrderStat
 			apiorder.IsPaid = dtoorderstatus.Value
 		case ORDER_STATUS_MODERATOR_BEGIN:
 			apiorder.IsStarted = dtoorderstatus.Value
+		case ORDER_STATUS_SUPPLIER_FACTUAL_COST_NEW:
+			apiorder.IsNewCharge = dtoorderstatus.Value
 		case ORDER_STATUS_SUPPLIER_CLOSE:
 			apiorder.IsExecuted = dtoorderstatus.Value
 		case ORDER_STATUS_MODERATOR_DOCUMENTS_GOTTEN:

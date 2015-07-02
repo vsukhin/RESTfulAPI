@@ -12,6 +12,7 @@ type CompanyRepository interface {
 	GetByUser(userid int64, filter string) (companies *[]models.ApiShortCompany, err error)
 	GetByUnit(unitid int64) (companies *[]models.ApiShortCompany, err error)
 	GetPrimaryByUser(userid int64) (company *models.DtoCompany, err error)
+	GetPrimaryByUnit(unitid int64) (company *models.DtoCompany, err error)
 	ClearPrimary(company *models.DtoCompany, trans *gorp.Transaction) (err error)
 	SetArrays(company *models.DtoCompany, trans *gorp.Transaction) (err error)
 	Create(company *models.DtoCompany, inTrans bool) (err error)
@@ -98,6 +99,18 @@ func (companyservice *CompanyService) GetPrimaryByUser(userid int64) (company *m
 		" and unit_id = (select unit_id from users where id = ?)", userid)
 	if err != nil {
 		log.Error("Error during getting unit company object from database %v with value %v", err, userid)
+		return nil, err
+	}
+
+	return company, nil
+}
+
+func (companyservice *CompanyService) GetPrimaryByUnit(unitid int64) (company *models.DtoCompany, err error) {
+	company = new(models.DtoCompany)
+	err = companyservice.DbContext.SelectOne(company, "select * from "+companyservice.Table+" where active = 1 and `primary` = 1"+
+		" and unit_id = ?", unitid)
+	if err != nil {
+		log.Error("Error during getting unit company object from database %v with value %v", err, unitid)
 		return nil, err
 	}
 

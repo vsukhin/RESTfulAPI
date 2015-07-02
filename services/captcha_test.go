@@ -60,6 +60,10 @@ func (testCaptchaDBMap *TestCaptchaDBMap) SelectOne(holder interface{}, query st
 	return testCaptchaDBMap.Err
 }
 
+func (testCaptchaDBMap *TestCaptchaDBMap) SelectFloat(query string, args ...interface{}) (float64, error) {
+	return 0, nil
+}
+
 type TestLogger struct {
 }
 

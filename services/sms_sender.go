@@ -2,11 +2,13 @@ package services
 
 import (
 	"application/models"
+	"fmt"
 )
 
 type SMSSenderRepository interface {
 	CheckCustomerAccess(user_id int64, id int64) (allowed bool, err error)
 	Exists(name string) (found bool, err error)
+	Belongs(dtotablecolumn *models.DtoTableColumn, unit_id int64) (found bool, err error)
 	Get(id int64) (smssender *models.DtoSMSSender, err error)
 	GetMeta(user_id int64) (smssender *models.ApiMetaSMSSender, err error)
 	GetByUser(userid int64, filter string) (smssenders *[]models.ApiShortSMSSender, err error)
@@ -45,6 +47,19 @@ func (smssenderservice *SMSSenderService) Exists(name string) (found bool, err e
 	}
 
 	return count != 0, nil
+}
+
+func (smssenderservice *SMSSenderService) Belongs(dtotablecolumn *models.DtoTableColumn, unit_id int64) (found bool, err error) {
+	var count int64
+	count, err = smssenderservice.DbContext.SelectInt("select count(*) from table_data where active = 1 and customer_table_id = ? and field"+
+		fmt.Sprintf("%v", dtotablecolumn.FieldNum)+" not in (select name from sms_senders where active = 1 and registered = 1 and unit_id = ?)",
+		dtotablecolumn.Customer_Table_ID, unit_id)
+	if err != nil {
+		log.Error("Error during getting sms sender object from database %v with value %v, %v", err, dtotablecolumn.ID, unit_id)
+		return false, err
+	}
+
+	return count == 0, nil
 }
 
 func (smssenderservice *SMSSenderService) Get(id int64) (smssender *models.DtoSMSSender, err error) {

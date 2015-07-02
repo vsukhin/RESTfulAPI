@@ -11,14 +11,14 @@ import (
 
 // Структура для организации хранения пользовательских таблиц
 type ViewShortCustomerTable struct {
-	Name   string `json:"name" validate:"nonzero,min=1,max=255"` // Название пользовательской таблицы
-	UnitID int64  `json:"unitId"`                                // Объединение
+	Name   string `json:"name" validate:"min=1,max=255"` // Название пользовательской таблицы
+	UnitID int64  `json:"unitId"`                        // Объединение
 }
 
 type ViewLongCustomerTable struct {
-	Name   string `json:"name" validate:"nonzero,min=1,max=255"` // Название пользовательской таблицы
-	Type   int    `json:"type"`                                  // Тип
-	UnitID int64  `json:"unitId" validate:"nonzero"`             // Объединение
+	Name   string `json:"name" validate:"min=1,max=255"` // Название пользовательской таблицы
+	Type   int    `json:"type"`                          // Тип
+	UnitID int64  `json:"unitId" validate:"nonzero"`     // Объединение
 }
 
 type ApiShortCustomerTable struct {

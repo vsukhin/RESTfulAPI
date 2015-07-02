@@ -18,6 +18,7 @@ type VerifyFacilityService struct {
 	DataColumnRepository  DataColumnRepository
 	ResultTableRepository ResultTableRepository
 	WorkTableRepository   WorkTableRepository
+	DataProductRepository DataProductRepository
 	*Repository
 }
 
@@ -50,6 +51,18 @@ func (verifyfacilityservice *VerifyFacilityService) Get(orderid int64) (verifyfa
 }
 
 func (verifyfacilityservice *VerifyFacilityService) SetArrays(verifyfacility *models.DtoVerifyFacility, trans *gorp.Transaction) (err error) {
+	err = verifyfacilityservice.DataProductRepository.DeleteByOrder(verifyfacility.Order_ID, trans)
+	if err != nil {
+		log.Error("Error during setting verify facility object in database %v with value %v", err, verifyfacility.Order_ID)
+		return err
+	}
+	for _, dtodataproduct := range verifyfacility.DataProducts {
+		err = verifyfacilityservice.DataProductRepository.Create(&dtodataproduct, trans)
+		if err != nil {
+			log.Error("Error during setting verify facility object in database %v with value %v", err, verifyfacility.Order_ID)
+			return err
+		}
+	}
 	err = verifyfacilityservice.DataColumnRepository.DeleteByOrder(verifyfacility.Order_ID, trans)
 	if err != nil {
 		log.Error("Error during setting verify facility object in database %v with value %v", err, verifyfacility.Order_ID)

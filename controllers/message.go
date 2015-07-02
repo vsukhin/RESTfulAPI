@@ -99,13 +99,25 @@ func GetMessages(w http.ResponseWriter, request *http.Request, r render.Render, 
 }
 
 // post /api/v1.0/messages/order/:oid/
-func CreateMessage(errors binding.Errors, viewmessage models.ViewMessage, r render.Render, params martini.Params,
+func CreateMessage(errors binding.Errors, viewmessage models.ViewLongMessage, r render.Render, params martini.Params,
 	orderrepository services.OrderRepository, messagerepository services.MessageRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewmessage, errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
 	if err != nil {
+		return
+	}
+	allowed, err := orderrepository.CheckUnitAccess(viewmessage.Receiver_ID, dtoorder.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	if !allowed {
+		log.Error("Receiver %v is not allowed for order %v", viewmessage.Receiver_ID, dtoorder.ID)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
@@ -114,6 +126,7 @@ func CreateMessage(errors binding.Errors, viewmessage models.ViewMessage, r rend
 	dtomessage.Order_ID = dtoorder.ID
 	dtomessage.Created = time.Now()
 	dtomessage.Content = viewmessage.Content
+	dtomessage.Receiver_ID = viewmessage.Receiver_ID
 	err = messagerepository.Create(dtomessage, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -140,7 +153,7 @@ func GetMessage(r render.Render, params martini.Params, orderrepository services
 	}
 
 	r.JSON(http.StatusOK, models.NewApiLongMessage(dtomessage.ID, dtomessage.Created, !read,
-		dtomessage.User_ID == session.UserID, dtomessage.User_ID, dtomessage.Content))
+		dtomessage.User_ID == session.UserID, dtomessage.User_ID, dtomessage.Receiver_ID, dtomessage.Content))
 }
 
 // patch /api/v1.0/messages/orders/:oid/message/:mid/
@@ -180,9 +193,9 @@ func MarkMessages(r render.Render, params martini.Params, orderrepository servic
 }
 
 // put /api/v1.0/messages/orders/:oid/message/:mid/
-func UpdateMessage(errors binding.Errors, viewmessage models.ViewMessage, r render.Render, params martini.Params,
+func UpdateMessage(errors binding.Errors, viewmessage models.ViewShortMessage, r render.Render, params martini.Params,
 	orderrepository services.OrderRepository, messagerepository services.MessageRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewmessage, errors, r, session.Language) != nil {
 		return
 	}
 	dtomessage, err := helpers.CheckChangeableMessage(r, params, orderrepository, messagerepository, session.UserID, session.Language, true)
@@ -206,7 +219,7 @@ func UpdateMessage(errors binding.Errors, viewmessage models.ViewMessage, r rend
 	}
 
 	r.JSON(http.StatusOK, models.NewApiLongMessage(dtomessage.ID, dtomessage.Created, !read,
-		dtomessage.User_ID == session.UserID, dtomessage.User_ID, dtomessage.Content))
+		dtomessage.User_ID == session.UserID, dtomessage.User_ID, dtomessage.Receiver_ID, dtomessage.Content))
 }
 
 // delete /api/v1.0/messages/orders/:oid/message/:mid/

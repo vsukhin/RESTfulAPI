@@ -36,7 +36,7 @@ func NewFileService(repository *Repository) *FileService {
 
 func (fileservice *FileService) ClearExpiredFiles() {
 	for {
-		files, err := fileservice.GetExpired(config.Configuration.Server.FileTimeout)
+		files, err := fileservice.GetExpired(config.Configuration.FileTimeout)
 		if err == nil {
 			for _, file := range *files {
 				if !file.Permanent {
@@ -56,7 +56,7 @@ func (fileservice *FileService) Get(fileid int64) (file *models.DtoFile, err err
 		return nil, err
 	}
 
-	file.FileData, err = ioutil.ReadFile(filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
+	file.FileData, err = ioutil.ReadFile(filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
 	if err != nil {
 		log.Error("Error during getting file in filesystem %v with value %v", err, file.ID)
 		return nil, err
@@ -108,7 +108,7 @@ func (fileservice *FileService) Create(file *models.DtoFile, data *models.ViewFi
 		return err
 	}
 
-	fullpath := filepath.Join(config.Configuration.Server.FileStorage, file.Path)
+	fullpath := filepath.Join(config.Configuration.FileStorage, file.Path)
 	if _, err = os.Stat(fullpath); os.IsNotExist(err) {
 		err = os.MkdirAll(fullpath, 0777)
 		if err != nil {
@@ -158,7 +158,7 @@ func (fileservice *FileService) Delete(file *models.DtoFile) (err error) {
 		return err
 	}
 
-	err = os.Remove(filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
+	err = os.Remove(filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
 	if err != nil {
 		log.Error("Error during deleting file in filesystem %v with value %v", err, file.ID)
 		return err

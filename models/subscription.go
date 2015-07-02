@@ -8,14 +8,14 @@ import (
 
 // Структура для организации хранения подписки
 type ViewSubscription struct {
-	Email        string `json:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Email подписчика
-	CaptchaValue string `json:"captchaValue" validate:"max=255"`                       // Значение капчи
-	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                        // Хэш капчи
-	Language     string `json:"language" validate:"max=10"`                            // Язык подписчика
+	Email        string `json:"email" validate:"max=255,regexp=^.+@.+$"` // Email подписчика
+	CaptchaValue string `json:"captchaValue" validate:"max=255"`         // Значение капчи
+	CaptchaHash  string `json:"captchaHash" validate:"max=255"`          // Хэш капчи
+	Language     string `json:"language" validate:"max=10"`              // Язык подписчика
 }
 
 type SubscriptionConfirm struct {
-	Code string `json:"code" validate:"nonzero,min=1,max=255"` // Код подтверждения подписки
+	Code string `json:"code" validate:"min=1,max=255"` // Код подтверждения подписки
 }
 
 type ApiShortSubscription struct {

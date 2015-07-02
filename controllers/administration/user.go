@@ -15,7 +15,7 @@ import (
 )
 
 // get /api/v1.0/administration/users/
-func GetUsers(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params,
+func GetUsers(w http.ResponseWriter, request *http.Request, r render.Render,
 	userrepository services.UserRepository, session *models.DtoSession) {
 	query := ""
 
@@ -69,11 +69,11 @@ func GetUsers(w http.ResponseWriter, request *http.Request, r render.Render, par
 }
 
 // post /api/v1.0/administration/users/
-func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *http.Request, r render.Render, params martini.Params,
+func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *http.Request, r render.Render,
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
 		return
 	}
 
@@ -90,6 +90,8 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	dtouser.Language = strings.ToLower(user.Language)
 	dtouser.Code = ""
 	dtouser.Password = ""
+	dtouser.ReportAccess = true
+	dtouser.CaptchaRequired = false
 
 	if helpers.CheckUserRoles(user.Roles, session.Language, r, grouprepository) != nil {
 		return
@@ -146,11 +148,11 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 			}
 		}
 		*dtouser.Emails = append(*dtouser.Emails, models.DtoEmail{
-			Email:         updEmail.Email,
-			Created:       dtouser.LastLogin,
-			Primary:       updEmail.Primary,
-			Confirmed:     updEmail.Confirmed,
-			Subscription:  updEmail.Subscription,
+			Email:     updEmail.Email,
+			Created:   dtouser.LastLogin,
+			Primary:   updEmail.Primary,
+			Confirmed: updEmail.Confirmed,
+			//			Subscription:  updEmail.Subscription,
 			Code:          code,
 			Language:      strings.ToLower(updEmail.Language),
 			Exists:        emailExists,
@@ -169,11 +171,11 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		}
 
 		*dtouser.MobilePhones = append(*dtouser.MobilePhones, models.DtoMobilePhone{
-			Phone:         updMobilePhone.Phone,
-			Created:       dtouser.LastLogin,
-			Primary:       updMobilePhone.Primary,
-			Confirmed:     updMobilePhone.Confirmed,
-			Subscription:  updMobilePhone.Subscription,
+			Phone:     updMobilePhone.Phone,
+			Created:   dtouser.LastLogin,
+			Primary:   updMobilePhone.Primary,
+			Confirmed: updMobilePhone.Confirmed,
+			//			Subscription:  updMobilePhone.Subscription,
 			Code:          "",
 			Language:      strings.ToLower(updMobilePhone.Language),
 			Exists:        phoneExists,
@@ -188,7 +190,7 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		return
 	}
 
-	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository) != nil {
+	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, true) != nil {
 		return
 	}
 
@@ -201,7 +203,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
 		return
 	}
 	userid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_USER_ID], session.Language)
@@ -281,12 +283,12 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 			}
 
 			*arrOutEmails = append(*arrOutEmails, models.DtoEmail{
-				Email:         updEmail.Email,
-				UserID:        dtouser.ID,
-				Created:       time.Now(),
-				Primary:       updEmail.Primary,
-				Confirmed:     updEmail.Confirmed,
-				Subscription:  updEmail.Subscription,
+				Email:     updEmail.Email,
+				UserID:    dtouser.ID,
+				Created:   time.Now(),
+				Primary:   updEmail.Primary,
+				Confirmed: updEmail.Confirmed,
+				//				Subscription:  updEmail.Subscription,
 				Code:          code,
 				Language:      strings.ToLower(updEmail.Language),
 				Exists:        emailExists,
@@ -295,7 +297,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		} else {
 			curEmail.Primary = updEmail.Primary
 			curEmail.Confirmed = updEmail.Confirmed
-			curEmail.Subscription = updEmail.Subscription
+			//			curEmail.Subscription = updEmail.Subscription
 			curEmail.Code = code
 			curEmail.Language = strings.ToLower(updEmail.Language)
 			curEmail.Classifier_ID = classifier.ID
@@ -310,13 +312,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return
 			}
-
 			(*arrOutEmails)[len(*arrOutEmails)-1].Code = code
-
-			if updEmail.Primary {
-				dtouser.Code = code
-				dtouser.Password = code
-			}
 		}
 	}
 
@@ -347,12 +343,12 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 			}
 
 			*arrOutMobilePhones = append(*arrOutMobilePhones, models.DtoMobilePhone{
-				Phone:         updMobilePhone.Phone,
-				UserID:        dtouser.ID,
-				Created:       time.Now(),
-				Primary:       updMobilePhone.Primary,
-				Confirmed:     updMobilePhone.Confirmed,
-				Subscription:  updMobilePhone.Subscription,
+				Phone:     updMobilePhone.Phone,
+				UserID:    dtouser.ID,
+				Created:   time.Now(),
+				Primary:   updMobilePhone.Primary,
+				Confirmed: updMobilePhone.Confirmed,
+				//				Subscription:  updMobilePhone.Subscription,
 				Code:          "",
 				Language:      strings.ToLower(updMobilePhone.Language),
 				Exists:        phoneExists,
@@ -361,7 +357,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		} else {
 			curMobilePhone.Primary = updMobilePhone.Primary
 			curMobilePhone.Confirmed = updMobilePhone.Confirmed
-			curMobilePhone.Subscription = updMobilePhone.Subscription
+			//			curMobilePhone.Subscription = updMobilePhone.Subscription
 			curMobilePhone.Language = strings.ToLower(updMobilePhone.Language)
 			curMobilePhone.Classifier_ID = classifier.ID
 
@@ -378,7 +374,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		return
 	}
 
-	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository) != nil {
+	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false) != nil {
 		return
 	}
 
@@ -439,12 +435,12 @@ func GetUserFullInfo(r render.Render, params martini.Params, userrepository serv
 		user.Surname, user.Name, user.MiddleName, user.WorkPhone, user.JobTitle, user.Language, user.Roles,
 		*new([]models.ViewApiEmail), *new([]models.ViewApiMobilePhone))
 	for _, email := range *user.Emails {
-		userfull.Emails = append(userfull.Emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, email.Subscription,
+		userfull.Emails = append(userfull.Emails, *models.NewViewApiEmail(email.Email, email.Primary, email.Confirmed, /*email.Subscription,*/
 			email.Language, email.Classifier_ID))
 	}
 	for _, mobilephone := range *user.MobilePhones {
 		userfull.MobilePhones = append(userfull.MobilePhones, *models.NewViewApiMobilePhone(mobilephone.Phone, mobilephone.Primary,
-			mobilephone.Confirmed, mobilephone.Subscription, mobilephone.Language, mobilephone.Classifier_ID))
+			mobilephone.Confirmed /*mobilephone.Subscription,*/, mobilephone.Language, mobilephone.Classifier_ID))
 	}
 
 	r.JSON(http.StatusOK, userfull)

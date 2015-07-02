@@ -8,24 +8,31 @@ import (
 
 // Структура для организации хранения email
 type UpdateEmail struct {
-	Email         string `json:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Уникальный email
-	Primary       bool   `json:"primary"`                                               // Основной
-	Confirmed     bool   `json:"-"`                                                     // Подтвержден
-	Subscription  bool   `json:"subscription"`                                          // Используется для рассылки
-	Language      string `json:"language" validate:"nonzero,min=1,max=10"`              // Язык рассылки
-	Classifier_ID int    `json:"contactClass" validate:"nonzero"`                       // Идентификатор классификатора
-}
-
-type ViewApiEmail struct {
-	Email         string `json:"email" db:"email" validate:"nonzero,min=1,max=255,regexp=^.+@.+$"` // Уникальный email
-	Primary       bool   `json:"primary" db:"primary"`                                             // Основной
-	Confirmed     bool   `json:"confirmed" db:"confirmed"`                                         // Подтвержден
-	Subscription  bool   `json:"subscription" db:"subscription"`                                   // Используется для рассылки
-	Language      string `json:"language" db:"language" validate:"nonzero,min=1,max=10"`           // Язык рассылки
-	Classifier_ID int    `json:"contactClass" db:"classifier_id" validate:"nonzero"`               // Идентификатор классификатора
+	Email     string `json:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
+	Primary   bool   `json:"primary"`                                 // Основной
+	Confirmed bool   `json:"-"`                                       // Подтвержден
+	//	Subscription  bool   `json:"subscription"`                                          // Используется для рассылки
+	Language      string `json:"language" validate:"min=1,max=10"` // Язык рассылки
+	Classifier_ID int    `json:"contactClass"`                     // Идентификатор классификатора
 }
 
 type UpdateEmails []UpdateEmail
+
+type ViewApiEmail struct {
+	Email     string `json:"email" db:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
+	Primary   bool   `json:"primary" db:"primary"`                               // Основной
+	Confirmed bool   `json:"confirmed" db:"confirmed"`                           // Подтвержден
+	//	Subscription  bool   `json:"subscription" db:"subscription"`                                   // Используется для рассылки
+	Language      string `json:"language" db:"language" validate:"min=1,max=10"` // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                // Идентификатор классификатора
+}
+
+type ViewEmail struct {
+	Email         string `json:"email" db:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
+	Primary       bool   `json:"primary" db:"primary"`                               // Основной
+	Language      string `json:"language" db:"language" validate:"min=1,max=10"`     // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                    // Идентификатор классификатора
+}
 
 type DtoEmail struct {
 	Email         string    `db:"email"`        // Уникальный email
@@ -41,12 +48,12 @@ type DtoEmail struct {
 }
 
 // Конструктор создания объекта email в api
-func NewViewApiEmail(email string, primary bool, confirmed bool, subscription bool, language string, classifier_id int) *ViewApiEmail {
+func NewViewApiEmail(email string, primary bool, confirmed bool /*subscription bool,*/, language string, classifier_id int) *ViewApiEmail {
 	return &ViewApiEmail{
-		Email:         email,
-		Primary:       primary,
-		Confirmed:     confirmed,
-		Subscription:  subscription,
+		Email:     email,
+		Primary:   primary,
+		Confirmed: confirmed,
+		//		Subscription:  subscription,
 		Language:      language,
 		Classifier_ID: classifier_id,
 	}
@@ -74,5 +81,9 @@ func (email UpdateEmail) Validate(errors binding.Errors, req *http.Request) bind
 }
 
 func (email *ViewApiEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+	return ValidateWithLanguage(email, errors, req, email.Language)
+}
+
+func (email *ViewEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	return ValidateWithLanguage(email, errors, req, email.Language)
 }

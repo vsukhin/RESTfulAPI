@@ -108,7 +108,7 @@ func GetTable(r render.Render, params martini.Params, customertablerepository se
 func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustomerTable, r render.Render,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
 	tabletyperepository services.TableTypeRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewcustomertable, errors, r, session.Language) != nil {
 		return
 	}
 
@@ -140,7 +140,7 @@ func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustom
 func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustomerTable, r render.Render, params martini.Params,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository, unitrepository services.UnitRepository,
 	tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewcustomertable, errors, r, session.Language) != nil {
 		return
 	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
@@ -214,8 +214,11 @@ func GetTableMetaData(r render.Render, params martini.Params, customertablerepos
 // put /api/v1.0/tables/:tid/price/
 func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiPriceProperties, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, pricepropertiesrepository services.PricePropertiesRepository,
-	facilityrepository services.FacilityRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	facilityrepository services.FacilityRepository, tablecolumnrepository services.TableColumnRepository,
+	columntyperepository services.ColumnTypeRepository, tablerowrepository services.TableRowRepository,
+	recognizeproductrepository services.RecognizeProductRepository, verifyproductrepository services.VerifyProductRepository,
+	session *models.DtoSession) {
+	if helpers.CheckValidation(&viewpriceproperties, errors, r, session.Language) != nil {
 		return
 	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
@@ -229,6 +232,7 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 		return
 	}
+	published := false
 	created := time.Now()
 	if found {
 		priceproperties, err := pricepropertiesrepository.Get(dtocustomertable.ID)
@@ -237,93 +241,188 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
-		if !middlewares.IsAdmin(session.Roles) {
-			if priceproperties.Published {
-				if priceproperties.Facility_ID != viewpriceproperties.Facility_ID ||
-					priceproperties.After_ID != viewpriceproperties.After_ID ||
-					((viewpriceproperties.Begin.IsZero() &&
-						!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
-						(!viewpriceproperties.Begin.IsZero() &&
-							(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
-						(!viewpriceproperties.Begin.IsZero() &&
-							!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1) &&
-							viewpriceproperties.Begin.Sub(priceproperties.Begin) != 0)) ||
-					(!viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()).Hours() < TIME_ONE_MONTH) ||
-					priceproperties.Published != viewpriceproperties.Published {
-					log.Error("Can't change fields for published price list %v", dtocustomertable.ID)
-					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-						Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-					return
-				}
+		if priceproperties.Published {
+			if priceproperties.Facility_ID != viewpriceproperties.Facility_ID ||
+				priceproperties.After_ID != viewpriceproperties.After_ID ||
+				((viewpriceproperties.Begin.IsZero() &&
+					!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
+					(!viewpriceproperties.Begin.IsZero() &&
+						(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1)) ||
+					(!viewpriceproperties.Begin.IsZero() &&
+						!(priceproperties.Begin.Year() == 1 && priceproperties.Begin.Month() == 1 && priceproperties.Begin.Day() == 1) &&
+						viewpriceproperties.Begin.Sub(priceproperties.Begin) != 0)) ||
+				(!viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()).Hours() < TIME_ONE_MONTH) ||
+				priceproperties.Published != viewpriceproperties.Published {
+				log.Error("Can't change fields for published price list %v", dtocustomertable.ID)
+				r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,
+					Message: config.Localization[session.Language].Errors.Api.Data_Changes_Denied})
+				return
 			}
 		}
+		published = priceproperties.Published
 		created = priceproperties.Created
 	}
-	facility, err := facilityrepository.Get(viewpriceproperties.Facility_ID)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-	if !facility.Active {
-		log.Error("Facility is not active %v", facility.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
 
-	if viewpriceproperties.After_ID != 0 {
-		customertable, err := helpers.IsTableAvailable(r, customertablerepository, viewpriceproperties.After_ID, session.Language)
-		if err != nil {
-			return
-		}
-		if customertable.TypeID != models.TABLE_TYPE_PRICE {
-			log.Error("After price is not price type %v", customertable.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-			return
-		}
-
-		priceproperties, err := pricepropertiesrepository.Get(customertable.ID)
+	if !published {
+		facility, err := facilityrepository.Get(viewpriceproperties.Facility_ID)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
-		if priceproperties.Facility_ID != viewpriceproperties.Facility_ID {
-			log.Error("Service is not the same for after price %v", customertable.ID)
+		if !facility.Active {
+			log.Error("Facility is not active %v", facility.ID)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
-		if !priceproperties.Published {
-			log.Error("After price is not published %v", customertable.ID)
+
+		if viewpriceproperties.After_ID != 0 {
+			customertable, err := helpers.IsTableAvailable(r, customertablerepository, viewpriceproperties.After_ID, session.Language)
+			if err != nil {
+				return
+			}
+			if customertable.TypeID != models.TABLE_TYPE_PRICE {
+				log.Error("After price is not price type %v", customertable.ID)
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+					Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+				return
+			}
+
+			priceproperties, err := pricepropertiesrepository.Get(customertable.ID)
+			if err != nil {
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+					Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+				return
+			}
+			if priceproperties.Facility_ID != viewpriceproperties.Facility_ID {
+				log.Error("Service is not the same for after price %v", customertable.ID)
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+					Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+				return
+			}
+			if !priceproperties.Published {
+				log.Error("After price is not published %v", customertable.ID)
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+					Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+				return
+			}
+		}
+
+		if !viewpriceproperties.Begin.IsZero() && viewpriceproperties.Begin.Sub(time.Now()) < 0 {
+			log.Error("Begin date is in the past %v", viewpriceproperties.Begin)
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			return
+		}
+
+		if !viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()) < 0 {
+			log.Error("End date is in the past %v", viewpriceproperties.End)
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			return
+		}
+
+		if !viewpriceproperties.Begin.IsZero() && !viewpriceproperties.End.IsZero() &&
+			viewpriceproperties.Begin.Sub(viewpriceproperties.End) > 0 {
+			log.Error("Begin date can't be bigger than end date %v", viewpriceproperties.Begin, viewpriceproperties.End)
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			return
+		}
+
+		pricecolumns, err := helpers.CheckPriceColumns(dtocustomertable.ID, facility.Alias, r, tablecolumnrepository, columntyperepository,
+			session.Language)
+		if err != nil {
+			return
+		}
+		if viewpriceproperties.Published && len(*pricecolumns) != 0 {
+			log.Error("Can't find required price list columns for table %v", dtocustomertable.ID)
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
 			return
 		}
-	}
+		if len(*pricecolumns) != 0 {
+			err = tablecolumnrepository.CreateAll(pricecolumns)
+			if err != nil {
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+				return
+			}
+		}
 
-	if !viewpriceproperties.Begin.IsZero() && viewpriceproperties.Begin.Sub(time.Now()) < 0 {
-		log.Error("Begin date is in the past %v", viewpriceproperties.Begin)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
-	}
-
-	if !viewpriceproperties.End.IsZero() && viewpriceproperties.End.Sub(time.Now()) < 0 {
-		log.Error("End date is in the past %v", viewpriceproperties.End)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
-	}
-
-	if !viewpriceproperties.Begin.IsZero() && !viewpriceproperties.End.IsZero() &&
-		viewpriceproperties.Begin.Sub(viewpriceproperties.End) > 0 {
-		log.Error("Begin date can't be bigger than end date %v", viewpriceproperties.Begin, viewpriceproperties.End)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
+		if viewpriceproperties.Published && (facility.Alias == models.SERVICE_TYPE_RECOGNIZE || facility.Alias == models.SERVICE_TYPE_VERIFY) {
+			products, err := helpers.CheckProductColumns(dtocustomertable.ID, facility.Alias, r, tablecolumnrepository, tablerowrepository,
+				recognizeproductrepository, verifyproductrepository, session.Language)
+			if err != nil {
+				return
+			}
+			uniqueproducts := make(map[string]int)
+			for _, product := range *products {
+				if product.Product_ID == 0 {
+					uniqueproducts[product.Name] = 0
+				}
+			}
+			if facility.Alias == models.SERVICE_TYPE_RECOGNIZE {
+				recognizeproducts := new([]models.DtoRecognizeProduct)
+				for productname, _ := range uniqueproducts {
+					recognizeproduct := new(models.DtoRecognizeProduct)
+					recognizeproduct.Name = productname
+					recognizeproduct.Created = time.Now()
+					recognizeproduct.Active = true
+					*recognizeproducts = append(*recognizeproducts, *recognizeproduct)
+				}
+				if len(*recognizeproducts) != 0 {
+					err = recognizeproductrepository.CreateAll(recognizeproducts)
+					if err != nil {
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+						return
+					}
+				}
+				for _, recognizeproduct := range *recognizeproducts {
+					uniqueproducts[recognizeproduct.Name] = recognizeproduct.ID
+				}
+			}
+			if facility.Alias == models.SERVICE_TYPE_VERIFY {
+				verifyproducts := new([]models.DtoVerifyProduct)
+				for productname, _ := range uniqueproducts {
+					verifyproduct := new(models.DtoVerifyProduct)
+					verifyproduct.Name = productname
+					verifyproduct.Created = time.Now()
+					verifyproduct.Active = true
+					*verifyproducts = append(*verifyproducts, *verifyproduct)
+				}
+				if len(*verifyproducts) != 0 {
+					err = verifyproductrepository.CreateAll(verifyproducts)
+					if err != nil {
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+						return
+					}
+				}
+				for _, verifyproduct := range *verifyproducts {
+					uniqueproducts[verifyproduct.Name] = verifyproduct.ID
+				}
+			}
+			for i, product := range *products {
+				if product.Product_ID == 0 {
+					productid, ok := uniqueproducts[product.Name]
+					if !ok {
+						log.Error("Can't find product name %v for price list table %v", product.Name, dtocustomertable.ID)
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+							Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+						return
+					}
+					(*products)[i].Product_ID = productid
+				}
+			}
+			err = helpers.UpdateProductColumn(products, dtocustomertable.ID, r, tablecolumnrepository, columntyperepository, tablerowrepository,
+				session.Language)
+			if err != nil {
+				return
+			}
+		}
 	}
 
 	dtopriceproperties := models.NewDtoPriceProperties(dtocustomertable.ID, viewpriceproperties.Facility_ID,

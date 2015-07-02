@@ -62,7 +62,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 		return
 	}
 
-	fullpath := filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID))
+	fullpath := filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID))
 	dataformat, err := DetectDataFormat(fullpath)
 	if err != nil {
 		log.Error("Can't detect data format for file %v with value %v", err, fullpath)
@@ -253,7 +253,7 @@ func ExportData(viewexporttable *models.ViewExportTable, file *models.DtoFile, d
 	}
 
 	mvCmd := exec.Command("mv", "-f", filepath.Join(config.Configuration.TempDirectory, fmt.Sprintf("%08d", file.ID)+version),
-		filepath.Join(config.Configuration.Server.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
+		filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
 	err = mvCmd.Run()
 	if err != nil {
 		log.Error("Can't move temporable file %v with value %v%v", err, file.ID, version)

@@ -8,15 +8,22 @@ import (
 
 // Структура для организации хранения мобильных телефонов
 type ViewApiMobilePhone struct {
-	Phone         string `json:"phone" db:"phone" validate:"nonzero,min=1,max=25,regexp=^7[0-9]{10}$"` // Уникальный номер
-	Primary       bool   `json:"primary" db:"primary"`                                                 // Основной
-	Confirmed     bool   `json:"confirmed" db:"confirmed"`                                             // Подтвержден
-	Subscription  bool   `json:"subscription" db:"subscription"`                                       // Используется для рассылки
-	Language      string `json:"language" db:"language" validate:"nonzero,min=1,max=10"`               // Язык рассылки
-	Classifier_ID int    `json:"contactClass" db:"classifier_id" validate:"nonzero"`                   // Идентификатор классификатора
+	Phone     string `json:"phone" db:"phone" validate:"regexp=^7[0-9]{10}$"` // Уникальный номер
+	Primary   bool   `json:"primary" db:"primary"`                            // Основной
+	Confirmed bool   `json:"confirmed" db:"confirmed"`                        // Подтвержден
+	//	Subscription  bool   `json:"subscription" db:"subscription"`                                       // Используется для рассылки
+	Language      string `json:"language" db:"language" validate:"min=1,max=10"` // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                // Идентификатор классификатора
 }
 
 type UpdateMobilePhones []ViewApiMobilePhone
+
+type ViewMobilePhone struct {
+	Phone         string `json:"phone" db:"phone" validate:"regexp=^7[0-9]{10}$"` // Уникальный номер
+	Primary       bool   `json:"primary" db:"primary"`                            // Основной
+	Language      string `json:"language" db:"language" validate:"min=1,max=10"`  // Язык рассылки
+	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                 // Идентификатор классификатора
+}
 
 type DtoMobilePhone struct {
 	Phone         string    `db:"phone"`        // Уникальный номер
@@ -32,13 +39,13 @@ type DtoMobilePhone struct {
 }
 
 // Конструктор создания объекта мобильного телефона в api
-func NewViewApiMobilePhone(phone string, primary bool, confirmed bool, subscription bool,
+func NewViewApiMobilePhone(phone string, primary bool, confirmed bool, /*subscription bool,*/
 	language string, classifier_id int) *ViewApiMobilePhone {
 	return &ViewApiMobilePhone{
-		Phone:         phone,
-		Primary:       primary,
-		Confirmed:     confirmed,
-		Subscription:  subscription,
+		Phone:     phone,
+		Primary:   primary,
+		Confirmed: confirmed,
+		//		Subscription:  subscription,
 		Language:      language,
 		Classifier_ID: classifier_id,
 	}
@@ -62,5 +69,9 @@ func NewDtoMobilePhone(phone string, userid int64, classifier_id int, created ti
 }
 
 func (phone ViewApiMobilePhone) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+	return ValidateWithLanguage(&phone, errors, req, phone.Language)
+}
+
+func (phone ViewMobilePhone) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	return ValidateWithLanguage(&phone, errors, req, phone.Language)
 }

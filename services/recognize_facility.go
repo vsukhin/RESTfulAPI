@@ -21,6 +21,7 @@ type RecognizeFacilityService struct {
 	InputFtpRepository        InputFtpRepository
 	ResultTableRepository     ResultTableRepository
 	WorkTableRepository       WorkTableRepository
+	InputProductRepository    InputProductRepository
 	*Repository
 }
 
@@ -58,8 +59,20 @@ func (recognizefacilityservice *RecognizeFacilityService) SetArrays(recognizefac
 		log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
 		return err
 	}
-	for _, dtoinpiutfield := range recognizefacility.EstimatedFields {
-		err = recognizefacilityservice.InputFieldRepository.Create(&dtoinpiutfield, trans)
+	for _, dtoinputfield := range recognizefacility.EstimatedFields {
+		err = recognizefacilityservice.InputFieldRepository.Create(&dtoinputfield, trans)
+		if err != nil {
+			log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
+			return err
+		}
+	}
+	err = recognizefacilityservice.InputProductRepository.DeleteByOrder(recognizefacility.Order_ID, trans)
+	if err != nil {
+		log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
+		return err
+	}
+	for _, dtoinputproduct := range recognizefacility.InputProducts {
+		err = recognizefacilityservice.InputProductRepository.Create(&dtoinputproduct, trans)
 		if err != nil {
 			log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
 			return err

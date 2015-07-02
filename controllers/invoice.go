@@ -79,10 +79,10 @@ func GetInvoices(w http.ResponseWriter, request *http.Request, r render.Render, 
 }
 
 // post /api/v1.0/customers/invoices/
-func CreateInvoice(errors binding.Errors, viewinvoice models.ViewInvoice, r render.Render, params martini.Params,
+func CreateInvoice(errors binding.Errors, viewinvoice models.ViewInvoice, r render.Render,
 	invoicerepository services.InvoiceRepository, companyrepository services.CompanyRepository,
 	invoiceitemrepository services.InvoiceItemRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewinvoice, errors, r, session.Language) != nil {
 		return
 	}
 	company, err := helpers.CheckCompanyAvailability(viewinvoice.Company_ID, session.UserID, r, companyrepository, session.Language)
@@ -96,10 +96,11 @@ func CreateInvoice(errors binding.Errors, viewinvoice models.ViewInvoice, r rend
 	dtoinvoice.Created = time.Now()
 	dtoinvoice.Active = true
 	dtoinvoice.Total = viewinvoice.Total
-	dtoinvoice.VAT = (dtoinvoice.Total / (1 + helpers.FIELD_VAT_RATE)) * helpers.FIELD_VAT_RATE
-	dtoinvoice.InvoiceItems = []models.DtoInvoiceItem{*models.NewDtoInvoiceItem(0, 0, "Оплата по договору", "руб", 1, viewinvoice.Total, viewinvoice.Total)}
+	dtoinvoice.VAT = (dtoinvoice.Total / (1 + float64(company.VAT)/100)) * float64(company.VAT) / 100
+	dtoinvoice.InvoiceItems = []models.DtoInvoiceItem{*models.NewDtoInvoiceItem(0, 0, models.INVOICE_ITEM_NAME_DEFAULT, models.INVOICE_ITEM_TYPE_ROUBLE,
+		1, viewinvoice.Total, viewinvoice.Total)}
 
-	err = invoicerepository.Create(dtoinvoice, true)
+	err = invoicerepository.Create(dtoinvoice, nil, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -140,7 +141,7 @@ func GetInvoice(r render.Render, params martini.Params, invoicerepository servic
 func UpdateInvoice(errors binding.Errors, viewinvoice models.ViewInvoice, r render.Render, params martini.Params,
 	invoicerepository services.InvoiceRepository, companyrepository services.CompanyRepository,
 	invoiceitemrepository services.InvoiceItemRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewinvoice, errors, r, session.Language) != nil {
 		return
 	}
 	if viewinvoice.Company_ID == 0 {
@@ -172,11 +173,11 @@ func UpdateInvoice(errors binding.Errors, viewinvoice models.ViewInvoice, r rend
 
 	dtoinvoice.Company_ID = company.ID
 	dtoinvoice.Total = viewinvoice.Total
-	dtoinvoice.VAT = (dtoinvoice.Total / (1 + helpers.FIELD_VAT_RATE)) * helpers.FIELD_VAT_RATE
-	dtoinvoice.InvoiceItems = []models.DtoInvoiceItem{*models.NewDtoInvoiceItem(0, dtoinvoice.ID, "Оплата по договору", "руб", 1,
-		viewinvoice.Total, viewinvoice.Total)}
+	dtoinvoice.VAT = (dtoinvoice.Total / (1 + float64(company.VAT)/100)) * float64(company.VAT) / 100
+	dtoinvoice.InvoiceItems = []models.DtoInvoiceItem{*models.NewDtoInvoiceItem(0, dtoinvoice.ID, models.INVOICE_ITEM_NAME_DEFAULT, models.INVOICE_ITEM_TYPE_ROUBLE,
+		1, viewinvoice.Total, viewinvoice.Total)}
 
-	err = invoicerepository.Update(dtoinvoice, true)
+	err = invoicerepository.Update(dtoinvoice, nil, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})

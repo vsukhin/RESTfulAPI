@@ -71,6 +71,27 @@ const (
 	TABLE_COMPLEX_STATUSES           = "complex_statuses"
 	TABLE_INVOICES                   = "invoices"
 	TABLE_INVOICE_ITEMS              = "invoice_items"
+	TABLE_RECOGNIZE_PRODUCTS         = "input_products"
+	TABLE_VERIFY_PRODUCTS            = "data_products"
+	TABLE_INPUT_PRODUCTS             = "input_order_products"
+	TABLE_DATA_PRODUCTS              = "data_order_products"
+	TABLE_FEEDBACK                   = "feedback"
+	TABLE_DEVICES                    = "devices"
+	TABLE_SMS_PERIODS                = "sms_periods"
+	TABLE_SMS_EVENTS                 = "sms_events"
+	TABLE_REPORTS                    = "reports"
+	TABLE_REPORT_PERIODS             = "report_periods"
+	TABLE_REPORT_PROJECTS            = "report_projects"
+	TABLE_REPORT_ORDERS              = "report_orders"
+	TABLE_REPORT_FACILITIES          = "report_services"
+	TABLE_REPORT_COMPLEX_STATUSES    = "report_complex_statuses"
+	TABLE_REPORT_SUPPLIERS           = "report_suppliers"
+	TABLE_REPORT_SETTINGS            = "report_settings"
+	TABLE_TRANSACTIONS               = "transactions"
+	TABLE_OPERATIONS                 = "operations"
+	TABLE_TRANSACTION_TYPES          = "transaction_types"
+	TABLE_OPERATION_TYPES            = "operation_types"
+	TABLE_ORDER_INVOICES             = "order_invoices"
 )
 
 var (
@@ -91,7 +112,7 @@ func InitDB() (err error) {
 		cfgMySql.Host = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Host
 		cfgMySql.Port = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Port
 		cfgMySql.Type = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Type
-		cfgMySql.Socket = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Socker
+		cfgMySql.Socket = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Socket
 		cfgMySql.Name = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Name
 		cfgMySql.Login = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Login
 		cfgMySql.Password = config.Configuration.MySql[MYSQL_CONFIG_NUMBER].Password

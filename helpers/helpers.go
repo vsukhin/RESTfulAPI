@@ -6,6 +6,7 @@ import (
 	"application/config"
 	"application/models"
 	"errors"
+	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	logging "github.com/op/go-logging"
@@ -27,19 +28,21 @@ func InitLogger(logger config.Logger) {
 	log = logger
 }
 
-func CheckValidation(binerrs binding.Errors, r render.Render, language string) error {
+func CheckValidation(object interface{}, binerrs binding.Errors, r render.Render, language string) error {
 	fielderrors, errcode := models.ConvertErrors(language, binerrs)
 	switch errcode {
 	case types.TYPE_ERROR_LANGUAGE_NOTSUPPORTED:
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_LANGUAGE_NOTSUPPORTED,
 			Message: config.Localization[language].Errors.Api.Language_NotSupported})
 		return errors.New("Wrong language")
-	case types.TYPE_ERROR_DATA_WRONG:
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return errors.New("Wrong data")
 	case types.TYPE_ERROR_NONE:
 		if len(*fielderrors) > 0 {
+			for i, _ := range *fielderrors {
+				value, found := models.GetFieldValue((*fielderrors)[i].Field, object)
+				if found {
+					(*fielderrors)[i].FieldValue = fmt.Sprintf("%v", value)
+				}
+			}
 			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong, Errors: *fielderrors})
 			return errors.New("Wrong fields")
@@ -54,7 +57,7 @@ func CheckParameterInt(r render.Render, param string, language string) (value in
 		log.Error("Parameter is too long or too short %v", param)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return 0, errors.New("Length is wrong ")
+		return 0, errors.New("Length is wrong")
 	}
 
 	value, err = strconv.ParseInt(param, 0, 64)
@@ -62,7 +65,7 @@ func CheckParameterInt(r render.Render, param string, language string) (value in
 		log.Error("Can't convert to number %v with value %v", err, param)
 		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return 0, errors.New("Value is wrong ")
+		return 0, errors.New("Value is wrong")
 	}
 
 	return value, nil

@@ -9,13 +9,15 @@ type SMSFacilityRepository interface {
 	Exists(orderid int64) (found bool, err error)
 	Get(order_id int64) (smsfacility *models.DtoSMSFacility, err error)
 	SetArrays(smsfacility *models.DtoSMSFacility, trans *gorp.Transaction) (err error)
-	Create(smsfacility *models.DtoSMSFacility, inTrans bool) (err error)
-	Update(smsfacility *models.DtoSMSFacility, inTrans bool) (err error)
-	Save(smsfacility *models.DtoSMSFacility, inTrans bool) (err error)
+	Create(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error)
+	Update(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error)
+	Save(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error)
 }
 
 type SMSFacilityService struct {
 	MobileOperatorOperationRepository MobileOperatorOperationRepository
+	SMSPeriodRepository               SMSPeriodRepository
+	SMSEventRepository                SMSEventRepository
 	ResultTableRepository             ResultTableRepository
 	WorkTableRepository               WorkTableRepository
 	*Repository
@@ -62,6 +64,30 @@ func (smsfacilityservice *SMSFacilityService) SetArrays(smsfacility *models.DtoS
 			return err
 		}
 	}
+	err = smsfacilityservice.SMSPeriodRepository.DeleteByOrder(smsfacility.Order_ID, trans)
+	if err != nil {
+		log.Error("Error during setting sms facility object in database %v with value %v", err, smsfacility.Order_ID)
+		return err
+	}
+	for _, smsevent := range smsfacility.Periods {
+		err = smsfacilityservice.SMSPeriodRepository.Create(&smsevent, trans)
+		if err != nil {
+			log.Error("Error during setting sms facility object in database %v with value %v", err, smsfacility.Order_ID)
+			return err
+		}
+	}
+	err = smsfacilityservice.SMSEventRepository.DeleteByOrder(smsfacility.Order_ID, trans)
+	if err != nil {
+		log.Error("Error during setting sms facility object in database %v with value %v", err, smsfacility.Order_ID)
+		return err
+	}
+	for _, smsevent := range smsfacility.Events {
+		err = smsfacilityservice.SMSEventRepository.Create(&smsevent, trans)
+		if err != nil {
+			log.Error("Error during setting sms facility object in database %v with value %v", err, smsfacility.Order_ID)
+			return err
+		}
+	}
 	err = smsfacilityservice.ResultTableRepository.DeleteByOrder(smsfacility.Order_ID, trans)
 	if err != nil {
 		log.Error("Error during setting sms facility object in database %v with value %v", err, smsfacility.Order_ID)
@@ -90,7 +116,7 @@ func (smsfacilityservice *SMSFacilityService) SetArrays(smsfacility *models.DtoS
 	return nil
 }
 
-func (smsfacilityservice *SMSFacilityService) Create(smsfacility *models.DtoSMSFacility, inTrans bool) (err error) {
+func (smsfacilityservice *SMSFacilityService) Create(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -114,12 +140,14 @@ func (smsfacilityservice *SMSFacilityService) Create(smsfacility *models.DtoSMSF
 		return err
 	}
 
-	err = smsfacilityservice.SetArrays(smsfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = smsfacilityservice.SetArrays(smsfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -133,7 +161,7 @@ func (smsfacilityservice *SMSFacilityService) Create(smsfacility *models.DtoSMSF
 	return nil
 }
 
-func (smsfacilityservice *SMSFacilityService) Update(smsfacility *models.DtoSMSFacility, inTrans bool) (err error) {
+func (smsfacilityservice *SMSFacilityService) Update(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -157,12 +185,14 @@ func (smsfacilityservice *SMSFacilityService) Update(smsfacility *models.DtoSMSF
 		return err
 	}
 
-	err = smsfacilityservice.SetArrays(smsfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = smsfacilityservice.SetArrays(smsfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -176,7 +206,7 @@ func (smsfacilityservice *SMSFacilityService) Update(smsfacility *models.DtoSMSF
 	return nil
 }
 
-func (smsfacilityservice *SMSFacilityService) Save(smsfacility *models.DtoSMSFacility, inTrans bool) (err error) {
+func (smsfacilityservice *SMSFacilityService) Save(smsfacility *models.DtoSMSFacility, briefly bool, inTrans bool) (err error) {
 	count, err := smsfacilityservice.DbContext.SelectInt("select count(*) from "+smsfacilityservice.Table+
 		" where order_id = ?", smsfacility.Order_ID)
 	if err != nil {
@@ -184,9 +214,9 @@ func (smsfacilityservice *SMSFacilityService) Save(smsfacility *models.DtoSMSFac
 		return err
 	}
 	if count == 0 {
-		err = smsfacilityservice.Create(smsfacility, inTrans)
+		err = smsfacilityservice.Create(smsfacility, briefly, inTrans)
 	} else {
-		err = smsfacilityservice.Update(smsfacility, inTrans)
+		err = smsfacilityservice.Update(smsfacility, briefly, inTrans)
 	}
 
 	return err

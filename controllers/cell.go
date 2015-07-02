@@ -43,7 +43,7 @@ func UpdateTableCell(errors binding.Errors, viewtablecell models.ViewTableCell,
 	r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewtablecell, errors, r, session.Language) != nil {
 		return
 	}
 

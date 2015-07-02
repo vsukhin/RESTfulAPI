@@ -77,9 +77,11 @@ func (messageservice *MessageService) IsLastForUser(user_id int64, id int64) (la
 func (messageservice *MessageService) GetByOrder(order_id int64, user_id int64, filter string) (messages *[]models.ApiLongMessage, err error) {
 	messages = new([]models.ApiLongMessage)
 	_, err = messageservice.DbContext.Select(messages,
-		"select m.id, m.created, m.user_id as userId, m.content as message, m.user_id = ? as isMine,"+
+		"select m.id, m.created, m.user_id as userId, m.content as message, m.receiver_id as receiverId, m.user_id = ? as isMine,"+
 			"coalesce((select u.user_id from user_messages u where u.message_id = m.id and u.user_id = ?), 0) <> ? as new from "+messageservice.Table+
-			" m where m.order_id = ?"+filter, user_id, user_id, user_id, order_id)
+			" m where m.order_id = ? and (m.user_id in (select id from users where unit_id in (select unit_id from users where id = ?))"+
+			" or m.receiver_id = (select unit_id from users where id = ?))"+filter,
+		user_id, user_id, user_id, order_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting all message object from database %v with value %v, %v", err, order_id, user_id)
 		return nil, err
@@ -91,26 +93,57 @@ func (messageservice *MessageService) GetByOrder(order_id int64, user_id int64, 
 func (messageservice *MessageService) GetMetaByOrder(order_id int64, user_id int64) (message *models.ApiMetaMessage, err error) {
 	message = new(models.ApiMetaMessage)
 	message.NumOfAll, err = messageservice.DbContext.SelectInt(
-		"select count(*) from "+messageservice.Table+" where order_id = ?", order_id)
+		"select count(*) from "+messageservice.Table+" where order_id = ? and (user_id in (select id from users where unit_id in"+
+			" (select unit_id from users where id = ?)) or receiver_id = (select unit_id from users where id = ?))", order_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting meta message object from database %v with value %v", err, order_id)
 		return nil, err
 	}
 	message.NumOfNew, err = messageservice.DbContext.SelectInt(
-		"select count(*) from "+messageservice.Table+" where order_id = ? and id not in (select message_id from user_messages where user_id = ?)",
-		order_id, user_id)
+		"select count(*) from "+messageservice.Table+" where order_id = ? and id not in (select message_id from user_messages where user_id = ?)"+
+			" and (user_id in (select id from users where unit_id in (select unit_id from users where id = ?))"+
+			" or receiver_id = (select unit_id from users where id = ?))", order_id, user_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during getting meta message object from database %v with value %v, %v", err, order_id, user_id)
 		return nil, err
+	}
+
+	totalmessages := new([]models.ApiMetaMessageTotal)
+	_, err = messageservice.DbContext.Select(totalmessages, "select receiver_id, count(*) as count from "+messageservice.Table+" where order_id = ?"+
+		" and (receiver_id = (select unit_id from users where id = ?) or user_id in (select id from users where unit_id ="+
+		" (select unit_id from users where id = ?))) group by receiver_id", order_id, user_id, user_id)
+	if err != nil {
+		log.Error("Error during getting meta message object from database %v with value %v, %v", err, order_id, user_id)
+		return nil, err
+	}
+
+	newmessages := new([]models.ApiMetaMessageTotal)
+	_, err = messageservice.DbContext.Select(newmessages, "select receiver_id, count(*) as count from "+messageservice.Table+" where order_id = ?"+
+		" and (receiver_id = (select unit_id from users where id = ?) or user_id in (select id from users where unit_id ="+
+		" (select unit_id from users where id = ?))) and id not in (select message_id from user_messages where user_id in"+
+		" (select id from users where unit_id = receiver_id)) group by receiver_id", order_id, user_id, user_id)
+	if err != nil {
+		log.Error("Error during getting meta message object from database %v with value %v, %v", err, order_id, user_id)
+		return nil, err
+	}
+
+	receivers := make(map[int64]int64)
+	for _, newmessage := range *newmessages {
+		receivers[newmessage.Receiver_ID] = newmessage.Total
+	}
+	for _, totalmessage := range *totalmessages {
+		message.Receivers = append(message.Receivers,
+			*models.NewApiMetaMessageReceiver(totalmessage.Receiver_ID, totalmessage.Total, receivers[totalmessage.Receiver_ID]))
 	}
 
 	return message, nil
 }
 
 func (messageservice *MessageService) SetReadByUserForOrder(user_id int64, order_id int64) (err error) {
-	_, err = messageservice.DbContext.Exec("insert into user_messages (message_id, user_id) select ?, id from "+
-		messageservice.Table+" where order_id = ? and id not in (select message_id from user_messages where user_id = ?)",
-		user_id, order_id, user_id)
+	_, err = messageservice.DbContext.Exec("insert into user_messages (message_id, user_id) select id, ? from "+
+		messageservice.Table+" where order_id = ? and id not in (select message_id from user_messages where user_id = ?)"+
+		" and (user_id in (select id from users where unit_id in (select unit_id from users where id = ?))"+
+		" or receiver_id = (select unit_id from users where id = ?))", user_id, order_id, user_id, user_id, user_id)
 	if err != nil {
 		log.Error("Error during setting message objects for user object in database %v with value %v, %v", err, order_id, user_id)
 		return err

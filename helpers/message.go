@@ -77,7 +77,7 @@ func CheckChangeableMessage(r render.Render, params martini.Params, orderreposit
 		return nil, err
 	}
 	if read {
-		old := time.Now().Sub(dtomessage.Created) > config.Configuration.Server.MessageTimeout
+		old := time.Now().Sub(dtomessage.Created) > config.Configuration.MessageTimeout
 		if !hastimeout || (hastimeout && old) {
 			log.Error("Data can't be changed when message is viewed %v", dtomessage.ID)
 			r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,

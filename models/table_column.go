@@ -8,9 +8,9 @@ import (
 
 // Структура для организации хранения колонок таблиц
 type ViewApiTableColumn struct {
-	Name     string `json:"name" validate:"nonzero,min=1,max=255"` // Название колонки таблицы
-	TypeID   int    `json:"typeId"`                                // Идентификатор типа
-	Position int64  `json:"position" validate:"min=0"`             // Позиция
+	Name     string `json:"name" validate:"min=1,max=255"` // Название колонки таблицы
+	TypeID   int    `json:"typeId"`                        // Идентификатор типа
+	Position int64  `json:"position" validate:"min=0"`     // Позиция
 }
 
 type ViewApiOrderTableColumn struct {

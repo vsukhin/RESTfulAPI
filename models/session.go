@@ -8,16 +8,20 @@ import (
 
 // Структура для организации сессии
 type ViewSession struct {
-	Login        string `json:"login" validate:"nonzero,min=1,max=255,regexp=^((.+@.+)|(7[0-9]{10}))$"` // Логин пользователя
-	Password     string `json:"password" validate:"nonzero,min=1,max=255"`                              // Пароль пользователя
-	CaptchaValue string `json:"captchaValue" validate:"max=255"`                                        // Значение капчи
-	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                                         // Хэш капчи
-	Language     string `json:"language" validate:"max=10"`                                             // Язык пользователя
+	Login        string `json:"login" validate:"max=255,regexp=^((.+@.+)|(7[0-9]{10}))$"` // Логин пользователя
+	Password     string `json:"password" validate:"min=1,max=255"`                        // Пароль пользователя
+	CaptchaValue string `json:"captchaValue" validate:"max=255"`                          // Значение капчи
+	CaptchaHash  string `json:"captchaHash" validate:"max=255"`                           // Хэш капчи
+	Language     string `json:"language" validate:"max=10"`                               // Язык пользователя
 }
 
 type ApiSession struct {
 	Timeout     time.Time `json:"timeout"`      // Таймаут сессии
 	AccessToken string    `json:"access-token"` // Токен доступа сессии
+}
+
+type ApiSessionToken struct {
+	Token string `json:"token"` // Токен доступа сессии
 }
 
 type DtoSession struct {
@@ -33,6 +37,12 @@ func NewApiSession(timeout time.Time, accesstoken string) *ApiSession {
 	return &ApiSession{
 		Timeout:     timeout,
 		AccessToken: accesstoken,
+	}
+}
+
+func NewApiSessionToken(token string) *ApiSessionToken {
+	return &ApiSessionToken{
+		Token: token,
 	}
 }
 

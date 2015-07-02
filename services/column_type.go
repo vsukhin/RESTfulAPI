@@ -4,11 +4,10 @@ import (
 	"application/models"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var (
-	numberRegExp = regexp.MustCompile("[0-9]+")
+	NumberRegExp = regexp.MustCompile("[0-9]+")
 )
 
 type ColumnTypeRepository interface {
@@ -35,20 +34,14 @@ func (columntypeservice *ColumnTypeService) Validate(dtocolumntype *models.DtoCo
 	valid = true
 	switch dtocolumntype.ID {
 	case models.COLUMN_TYPE_BIRTHDAY:
-		found := false
-		layouts := []string{"2006 Jan 02", "2006-Jan-02", "2006/Jan/02", "2006.Jan.02", "2006-01-02", "2006/01/02", "2006.01.02",
-			"02 Jan 2006", "02-Jan-2006", "02/Jan/2006", "02.Jan.2006", "02-01-2006", "02/01/2006", "02.01.2006",
-			"02 Jan 06", "02-Jan-06", "02/Jan/06", "02.Jan.06"}
-		for _, layout := range layouts {
-			_, err = time.Parse(layout, value)
-			if err == nil {
-				found = true
-				break
-			}
+		_, err = models.ParseDate(value)
+		if err == nil {
+			valid = true
+		} else {
+			valid = false
 		}
-		valid = found
 	case models.COLUMN_TYPE_MOBILE_PHONE:
-		numbers := numberRegExp.FindAllString(value, -1)
+		numbers := NumberRegExp.FindAllString(value, -1)
 		value = strings.Join(numbers, "")
 		runes := []rune(value)
 		if len(runes) != 0 {

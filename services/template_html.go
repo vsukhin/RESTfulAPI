@@ -10,7 +10,7 @@ import (
 
 func (templateservice *TemplateService) GenerateHTML(name string, w http.ResponseWriter, object interface{}) (err error) {
 	var tpl *template.Template
-	tpl, err = ace.Load(filepath.Join(config.Configuration.Server.TemplateStorage, name), "", nil)
+	tpl, err = ace.Load(filepath.Join(config.Configuration.TemplateStorage, name), "", nil)
 	if err != nil {
 		log.Error("Error during loading jade template %v  with value %v", err, name)
 		return err

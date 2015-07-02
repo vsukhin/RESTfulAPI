@@ -22,23 +22,23 @@ const (
 
 // Структура для организации хранения импорта-экспорта
 type ViewImportTable struct {
-	File_ID   string `json:"fileId" validate:"nonzero,min=1,max=255"` // Уникальный идентификатор файла
-	HasHeader bool   `json:"names"`                                   // Есть строка заголовка
+	File_ID   string `json:"fileId" validate:"min=1,max=255"` // Уникальный идентификатор файла
+	HasHeader bool   `json:"names"`                           // Есть строка заголовка
 }
 
 type ViewImportColumn struct {
-	ID       int64  `json:"id" db:"id" validate:"nonzero"`         // Уникальный идентификатор временной колонки таблицы
-	Name     string `json:"name" validate:"nonzero,min=1,max=255"` // Название колонки таблицы
-	Position int64  `json:"position" validate:"min=0"`             // Позиция
-	TypeID   int    `json:"typeId"`                                // Идентификатор типа
-	Use      bool   `json:"pass"`                                  // Импортируется
+	ID       int64  `json:"id" db:"id" validate:"nonzero"` // Уникальный идентификатор временной колонки таблицы
+	Name     string `json:"name" validate:"min=1,max=255"` // Название колонки таблицы
+	Position int64  `json:"position" validate:"min=0"`     // Позиция
+	TypeID   int    `json:"typeId"`                        // Идентификатор типа
+	Use      bool   `json:"pass"`                          // Импортируется
 }
 
 type ViewImportColumns []ViewImportColumn
 
 type ViewExportTable struct {
-	Data_Format_ID int    `json:"format" validate:"nonzero"`             // Уникальный идентификатор формата данных
-	Type           string `json:"rows" validate:"nonzero,min=1,max=255"` // Тип экспортируемых данных
+	Data_Format_ID int    `json:"format" validate:"nonzero"`     // Уникальный идентификатор формата данных
+	Type           string `json:"rows" validate:"min=1,max=255"` // Тип экспортируемых данных
 }
 
 type ApiImportTable struct {

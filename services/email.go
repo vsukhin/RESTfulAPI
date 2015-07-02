@@ -11,7 +11,8 @@ import (
 )
 
 type EmailRepository interface {
-	SendEmail(email string, subject string, body string, headers string) (err error)
+	SendEmail(email string, subject string, body string, headers string, from string) (err error)
+	SendHTML(email string, subject string, body string, headers string, from string) (err error)
 	Exists(email string) (found bool, err error)
 	FindByCode(code string) (email *models.DtoEmail, err error)
 	Get(email string) (dtoemail *models.DtoEmail, err error)
@@ -79,7 +80,7 @@ func SendEmailTLS(addr string, a smtp.Auth, from string, to []string, msg []byte
 	return c.Quit()
 }
 
-func (emailservice *EmailService) SendEmail(email string, subject string, body string, headers string) (err error) {
+func (emailservice *EmailService) SendEmail(email string, subject string, body string, headers string, from string) (err error) {
 	// Set up authentication information.
 	auth := smtp.PlainAuth(
 		"",
@@ -94,11 +95,46 @@ func (emailservice *EmailService) SendEmail(email string, subject string, body s
 	if headers != "" {
 		data += headers + "\r\n"
 	}
-	data += "From: " + config.Configuration.Mail.Sender + "\r\nTo: " + email + "\r\nSubject: " + subject + "\r\n\r\n" + body
+	if from == "" {
+		from = config.Configuration.Mail.Sender
+	}
+	data += "From: " + from + "\r\nTo: " + email + "\r\nSubject: " + subject + "\r\n\r\n" + body
 
 	err = SendEmailTLS(config.Configuration.Mail.Host+":"+strconv.Itoa(config.Configuration.Mail.Port),
 		auth,
-		config.Configuration.Mail.Sender,
+		from,
+		[]string{email},
+		[]byte(data))
+	if err != nil {
+		log.Error("Error during sending email %v with value %v", err, email)
+	}
+
+	return err
+}
+
+func (emailservice *EmailService) SendHTML(email string, subject string, body string, headers string, from string) (err error) {
+	// Set up authentication information.
+	auth := smtp.PlainAuth(
+		"",
+		config.Configuration.Mail.Login,
+		config.Configuration.Mail.Password,
+		config.Configuration.Mail.Host,
+	)
+	// Connect to the server, authenticate, set the sender and recipient,
+	// and send the email all in one step.
+
+	data := ""
+	if headers != "" {
+		data += headers + "\r\n"
+	}
+	if from == "" {
+		from = config.Configuration.Mail.Sender
+	}
+	data += "MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\nFrom: " + from + "\r\nTo: " + email + "\r\nSubject: " + subject + "\r\n\r\n" + body
+
+	err = SendEmailTLS(config.Configuration.Mail.Host+":"+strconv.Itoa(config.Configuration.Mail.Port),
+		auth,
+		from,
 		[]string{email},
 		[]byte(data))
 	if err != nil {

@@ -7,12 +7,12 @@ import (
 
 // Структура для организации хранения банка компании
 type ViewApiCompanyBank struct {
-	Primary              bool   `json:"primary" db:"primary"`                                                            // Основной
-	Bik                  string `json:"bik" db:"bik" validate:"nonzero,min=1,max=25"`                                    // БИК
-	Name                 string `json:"name" db:"name" validate:"nonzero,min=1,max=255"`                                 // Наименование
-	CheckingAccount      string `json:"checkingAccount" db:"checking_account" validate:"nonzero,min=1,max=50"`           // Расчетный счет
-	CorrespondingAccount string `json:"correspondentAccount" db:"corresponding_account" validate:"nonzero,min=1,max=50"` // Корреспондентский счет
-	Deleted              bool   `json:"del" db:"del"`                                                                    // Активный
+	Primary              bool   `json:"primary" db:"primary"`                                                    // Основной
+	Bik                  string `json:"bik" db:"bik" validate:"min=1,max=25"`                                    // БИК
+	Name                 string `json:"name" db:"name" validate:"min=1,max=255"`                                 // Наименование
+	CheckingAccount      string `json:"checkingAccount" db:"checking_account" validate:"min=1,max=50"`           // Расчетный счет
+	CorrespondingAccount string `json:"correspondentAccount" db:"corresponding_account" validate:"min=1,max=50"` // Корреспондентский счет
+	Deleted              bool   `json:"del" db:"del"`                                                            // Активный
 }
 
 type DtoCompanyBank struct {

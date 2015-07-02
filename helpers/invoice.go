@@ -12,7 +12,6 @@ import (
 
 const (
 	PARAM_NAME_INVOICE_ID = "iid"
-	FIELD_VAT_RATE        = 0.18
 )
 
 func CheckInvoice(r render.Render, params martini.Params, invoicerepository services.InvoiceRepository,

@@ -338,6 +338,89 @@ func RequireInvoiceRights(r render.Render, params martini.Params, invoicereposit
 	}
 }
 
+func RequireUnitRights(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	if !IsAdmin(session.Roles) {
+		var allowed bool = false
+		if IsUser(session.Roles) {
+			var err error
+			allowed, err = userrepository.CheckUnitAccess(session.UserID)
+			if err == nil {
+				if !allowed {
+					log.Error("Unit administration is not accessible for user %v", session.UserID)
+				}
+			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
+func RequireReportAccessRights(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	if !IsAdmin(session.Roles) {
+		var allowed bool = false
+		if IsCustomer(session.Roles) {
+			var err error
+			allowed, err = userrepository.CheckReportAccess(session.UserID)
+			if err == nil {
+				if !allowed {
+					log.Error("Reports are not accessible for user %v", session.UserID)
+				}
+			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
+func RequireReportRights(r render.Render, params martini.Params, userrepository services.UserRepository,
+	reportrepository services.ReportRepository, session *models.DtoSession) {
+	if !IsAdmin(session.Roles) {
+		var allowed bool = false
+		if IsCustomer(session.Roles) {
+			param := params[helpers.PARAM_NAME_REPORT_ID]
+			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+				reportid, err := strconv.ParseInt(param, 0, 64)
+				if err == nil {
+					allowed, err = userrepository.CheckReportAccess(session.UserID)
+					if err == nil {
+						if allowed {
+							allowed, err = reportrepository.CheckCustomerAccess(session.UserID, reportid)
+							if err == nil {
+								if !allowed {
+									log.Error("Report %v is not accessible for user %v", reportid, session.UserID)
+								}
+							}
+						} else {
+							log.Error("Reports are not accessible for user %v", session.UserID)
+						}
+					}
+				} else {
+					log.Error("Can't convert parameter %v with value %v", err, param)
+				}
+			} else {
+				log.Error("Parameter value is wrong %v", param)
+			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
 func IsUserRoleAllowed(existingRoles []models.UserRole, requiredRoles []models.UserRole) bool {
 	for _, requiredRole := range requiredRoles {
 		for _, existingRole := range existingRoles {

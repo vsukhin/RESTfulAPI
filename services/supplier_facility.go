@@ -45,7 +45,7 @@ func (supplierfacilityservice *SupplierFacilityService) GetAll(alias string) (su
 			" and ((date(begin) != '0001-01-01' and now() >= begin) or (date(begin) = '0001-01-01' and after_id = 0)"+
 			" or (date(begin) = '0001-01-01' and after_id != 0 and"+
 			" (select date(end) from price_properties where customer_table_id = p.after_id) != '0001-01-01' and"+
-			" now() > (select end from price_properties where customer_table_id = p.after_id))))", alias, models.TABLE_TYPE_PRICE)
+			" now() > (select end from price_properties where customer_table_id = p.after_id)))) order by f.position asc", alias, models.TABLE_TYPE_PRICE)
 	if err != nil {
 		log.Error("Error during getting all supplier facility object from database %v", err)
 		return nil, err

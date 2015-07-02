@@ -153,7 +153,7 @@ func GetTableRow(w http.ResponseWriter, r render.Render, params martini.Params, 
 func CreateTableRow(request *http.Request, errors binding.Errors, r render.Render, viewtablecells models.ViewApiTableRow, params martini.Params,
 	customertablerepository services.CustomerTableRepository, tablerowrepository services.TableRowRepository,
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewtablecells, errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
@@ -240,7 +240,7 @@ func CreateTableRow(request *http.Request, errors binding.Errors, r render.Rende
 func UpdateTableRow(errors binding.Errors, r render.Render, viewtablecells models.ViewApiTableRow, params martini.Params,
 	customertablerepository services.CustomerTableRepository, tablerowrepository services.TableRowRepository,
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewtablecells, errors, r, session.Language) != nil {
 		return
 	}
 	oldtablerow, err := helpers.CheckTableRow(r, params, customertablerepository, tablerowrepository, session.Language)

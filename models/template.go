@@ -22,6 +22,11 @@ type DtoDualCodeTemplate struct {
 	Unsubscr_Code string // Код отписки
 }
 
+type DtoHTMLTemplate struct {
+	Content  string // Содержание
+	Language string // Язык шаблона
+}
+
 // Конструктор создания объекта шаблона
 func NewDtoTemplate(email string, language string, host string) *DtoTemplate {
 	return &DtoTemplate{
@@ -46,6 +51,17 @@ func NewDtoDualCodeTemplate(dtotemplate *DtoTemplate, subscr_code string, unsubs
 	}
 }
 
+func NewDtoHTMLTemplate(content string, language string) *DtoHTMLTemplate {
+	return &DtoHTMLTemplate{
+		Content:  content,
+		Language: language,
+	}
+}
+
 func (template *DtoTemplate) GetResource() (Resource config.Resource) {
+	return config.Localization[template.Language]
+}
+
+func (template *DtoHTMLTemplate) GetResource() (Resource config.Resource) {
 	return config.Localization[template.Language]
 }

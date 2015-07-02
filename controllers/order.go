@@ -53,7 +53,7 @@ func GetProjectOrders(w http.ResponseWriter, r render.Render, params martini.Par
 func CreateProjectOrder(errors binding.Errors, vieworder models.ViewShortOrder, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
 		return
 	}
 	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
@@ -109,7 +109,7 @@ func GetProjectOrder(r render.Render, params martini.Params, projectrepository s
 func UpdateProjectOrder(errors binding.Errors, vieworder models.ViewMiddleOrder, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	facilityrepository services.FacilityRepository, orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -199,7 +199,8 @@ func DeleteProjectOrder(r render.Render, params martini.Params, projectrepositor
 // get /api/v1.0/projects/:prid/orders/:oid/service/sms/
 func GetProjectSMSOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
 	facilityrepository services.FacilityRepository, smsfacilityrepository services.SMSFacilityRepository,
-	mobileoperatoroperationrepository services.MobileOperatorOperationRepository, resulttablerepository services.ResultTableRepository,
+	mobileoperatoroperationrepository services.MobileOperatorOperationRepository, smsperiodrepository services.SMSPeriodRepository,
+	smseventrepository services.SMSEventRepository, resulttablerepository services.ResultTableRepository,
 	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
 	if err != nil {
@@ -207,7 +208,7 @@ func GetProjectSMSOrder(r render.Render, params martini.Params, projectrepositor
 	}
 
 	apismsfacility, err := helpers.GetSMSOrder(dtoorder, r, facilityrepository, smsfacilityrepository, mobileoperatoroperationrepository,
-		resulttablerepository, worktablerepository, session.Language)
+		smsperiodrepository, smseventrepository, resulttablerepository, worktablerepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -221,9 +222,10 @@ func UpdateProjectSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMS
 	smsfacilityrepository services.SMSFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, smssenderrepository services.SMSSenderRepository,
-	mobileoperatorrepository services.MobileOperatorRepository, resulttablerepository services.ResultTableRepository,
+	mobileoperatorrepository services.MobileOperatorRepository, periodrepository services.PeriodRepository,
+	eventrepository services.EventRepository, resulttablerepository services.ResultTableRepository,
 	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewsmsfacility, errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -233,7 +235,7 @@ func UpdateProjectSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMS
 
 	apismsfacility, err := helpers.UpdateSMSOrder(dtoorder, viewsmsfacility, r, facilityrepository, smsfacilityrepository,
 		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, smssenderrepository,
-		mobileoperatorrepository, resulttablerepository, worktablerepository, true, session.UserID, session.Language)
+		mobileoperatorrepository, periodrepository, eventrepository, resulttablerepository, worktablerepository, true, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
@@ -267,7 +269,7 @@ func UpdateProjectHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLR
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, mobileoperatorrepository services.MobileOperatorRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewhlrfacility, errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -288,7 +290,7 @@ func UpdateProjectHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLR
 // get /api/v1.0/projects/:prid/orders/:oid/service/recognize/
 func GetProjectRecognizeOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
 	facilityrepository services.FacilityRepository, recognizefacilityrepository services.RecognizeFacilityRepository,
-	inputfieldrepository services.InputFieldRepository, inputfilerepository services.InputFileRepository,
+	inputfieldrepository services.InputFieldRepository, inputproductrepository services.InputProductRepository, inputfilerepository services.InputFileRepository,
 	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -297,7 +299,8 @@ func GetProjectRecognizeOrder(r render.Render, params martini.Params, projectrep
 	}
 
 	apirecognizefacility, err := helpers.GetRecognizeOrder(dtoorder, r, facilityrepository, recognizefacilityrepository, inputfieldrepository,
-		inputfilerepository, supplierrequestrepository, inputftprepository, resulttablerepository, worktablerepository, session.Language)
+		inputproductrepository, inputfilerepository, supplierrequestrepository, inputftprepository, resulttablerepository, worktablerepository,
+		session.Language)
 	if err != nil {
 		return
 	}
@@ -309,10 +312,11 @@ func GetProjectRecognizeOrder(r render.Render, params martini.Params, projectrep
 func UpdateProjectRecognizeOrder(errors binding.Errors, viewrecognizefacility models.ViewRecognizeFacility, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
 	recognizefacilityrepository services.RecognizeFacilityRepository, orderstatusrepository services.OrderStatusRepository,
-	columntyperepository services.ColumnTypeRepository, filerepository services.FileRepository, inputfilerepository services.InputFileRepository,
+	columntyperepository services.ColumnTypeRepository, recognizeproductrepository services.RecognizeProductRepository,
+	filerepository services.FileRepository, inputfilerepository services.InputFileRepository,
 	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewrecognizefacility, errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -321,8 +325,8 @@ func UpdateProjectRecognizeOrder(errors binding.Errors, viewrecognizefacility mo
 	}
 
 	apirecognizefacility, err := helpers.UpdateRecognizeOrder(dtoorder, viewrecognizefacility, r, facilityrepository, recognizefacilityrepository,
-		orderstatusrepository, columntyperepository, filerepository, inputfilerepository, supplierrequestrepository, inputftprepository,
-		resulttablerepository, worktablerepository, session.Language)
+		orderstatusrepository, columntyperepository, recognizeproductrepository, filerepository, inputfilerepository, supplierrequestrepository,
+		inputftprepository, resulttablerepository, worktablerepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -333,15 +337,15 @@ func UpdateProjectRecognizeOrder(errors binding.Errors, viewrecognizefacility mo
 // get /api/v1.0/projects/:prid/orders/:oid/service/verification/
 func GetProjectVerifyOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
 	facilityrepository services.FacilityRepository, verifyfacilityrepository services.VerifyFacilityRepository,
-	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	dataproductrepository services.DataProductRepository, datacolumnrepository services.DataColumnRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
 	if err != nil {
 		return
 	}
 
-	apiverifyfacility, err := helpers.GetVerifyOrder(dtoorder, r, facilityrepository, verifyfacilityrepository, datacolumnrepository,
-		resulttablerepository, worktablerepository, session.Language)
+	apiverifyfacility, err := helpers.GetVerifyOrder(dtoorder, r, facilityrepository, verifyfacilityrepository, dataproductrepository,
+		datacolumnrepository, resulttablerepository, worktablerepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -354,9 +358,10 @@ func UpdateProjectVerifyOrder(errors binding.Errors, viewverifyfacility models.V
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
 	verifyfacilityrepository services.VerifyFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
-	tablecolumnrepository services.TableColumnRepository, datacolumnrepository services.DataColumnRepository,
-	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	verifyproductrepository services.VerifyProductRepository, tablecolumnrepository services.TableColumnRepository,
+	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(&viewverifyfacility, errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -365,7 +370,7 @@ func UpdateProjectVerifyOrder(errors binding.Errors, viewverifyfacility models.V
 	}
 
 	apiverifyfacility, err := helpers.UpdateVerifyOrder(dtoorder, viewverifyfacility, r, facilityrepository, verifyfacilityrepository,
-		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, datacolumnrepository,
+		orderstatusrepository, customertablerepository, columntyperepository, verifyproductrepository, tablecolumnrepository, datacolumnrepository,
 		resulttablerepository, worktablerepository, true, session.UserID, session.Language)
 	if err != nil {
 		return

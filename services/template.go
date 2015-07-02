@@ -6,10 +6,13 @@ import (
 )
 
 const (
-	TEMPLATE_LAYOUT       = "layout.txt.tmpl"
-	TEMPLATE_EMAIL        = "registration.txt.tmpl"
-	TEMPLATE_PASSWORD     = "user_password_reset.txt.tmpl"
-	TEMPLATE_SUBSCRIPTION = "subscription.txt.tmpl"
+	TEMPLATE_LAYOUT                = "layout.tpl.html"                   // Макет электронных писем
+	TEMPLATE_EMAIL_CONFIRMATION    = "email_added_confirmation.tpl.html" // Подтверждение e-mail при добавлении
+	TEMPLATE_PASSWORD_REGISTRATION = "password_registration.tpl.html"    // Установка пароля при регистрации
+	TEMPLATE_PASSWORD_RECOVERY     = "password_recovery.tpl.html"        // Сброс пароля зарегистрированного пользователя
+	TEMPLATE_SUBSCRIPTION          = "subscription.tpl.html"             // Письмо подписки на новости
+	TEMPLATE_FEEDBACK              = "sayhello.tpl.html"                 // Письмо обратной связи
+	TEMPLATE_CONFIRMATION          = "confirmation.tpl.html"             // Подтверждение успешности регистрации
 )
 
 type TemplateRepository interface {

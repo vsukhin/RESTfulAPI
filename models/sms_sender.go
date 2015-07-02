@@ -12,7 +12,7 @@ import (
 
 // Структура для организации хранения отправителя
 type ViewSMSSender struct {
-	Name string `json:"name" validate:"nonzero,min=1,max=255"` // Название
+	Name string `json:"name" validate:"min=1,max=255"` // Название
 }
 
 type ApiMetaSMSSender struct {

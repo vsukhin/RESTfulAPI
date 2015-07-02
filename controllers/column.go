@@ -29,7 +29,7 @@ func GetColumnTypes(w http.ResponseWriter, r render.Render, columntyperepository
 func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewtablecolumn, errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
@@ -51,7 +51,7 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	dtotablecolumn.Column_Type_ID = viewtablecolumn.TypeID
 	dtotablecolumn.Customer_Table_ID = tableid
 	dtotablecolumn.Prebuilt = false
-	dtotablecolumn.FieldNum, err = helpers.FindFreeColumn(tableid, r, tablecolumnrepository, session.Language)
+	dtotablecolumn.FieldNum, err = helpers.FindFreeColumn(tableid, 0, r, tablecolumnrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -110,7 +110,7 @@ func GetTableColumn(r render.Render, params martini.Params, customertablereposit
 func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewtablecolumn, errors, r, session.Language) != nil {
 		return
 	}
 	oldtablecolumn, err := helpers.CheckTableColumn(r, params, columntyperepository, customertablerepository, tablecolumnrepository, session.Language)
@@ -119,8 +119,8 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	}
 	if oldtablecolumn.Prebuilt {
 		log.Error("Can't update prebuilt column %v", oldtablecolumn.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,
+			Message: config.Localization[session.Language].Errors.Api.Data_Changes_Denied})
 		return
 	}
 	if helpers.IsColumnTypeActive(r, columntyperepository, viewtablecolumn.TypeID, session.Language) != nil {
@@ -159,8 +159,8 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertablerepo
 	}
 	if dtotablecolumn.Prebuilt {
 		log.Error("Can't delete prebuilt column %v", dtotablecolumn.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,
+			Message: config.Localization[session.Language].Errors.Api.Data_Changes_Denied})
 		return
 	}
 
@@ -178,7 +178,7 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertablerepo
 func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.ViewApiOrderTableColumns, w http.ResponseWriter, r render.Render,
 	params martini.Params, customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewordertablecolumns, errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)

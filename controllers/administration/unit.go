@@ -81,13 +81,15 @@ func GetUnits(w http.ResponseWriter, request *http.Request, r render.Render, uni
 // post /api/v1.0/administration/units/
 func CreateUnit(errors binding.Errors, viewunit models.ViewShortUnit, r render.Render, unitrepository services.UnitRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewunit, errors, r, session.Language) != nil {
 		return
 	}
 
 	dtounit := new(models.DtoUnit)
 	dtounit.Name = viewunit.Name
 	dtounit.Active = true
+	dtounit.Subscribed = false
+	dtounit.Paid = false
 	dtounit.Created = time.Now()
 
 	err := unitrepository.Create(dtounit, nil)
@@ -114,7 +116,7 @@ func GetUnit(r render.Render, params martini.Params, unitrepository services.Uni
 // put /api/v1.0/administration/units/:unitId/
 func UpdateUnit(errors binding.Errors, viewunit models.ViewLongUnit, r render.Render, params martini.Params,
 	unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewunit, errors, r, session.Language) != nil {
 		return
 	}
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
@@ -135,11 +137,10 @@ func UpdateUnit(errors binding.Errors, viewunit models.ViewLongUnit, r render.Re
 }
 
 // delete /api/v1.0/administration/units/:unitId/
-func DeleteUnit(r render.Render, params martini.Params, unitrepository services.UnitRepository,
-	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
-	projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
-	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository,
-	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+func DeleteUnit(r render.Render, params martini.Params, unitrepository services.UnitRepository, userrepository services.UserRepository,
+	customertablerepository services.CustomerTableRepository, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository, smssenderrepository services.SMSSenderRepository,
+	invoicerepository services.InvoiceRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
 		return
@@ -151,17 +152,17 @@ func DeleteUnit(r render.Render, params martini.Params, unitrepository services.
 		return
 	}
 
-	users, tables, projects, orders, facilities, companies, smssenders, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository,
-		customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository, smssenderrepository,
+	users, tables, projects, orders, facilities, companies, smssenders, invoices, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository,
+		customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository, smssenderrepository, invoicerepository,
 		session.Language)
 	if err != nil {
 		return
 	}
 
 	if len(*users) != 0 || len(*tables) != 0 || len(*projects) != 0 || len(*orders) != 0 || len(*facilities) != 0 || len(*companies) != 0 ||
-		len(*smssenders) != 0 {
-		log.Error("Can't delete unit %v with %v users, %v tables, %v projects, %v orders, %v facilities, %v organisations, %v smsfroms",
-			dtounit.ID, len(*users), len(*tables), len(*projects), len(*orders), len(*facilities), len(*companies), len(*smssenders))
+		len(*smssenders) != 0 || len(*invoices) != 0 {
+		log.Error("Can't delete unit %v with %v users, %v tables, %v projects, %v orders, %v facilities, %v organisations, %v smsfroms, %v invoices",
+			dtounit.ID, len(*users), len(*tables), len(*projects), len(*orders), len(*facilities), len(*companies), len(*smssenders), len(*invoices))
 		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_DELETE_DENIED,
 			Message: config.Localization[session.Language].Errors.Api.Data_Delete_Denied})
 		return
@@ -178,18 +179,17 @@ func DeleteUnit(r render.Render, params martini.Params, unitrepository services.
 }
 
 // options /api/v1.0/administration/units/:unitId/dependences/
-func GetUnitDependences(r render.Render, params martini.Params, unitrepository services.UnitRepository,
-	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
-	projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
-	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository,
-	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+func GetUnitDependences(r render.Render, params martini.Params, unitrepository services.UnitRepository, userrepository services.UserRepository,
+	customertablerepository services.CustomerTableRepository, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, companyrepository services.CompanyRepository, smssenderrepository services.SMSSenderRepository,
+	invoicerepository services.InvoiceRepository, session *models.DtoSession) {
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
 	if err != nil {
 		return
 	}
-	users, tables, projects, orders, facilities, companies, smssenders, err := helpers.GetUnitDependences(dtounit.ID, r,
-		userrepository, customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository,
-		smssenderrepository, session.Language)
+	users, tables, projects, orders, facilities, companies, smssenders, invoices, err := helpers.GetUnitDependences(dtounit.ID, r, userrepository,
+		customertablerepository, projectrepository, orderrepository, facilityrepository, companyrepository, smssenderrepository, invoicerepository,
+		session.Language)
 	if err != nil {
 		return
 	}
@@ -202,6 +202,7 @@ func GetUnitDependences(r render.Render, params martini.Params, unitrepository s
 	unitmeta.NumOfFacilities = int64(len(*facilities))
 	unitmeta.NumOfCompanies = int64(len(*companies))
 	unitmeta.NumOfSMSSenders = int64(len(*smssenders))
+	unitmeta.NumOfInvoices = int64(len(*invoices))
 
 	r.JSON(http.StatusOK, unitmeta)
 }
@@ -476,7 +477,7 @@ func UpdateOrder(errors binding.Errors, vieworder models.ViewFullOrder, r render
 	orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	userrepository services.UserRepository, facilityrepository services.FacilityRepository,
 	projectrepository services.ProjectRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)

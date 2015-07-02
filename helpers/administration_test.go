@@ -56,6 +56,14 @@ type TestUserRepository struct {
 	Err  error
 }
 
+func (testUserRepository *TestUserRepository) CheckReportAccess(user_id int64) (allowed bool, err error) {
+	return true, nil
+}
+
+func (testUserRepository *TestUserRepository) CheckUnitAccess(user_id int64) (allowed bool, err error) {
+	return true, nil
+}
+
 func (testUserRepository *TestUserRepository) GetUserArrays(user *models.DtoUser) (*models.DtoUser, error) {
 	return nil, nil
 }
@@ -76,11 +84,19 @@ func (testUserRepository *TestUserRepository) GetAll(filter string) (users *[]mo
 	return nil, nil
 }
 
+func (testUserRepository *TestUserRepository) GetAllByUser(user_id int64, filter string) (users *[]models.ApiSearchUnitUser, err error) {
+	return nil, nil
+}
+
 func (testUserRepository *TestUserRepository) GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error) {
 	return nil, nil
 }
 
 func (testUserRepository *TestUserRepository) GetMeta() (usermeta *models.ApiUserMeta, err error) {
+	return nil, nil
+}
+
+func (testUserRepository *TestUserRepository) GetMetaByUser(user_id int64) (metaunituser *models.ApiMetaUnitUser, err error) {
 	return nil, nil
 }
 
@@ -141,7 +157,11 @@ type TestEmailRepository struct {
 	SendErr   error
 }
 
-func (testEmailRepository *TestEmailRepository) SendEmail(email string, subject string, body string, headers string) (err error) {
+func (testEmailRepository *TestEmailRepository) SendEmail(email string, subject string, body string, headers string, from string) (err error) {
+	return testEmailRepository.SendErr
+}
+
+func (testEmailRepository *TestEmailRepository) SendHTML(email string, subject string, body string, headers string, from string) (err error) {
 	return testEmailRepository.SendErr
 }
 
@@ -545,7 +565,7 @@ func TestSendConfirmationsZero(t *testing.T) {
 	var emailrepository = new(TestEmailRepository)
 	var templaterepository = new(TestTemplateRepository)
 
-	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository)
+	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false)
 	if err != nil {
 		t.Error("Send confirmations should not return error")
 	}
@@ -561,7 +581,7 @@ func TestSendConfirmationTemplateErr(t *testing.T) {
 	var templaterepository = new(TestTemplateRepository)
 	templaterepository.Err = errors.New("Template error")
 
-	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository)
+	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false)
 	if err == nil {
 		t.Error("Send confirmations should return error")
 	}
@@ -582,7 +602,7 @@ func TestSendConfirmationEmailErr(t *testing.T) {
 	templaterepository.Buf = new(bytes.Buffer)
 	templaterepository.Err = nil
 
-	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository)
+	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false)
 	if err == nil {
 		t.Error("Send confirmations should return error")
 	}
@@ -603,7 +623,7 @@ func TestSendConfirmationsOk(t *testing.T) {
 	templaterepository.Buf = new(bytes.Buffer)
 	templaterepository.Err = nil
 
-	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository)
+	err := SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false)
 	if err != nil {
 		t.Error("Send confirmations should not return error")
 	}

@@ -12,13 +12,13 @@ const (
 
 // Структура для организации хранения сотрудника компании
 type ViewApiCompanyEmployee struct {
-	Employee_Type string `json:"type" db:"employee_type" validate:"nonzero,min=1,max=50"` // Тип сотрудника
-	Ditto         string `json:"ditto" db:"ditto" validate:"max=50"`                      // Повторный тип сотрудника
-	Surname       string `json:"surname" db:"surname" validate:"max=100"`                 // Фамилия
-	Name          string `json:"name" db:"name" validate:"max=100"`                       // Имя
-	MiddleName    string `json:"middleName" db:"middlename" validate:"max=100"`           // Отчество
-	Base          string `json:"basis" db:"base" validate:"max=255"`                      // Основание
-	Deleted       bool   `json:"del" db:"del"`                                            // Удален
+	Employee_Type string `json:"type" db:"employee_type" validate:"min=1,max=50"` // Тип сотрудника
+	Ditto         string `json:"ditto" db:"ditto" validate:"max=50"`              // Повторный тип сотрудника
+	Surname       string `json:"surname" db:"surname" validate:"max=100"`         // Фамилия
+	Name          string `json:"name" db:"name" validate:"max=100"`               // Имя
+	MiddleName    string `json:"middleName" db:"middlename" validate:"max=100"`   // Отчество
+	Base          string `json:"basis" db:"base" validate:"max=255"`              // Основание
+	Deleted       bool   `json:"del" db:"del"`                                    // Удален
 }
 
 type DtoCompanyEmployee struct {

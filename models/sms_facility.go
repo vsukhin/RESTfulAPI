@@ -29,6 +29,8 @@ type ViewSMSFacility struct {
 	EstimatedOperators          []ViewApiMobileOperatorOperation `json:"estimatedOperators"`                           // Прогноз распределения отправлений
 	DeliveryType                string                           `json:"deliveryType" validate:"nonzero"`              // Константа периодичности оказания услуги
 	DeliveryTime                bool                             `json:"deliveryTime"`                                 // Рассылка в период времени
+	Periods                     []ViewApiSMSPeriod               `json:"deliveryTimePeriods"`                          // Периоды
+	Events                      []ViewApiSMSEvent                `json:"deliveryTimeEvents"`                           // События
 	DeliveryTimeStart           time.Time                        `json:"deliveryTimeStart"`                            // Дата и время начала рассылки
 	DeliveryTimeEnd             time.Time                        `json:"deliveryTimeEnd"`                              // Дата и время прекращения рассылки
 	DeliveryBaseTime            time.Time                        `json:"deliveryBaseTime"`                             // Время для рассылок
@@ -50,6 +52,8 @@ type ApiSMSFacility struct {
 	EstimatedOperators          []ViewApiMobileOperatorOperation `json:"estimatedOperators,omitempty" db:"-"`                          // Прогноз распределения отправлений
 	DeliveryType                string                           `json:"deliveryType" db:"deliveryType"`                               // Константа периодичности оказания услуги
 	DeliveryTime                bool                             `json:"deliveryTime" db:"deliveryTime"`                               // Рассылка в период времени
+	Periods                     []ViewApiSMSPeriod               `json:"deliveryTimePeriods,omitempty" db:"-"`                         // Периоды
+	Events                      []ViewApiSMSEvent                `json:"deliveryTimeEvents,omitempty" db:"-"`                          // События
 	DeliveryTimeStart           time.Time                        `json:"deliveryTimeStart" db:"deliveryTimeStart"`                     // Дата и время начала рассылки
 	DeliveryTimeEnd             time.Time                        `json:"deliveryTimeEnd" db:"deliveryTimeEnd"`                         // Дата и время прекращения рассылки
 	DeliveryBaseTime            time.Time                        `json:"deliveryBaseTime" db:"deliveryBaseTime"`                       // Время для рассылок
@@ -76,6 +80,8 @@ type DtoSMSFacility struct {
 	EstimatedOperators          []DtoMobileOperatorOperation `db:"-"`                           // Прогноз распределения отправлений
 	DeliveryType                DeliveryType                 `db:"deliveryType"`                // Константа периодичности оказания услуги
 	DeliveryTime                bool                         `db:"deliveryTime"`                // Рассылка в период времени
+	Periods                     []DtoSMSPeriod               `db:"-"`                           // Периоды
+	Events                      []DtoSMSEvent                `db:"-"`                           // События
 	DeliveryTimeStart           time.Time                    `db:"deliveryTimeStart"`           // Дата и время начала рассылки
 	DeliveryTimeEnd             time.Time                    `db:"deliveryTimeEnd"`             // Дата и время прекращения рассылки
 	DeliveryBaseTime            time.Time                    `db:"deliveryBaseTime"`            // Время для рассылок
@@ -96,10 +102,10 @@ type DtoSMSFacility struct {
 // Конструктор создания объекта sms сервиса заказа в api
 func NewApiSMSFacility(estimatedNumbersShipments int, estimatedMessageInCyrillic bool,
 	estimatedNumberCharacters int, estimatedNumberSmsInMessage int, estimatedOperators []ViewApiMobileOperatorOperation,
-	deliveryType string, deliveryTime bool, deliveryTimeStart time.Time, deliveryTimeEnd time.Time, deliveryBaseTime time.Time,
-	deliveryDataId int64, deliveryDataDelete bool, messageFromId int64, messageFromInColumnId int64, messageToInColumnId int64,
-	messageBody string, messageBodyInColumnId int64, timeCorrection bool, cost float64, costFactual float64,
-	resultTables []ApiResultTable, workTables []ApiWorkTable) *ApiSMSFacility {
+	deliveryType string, deliveryTime bool, periods []ViewApiSMSPeriod, events []ViewApiSMSEvent, deliveryTimeStart time.Time,
+	deliveryTimeEnd time.Time, deliveryBaseTime time.Time, deliveryDataId int64, deliveryDataDelete bool, messageFromId int64,
+	messageFromInColumnId int64, messageToInColumnId int64, messageBody string, messageBodyInColumnId int64, timeCorrection bool,
+	cost float64, costFactual float64, resultTables []ApiResultTable, workTables []ApiWorkTable) *ApiSMSFacility {
 	return &ApiSMSFacility{
 		EstimatedNumbersShipments:   estimatedNumbersShipments,
 		EstimatedMessageInCyrillic:  estimatedMessageInCyrillic,
@@ -108,6 +114,8 @@ func NewApiSMSFacility(estimatedNumbersShipments int, estimatedMessageInCyrillic
 		EstimatedOperators:          estimatedOperators,
 		DeliveryType:                deliveryType,
 		DeliveryTime:                deliveryTime,
+		Periods:                     periods,
+		Events:                      events,
 		DeliveryTimeStart:           deliveryTimeStart,
 		DeliveryTimeEnd:             deliveryTimeEnd,
 		DeliveryBaseTime:            deliveryBaseTime,
@@ -129,10 +137,10 @@ func NewApiSMSFacility(estimatedNumbersShipments int, estimatedMessageInCyrillic
 // Конструктор создания объекта sms сервиса заказа в бд
 func NewDtoSMSFacility(order_id int64, estimatedNumbersShipments int, estimatedMessageInCyrillic bool,
 	estimatedNumberCharacters int, estimatedNumberSmsInMessage int, estimatedOperators []DtoMobileOperatorOperation,
-	deliveryType DeliveryType, deliveryTime bool, deliveryTimeStart time.Time, deliveryTimeEnd time.Time, deliveryBaseTime time.Time,
-	deliveryDataId int64, deliveryDataDelete bool, messageFromId int64, messageFromInColumnId int64, messageToInColumnId int64,
-	messageBody string, messageBodyInColumnId int64, timeCorrection bool, cost float64, costFactual float64,
-	resultTables []DtoResultTable, workTables []DtoWorkTable) *DtoSMSFacility {
+	deliveryType DeliveryType, deliveryTime bool, deliveryTimeStart time.Time, periods []DtoSMSPeriod, events []DtoSMSEvent,
+	deliveryTimeEnd time.Time, deliveryBaseTime time.Time, deliveryDataId int64, deliveryDataDelete bool, messageFromId int64,
+	messageFromInColumnId int64, messageToInColumnId int64, messageBody string, messageBodyInColumnId int64, timeCorrection bool,
+	cost float64, costFactual float64, resultTables []DtoResultTable, workTables []DtoWorkTable) *DtoSMSFacility {
 	return &DtoSMSFacility{
 		Order_ID:                    order_id,
 		EstimatedNumbersShipments:   estimatedNumbersShipments,
@@ -142,6 +150,8 @@ func NewDtoSMSFacility(order_id int64, estimatedNumbersShipments int, estimatedM
 		EstimatedOperators:          estimatedOperators,
 		DeliveryType:                deliveryType,
 		DeliveryTime:                deliveryTime,
+		Periods:                     periods,
+		Events:                      events,
 		DeliveryTimeStart:           deliveryTimeStart,
 		DeliveryTimeEnd:             deliveryTimeEnd,
 		DeliveryBaseTime:            deliveryBaseTime,
@@ -163,6 +173,12 @@ func NewDtoSMSFacility(order_id int64, estimatedNumbersShipments int, estimatedM
 func (facility *ViewSMSFacility) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	for _, operator := range facility.EstimatedOperators {
 		errors = Validate(&operator, errors, req)
+	}
+	for _, period := range facility.Periods {
+		errors = Validate(&period, errors, req)
+	}
+	for _, event := range facility.Events {
+		errors = Validate(&event, errors, req)
 	}
 	return Validate(facility, errors, req)
 }

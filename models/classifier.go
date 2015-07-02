@@ -11,17 +11,17 @@ import (
 )
 
 const (
-	CLASSIFIER_TYPE_UNKNOWN = 0
+	CLASSIFIER_TYPE_MAIN = 0
 )
 
 // Структура для организации хранения классификатора
 type ViewClassifier struct {
-	Name string `json:"name" validate:"nonzero,min=1,max=255"` // Название
+	Name string `json:"name" validate:"min=1,max=255"` // Название
 }
 
 type ViewUpdateClassifier struct {
-	Name    string `json:"name" validate:"nonzero,min=1,max=255"` // Название
-	Deleted bool   `json:"del"`                                   // Удален
+	Name    string `json:"name" validate:"min=1,max=255"` // Название
+	Deleted bool   `json:"del"`                           // Удален
 }
 
 type ApiShortClassifier struct {

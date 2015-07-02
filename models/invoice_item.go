@@ -1,5 +1,10 @@
 package models
 
+const (
+	INVOICE_ITEM_TYPE_ROUBLE  = "руб"
+	INVOICE_ITEM_NAME_DEFAULT = "Оплата по договору"
+)
+
 // Структура для организации позиции счета
 type ApiInvoiceItem struct {
 	ID      int64   `json:"id" db:"id"`             // Уникальный идентификатор позиции счета

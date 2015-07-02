@@ -9,12 +9,12 @@ func TestNewViewApiEmail(t *testing.T) {
 	var email = "test@email.com"
 	var primary = true
 	var confirmed = true
-	var subscription = true
+	//	var subscription = true
 	var language = "eng"
 	var classifierid int = 1
 	var viewapiEmail *ViewApiEmail
 
-	viewapiEmail = NewViewApiEmail(email, primary, confirmed, subscription, language, classifierid)
+	viewapiEmail = NewViewApiEmail(email, primary, confirmed /*subscription,*/, language, classifierid)
 	if viewapiEmail.Email != email {
 		t.Error("Email field is not properly initialized")
 	}
@@ -24,9 +24,9 @@ func TestNewViewApiEmail(t *testing.T) {
 	if viewapiEmail.Confirmed != confirmed {
 		t.Error("Confirmed field is not properly initialized")
 	}
-	if viewapiEmail.Subscription != subscription {
+	/*	if viewapiEmail.Subscription != subscription {
 		t.Error("Subscription field is not properly initialized")
-	}
+	}*/
 	if viewapiEmail.Language != language {
 		t.Error("Language field is not properly initialized")
 	}

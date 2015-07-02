@@ -15,7 +15,9 @@ type TableColumnRepository interface {
 	Extract(infield string, invalue string) (outfield string, outvalue string, errField error, errValue error)
 	GetAllFields(parameter interface{}) (fields *[]string)
 	GetByTable(tableid int64) (tablecolumns *[]models.DtoTableColumn, err error)
+	GetDefaultPosition(tableid int64) (position int64, err error)
 	Create(tablecolumn *models.DtoTableColumn, trans *gorp.Transaction) (err error)
+	CreateAll(tablecolumns *[]models.DtoTableColumn) (err error)
 	Update(newtablecolumn *models.DtoTableColumn, oldtablecolumn *models.DtoTableColumn, briefly bool, inTrans bool) (err error)
 	UpdateAll(tablecolumns *[]models.DtoTableColumn) (err error)
 	UpdateBriefly(tablecolumns *[]models.DtoTableColumn, trans *gorp.Transaction) (err error)
@@ -113,12 +115,52 @@ func (tablecolumnservice *TableColumnService) GetByTable(tableid int64) (tableco
 	return tablecolumns, nil
 }
 
+func (tablecolumnservice *TableColumnService) GetDefaultPosition(tableid int64) (position int64, err error) {
+	position, err = tablecolumnservice.DbContext.SelectInt("select max(position) from "+tablecolumnservice.Table+
+		" t left join column_types c on t.column_type_id = c.id where t.active = 1 "+
+		"and (c.active = 1) and t.customer_table_id = ?",
+		tableid)
+	if err != nil {
+		log.Error("Error during getting all table column object from database %v with value %v", err, tableid)
+		return 0, err
+	}
+
+	return position, nil
+}
+
 func (tablecolumnservice *TableColumnService) Create(tablecolumn *models.DtoTableColumn, trans *gorp.Transaction) (err error) {
 	if trans != nil {
 		err = trans.Insert(tablecolumn)
 	} else {
 		err = tablecolumnservice.DbContext.Insert(tablecolumn)
 	}
+	if err != nil {
+		log.Error("Error during creating table column object in database %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (tablecolumnservice *TableColumnService) CreateAll(tablecolumns *[]models.DtoTableColumn) (err error) {
+	var trans *gorp.Transaction
+
+	trans, err = tablecolumnservice.DbContext.Begin()
+	if err != nil {
+		log.Error("Error during creating table columnn object in database %v", err)
+		return err
+	}
+
+	for _, tablecolumn := range *tablecolumns {
+		err = trans.Insert(&tablecolumn)
+		if err != nil {
+			_ = trans.Rollback()
+			log.Error("Error during creating table column object in database %v", err)
+			return err
+		}
+	}
+
+	err = trans.Commit()
 	if err != nil {
 		log.Error("Error during creating table column object in database %v", err)
 		return err

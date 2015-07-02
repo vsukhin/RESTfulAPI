@@ -26,7 +26,7 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 	filerepository services.FileRepository, unitrepository services.UnitRepository, tabletyperepository services.TableTypeRepository,
 	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository,
 	columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewimporttable, errors, r, session.Language) != nil {
 		return
 	}
 
@@ -118,7 +118,7 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
 	columntyperepository services.ColumnTypeRepository, tablerowrepository services.TableRowRepository,
 	importsteprepository services.ImportStepRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(errors, r, session.Language) != nil {
+	if helpers.CheckValidation(&viewimportcolumns, errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TEMPORABLE_TABLE_ID], session.Language)
@@ -158,8 +158,8 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 		}
 		if dtotablecolumn.Prebuilt {
 			log.Error("Can't update prebuilt column %v", dtotablecolumn.ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,
+				Message: config.Localization[session.Language].Errors.Api.Data_Changes_Denied})
 			return
 		}
 
@@ -279,16 +279,16 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	format, err := url.QueryUnescape(request.URL.Query().Get(helpers.PARAM_QUERY_FORMAT))
 	if err != nil {
 		log.Error("Can't unescape %v url data", err)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
 	formatid, err := strconv.Atoi(format)
 	if err != nil {
 		log.Error("Can't convert data format to number %v with value %v", err, format)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
@@ -302,8 +302,8 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	rowtype, err := url.QueryUnescape(request.URL.Query().Get(helpers.PARAM_QUERY_TYPE))
 	if err != nil {
 		log.Error("Can't unescape %v url data", err)
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
@@ -366,7 +366,7 @@ func GetExportDataStatus(r render.Render, params martini.Params, filerepository 
 	}
 
 	r.JSON(http.StatusOK, models.NewApiExportStatus(file.Export_Ready, file.Export_Percentage,
-		fmt.Sprintf("%v", file.Created.Add(config.Configuration.Server.FileTimeout))))
+		fmt.Sprintf("%v", file.Created.Add(config.Configuration.FileTimeout))))
 }
 
 // get /api/v1.0/tables/export/:token/:fid/
@@ -385,7 +385,7 @@ func GetExportData(w http.ResponseWriter, r render.Render, params martini.Params
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
-	if time.Now().Sub(virtualdir.Created) > config.Configuration.Server.FileTimeout {
+	if time.Now().Sub(virtualdir.Created) > config.Configuration.FileTimeout {
 		log.Error("File token has been expired %v with value %v", virtualdir.Created, virtualdir.Token)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})

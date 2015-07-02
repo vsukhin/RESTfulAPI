@@ -7,14 +7,19 @@ import (
 	"errors"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"types"
+	"unicode"
 )
 
 const (
 	PARAM_NAME_ORDER_ID = "oid"
+	SMS_LENGTH_ASCII    = 153
+	SMS_LENGTH_UICODE   = 67
 )
 
 func CheckOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
@@ -33,37 +38,31 @@ func CheckOrder(r render.Render, params martini.Params, orderrepository services
 	return dtoorder, nil
 }
 
-func CheckFacility(facilityid int64, r render.Render, facilityrepository services.FacilityRepository,
-	language string) (err error) {
-	dtofacility, err := facilityrepository.Get(facilityid)
+func CheckOrderValidity(order_id int64, r render.Render, orderrepository services.OrderRepository,
+	language string) (dtoorder *models.DtoOrder, err error) {
+	dtoorder, err = orderrepository.Get(order_id)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return err
-	}
-	if !dtofacility.Active {
-		log.Error("Service is not active %v", dtofacility.ID)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return errors.New("Service not active")
+		return nil, err
 	}
 
-	return nil
+	return dtoorder, nil
 }
 
-func CheckFacilityAlias(facilityid int64, alias string, r render.Render, facilityrepository services.FacilityRepository,
+func CheckOrderAccess(order_id int64, user_id int64, r render.Render, orderrepository services.OrderRepository,
 	language string) (err error) {
-	dtofacility, err := facilityrepository.Get(facilityid)
+	allowed, err := orderrepository.CheckUserAccess(user_id, order_id)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return err
 	}
-	if dtofacility.Alias != alias {
-		log.Error("Order service is not macthed to the service method %v", facilityid)
+	if !allowed {
+		log.Error("Order %v is not accessible for user %v", order_id, user_id)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return errors.New("Wrong service alias")
+		return errors.New("Order not accessible")
 	}
 
 	return nil
@@ -80,8 +79,8 @@ func CheckOrderEditability(orderid int64, r render.Render, orderstatusrepository
 	for _, orderstatus := range *dtoorderstatuses {
 		if orderstatus.Status_ID == models.ORDER_STATUS_COMPLETED && orderstatus.Value == true {
 			log.Error("Can't update completed order %v", orderid)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_DATA_CHANGES_DENIED,
+				Message: config.Localization[language].Errors.Api.Data_Changes_Denied})
 			return errors.New("Not editable order")
 		}
 	}
@@ -121,6 +120,14 @@ func UpdateLongOrder(dtoorder *models.DtoOrder, vieworder *models.ViewLongOrder,
 	dtoorder.Proposed_Price = vieworder.Proposed_Price
 	dtoorder.Charged_Fee = vieworder.Charged_Fee
 	dtoorder.Execution_Forecast = vieworder.Execution_Forecast
+	if vieworder.IsPaid && (dtoorder.Begin_Date.IsZero() ||
+		(dtoorder.Begin_Date.Year() == 1 && dtoorder.Begin_Date.Month() == 1 && dtoorder.Begin_Date.Day() == 1)) {
+		dtoorder.Begin_Date = time.Now()
+	}
+	if vieworder.IsExecuted && (dtoorder.End_Date.IsZero() ||
+		(dtoorder.End_Date.Year() == 1 && dtoorder.End_Date.Month() == 1 && dtoorder.End_Date.Day() == 1)) {
+		dtoorder.End_Date = time.Now()
+	}
 
 	dtoorderstatuses := vieworder.ToOrderStatuses(dtoorder.ID)
 
@@ -202,6 +209,7 @@ func GetOrderTables(order_id int64, r render.Render, resulttablerepository servi
 
 func GetSMSOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository services.FacilityRepository,
 	smsfacilityrepository services.SMSFacilityRepository, mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	smsperiodrepository services.SMSPeriodRepository, smseventrepository services.SMSEventRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
 	language string) (apismsfacility *models.ApiSMSFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_SMS, r, facilityrepository, language)
@@ -223,6 +231,20 @@ func GetSMSOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository 
 		return nil, err
 	}
 
+	periods, err := smsperiodrepository.GetByOrder(dtoorder.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	events, err := smseventrepository.GetByOrder(dtoorder.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
 	resulttables, worktables, err := GetOrderTables(dtoorder.ID, r, resulttablerepository, worktablerepository, language)
 	if err != nil {
 		return nil, err
@@ -238,14 +260,14 @@ func GetSMSOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository 
 		deliveryType = models.TYPE_DELIVERY_EVENTTRIGGERED_VALUE
 	default:
 		log.Error("Unknown delivery type %v", dtosmsfacility.DeliveryType)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
 		return nil, errors.New("Wrong delivery type")
 	}
 
 	return models.NewApiSMSFacility(dtosmsfacility.EstimatedNumbersShipments, dtosmsfacility.EstimatedMessageInCyrillic,
 		dtosmsfacility.EstimatedNumberCharacters, dtosmsfacility.EstimatedNumberSmsInMessage, *operators,
-		deliveryType, dtosmsfacility.DeliveryTime, dtosmsfacility.DeliveryTimeStart, dtosmsfacility.DeliveryTimeEnd,
+		deliveryType, dtosmsfacility.DeliveryTime, *periods, *events, dtosmsfacility.DeliveryTimeStart, dtosmsfacility.DeliveryTimeEnd,
 		dtosmsfacility.DeliveryBaseTime, dtosmsfacility.DeliveryDataId, dtosmsfacility.DeliveryDataDelete, dtosmsfacility.MessageFromId,
 		dtosmsfacility.MessageFromInColumnId, dtosmsfacility.MessageToInColumnId, dtosmsfacility.MessageBody, dtosmsfacility.MessageBodyInColumnId,
 		dtosmsfacility.TimeCorrection, dtosmsfacility.Cost, dtosmsfacility.CostFactual, *resulttables, *worktables), nil
@@ -256,6 +278,7 @@ func UpdateSMSOrder(dtoorder *models.DtoOrder, viewsmsfacility models.ViewSMSFac
 	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
 	smssenderrepository services.SMSSenderRepository, mobileoperatorrepository services.MobileOperatorRepository,
+	periodrepository services.PeriodRepository, eventrepository services.EventRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
 	checkaccess bool, userid int64, language string) (apismsfacility *models.ApiSMSFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_SMS, r, facilityrepository, language)
@@ -332,6 +355,22 @@ func UpdateSMSOrder(dtoorder *models.DtoOrder, viewsmsfacility models.ViewSMSFac
 	}
 	dtosmsfacility.DeliveryType = deliveryType
 	dtosmsfacility.DeliveryTime = viewsmsfacility.DeliveryTime
+
+	for _, apiperiod := range viewsmsfacility.Periods {
+		dtoperiod, err := CheckPeriod(apiperiod.Period_ID, r, periodrepository, language)
+		if err != nil {
+			return nil, err
+		}
+		dtosmsfacility.Periods = append(dtosmsfacility.Periods, *models.NewDtoSMSPeriod(dtoorder.ID, dtoperiod.ID))
+	}
+
+	for _, apievent := range viewsmsfacility.Events {
+		dtoevent, err := CheckEvent(apievent.Event_ID, r, eventrepository, language)
+		if err != nil {
+			return nil, err
+		}
+		dtosmsfacility.Events = append(dtosmsfacility.Events, *models.NewDtoSMSEvent(dtoorder.ID, dtoevent.ID))
+	}
 
 	if !viewsmsfacility.DeliveryTimeStart.IsZero() && viewsmsfacility.DeliveryTimeStart.Sub(time.Now()) < 0 {
 		log.Error("Time start is in the past %v", viewsmsfacility.DeliveryTimeStart)
@@ -424,9 +463,9 @@ func UpdateSMSOrder(dtoorder *models.DtoOrder, viewsmsfacility models.ViewSMSFac
 	}
 
 	if !found {
-		err = smsfacilityrepository.Create(dtosmsfacility, true)
+		err = smsfacilityrepository.Create(dtosmsfacility, false, true)
 	} else {
-		err = smsfacilityrepository.Update(dtosmsfacility, true)
+		err = smsfacilityrepository.Update(dtosmsfacility, false, true)
 	}
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -436,10 +475,11 @@ func UpdateSMSOrder(dtoorder *models.DtoOrder, viewsmsfacility models.ViewSMSFac
 
 	return models.NewApiSMSFacility(viewsmsfacility.EstimatedNumbersShipments, viewsmsfacility.EstimatedMessageInCyrillic,
 		viewsmsfacility.EstimatedNumberCharacters, viewsmsfacility.EstimatedNumberSmsInMessage, viewsmsfacility.EstimatedOperators,
-		viewsmsfacility.DeliveryType, viewsmsfacility.DeliveryTime, viewsmsfacility.DeliveryTimeStart, viewsmsfacility.DeliveryTimeEnd,
-		viewsmsfacility.DeliveryBaseTime, viewsmsfacility.DeliveryDataId, viewsmsfacility.DeliveryDataDelete, viewsmsfacility.MessageFromId,
-		viewsmsfacility.MessageFromInColumnId, viewsmsfacility.MessageToInColumnId, viewsmsfacility.MessageBody, viewsmsfacility.MessageBodyInColumnId,
-		viewsmsfacility.TimeCorrection, dtosmsfacility.Cost, dtosmsfacility.CostFactual, *resulttables, *worktables), nil
+		viewsmsfacility.DeliveryType, viewsmsfacility.DeliveryTime, viewsmsfacility.Periods, viewsmsfacility.Events,
+		viewsmsfacility.DeliveryTimeStart, viewsmsfacility.DeliveryTimeEnd, viewsmsfacility.DeliveryBaseTime, viewsmsfacility.DeliveryDataId,
+		viewsmsfacility.DeliveryDataDelete, viewsmsfacility.MessageFromId, viewsmsfacility.MessageFromInColumnId, viewsmsfacility.MessageToInColumnId,
+		viewsmsfacility.MessageBody, viewsmsfacility.MessageBodyInColumnId, viewsmsfacility.TimeCorrection, dtosmsfacility.Cost, dtosmsfacility.CostFactual,
+		*resulttables, *worktables), nil
 }
 
 func GetHLROrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository services.FacilityRepository,
@@ -588,9 +628,10 @@ func UpdateHLROrder(dtoorder *models.DtoOrder, viewhlrfacility models.ViewHLRFac
 
 func GetRecognizeOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository services.FacilityRepository,
 	recognizefacilityrepository services.RecognizeFacilityRepository, inputfieldrepository services.InputFieldRepository,
-	inputfilerepository services.InputFileRepository, supplierrequestrepository services.SupplierRequestRepository,
-	inputftprepository services.InputFtpRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, language string) (apirecognizefacility *models.ApiRecognizeFacility, err error) {
+	inputproductrepository services.InputProductRepository, inputfilerepository services.InputFileRepository,
+	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
+	language string) (apirecognizefacility *models.ApiRecognizeFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_RECOGNIZE, r, facilityrepository, language)
 	if err != nil {
 		return nil, err
@@ -604,6 +645,13 @@ func GetRecognizeOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepos
 	}
 
 	inputfields, err := inputfieldrepository.GetByOrder(dtoorder.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	inputproducts, err := inputproductrepository.GetByOrder(dtoorder.ID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
@@ -635,7 +683,7 @@ func GetRecognizeOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepos
 	}
 
 	return models.NewApiRecognizeFacility(dtorecognizefacility.EstimatedNumbersForm, dtorecognizefacility.EstimatedCalculationOnFields,
-		*inputfields, dtorecognizefacility.PriceIncreaseUrgent, dtorecognizefacility.PriceIncreaseNano,
+		*inputfields, *inputproducts, dtorecognizefacility.PriceIncreaseUrgent, dtorecognizefacility.PriceIncreaseNano,
 		dtorecognizefacility.PriceIncreaseBackgroundBlack, dtorecognizefacility.RequiredFields, dtorecognizefacility.LoadDefectiveForms,
 		dtorecognizefacility.CommentsForSupplier, *inputfiles, dtorecognizefacility.RequestsSend, dtorecognizefacility.RequestsCancel, *supplierrequests,
 		dtorecognizefacility.Cost, dtorecognizefacility.CostFactual, *models.NewApiInputFtp(inputftp.Ready, inputftp.Customer_Table_ID,
@@ -645,10 +693,10 @@ func GetRecognizeOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepos
 func UpdateRecognizeOrder(dtoorder *models.DtoOrder, viewrecognizefacility models.ViewRecognizeFacility, r render.Render,
 	facilityrepository services.FacilityRepository, recognizefacilityrepository services.RecognizeFacilityRepository,
 	orderstatusrepository services.OrderStatusRepository, columntyperepository services.ColumnTypeRepository,
-	filerepository services.FileRepository, inputfilerepository services.InputFileRepository,
-	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
-	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
-	language string) (apirecognizefacility *models.ApiRecognizeFacility, err error) {
+	recognizeproductrepository services.RecognizeProductRepository, filerepository services.FileRepository,
+	inputfilerepository services.InputFileRepository, supplierrequestrepository services.SupplierRequestRepository,
+	inputftprepository services.InputFtpRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, language string) (apirecognizefacility *models.ApiRecognizeFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_RECOGNIZE, r, facilityrepository, language)
 	if err != nil {
 		return nil, err
@@ -687,6 +735,15 @@ func UpdateRecognizeOrder(dtoorder *models.DtoOrder, viewrecognizefacility model
 		}
 		dtorecognizefacility.EstimatedFields = append(dtorecognizefacility.EstimatedFields, *models.NewDtoInputField(dtoorder.ID,
 			inputfield.Column_Type_ID, inputfield.Count))
+	}
+
+	for _, inputproduct := range viewrecognizefacility.InputProducts {
+		_, err = CheckRecognizeProduct(inputproduct.Product_ID, r, recognizeproductrepository, language)
+		if err != nil {
+			return nil, err
+		}
+		dtorecognizefacility.InputProducts = append(dtorecognizefacility.InputProducts, *models.NewDtoInputProduct(dtoorder.ID,
+			inputproduct.Product_ID))
 	}
 
 	dtorecognizefacility.PriceIncreaseUrgent = viewrecognizefacility.PriceIncreaseUrgent
@@ -755,23 +812,31 @@ func UpdateRecognizeOrder(dtoorder *models.DtoOrder, viewrecognizefacility model
 	}
 
 	return models.NewApiRecognizeFacility(viewrecognizefacility.EstimatedNumbersForm, viewrecognizefacility.EstimatedCalculationOnFields,
-		viewrecognizefacility.EstimatedFields, viewrecognizefacility.PriceIncreaseUrgent, viewrecognizefacility.PriceIncreaseNano,
-		viewrecognizefacility.PriceIncreaseBackgroundBlack, viewrecognizefacility.RequiredFields, viewrecognizefacility.LoadDefectiveForms,
-		viewrecognizefacility.CommentsForSupplier, *inputfiles, dtorecognizefacility.RequestsSend, dtorecognizefacility.RequestsCancel,
-		*supplierrequests, dtorecognizefacility.Cost, dtorecognizefacility.CostFactual, *models.NewApiInputFtp(inputftp.Ready,
-			inputftp.Customer_Table_ID, inputftp.Host, inputftp.Port, inputftp.Path, inputftp.Login, inputftp.Password), *resulttables, *worktables), nil
+		viewrecognizefacility.EstimatedFields, viewrecognizefacility.InputProducts, viewrecognizefacility.PriceIncreaseUrgent,
+		viewrecognizefacility.PriceIncreaseNano, viewrecognizefacility.PriceIncreaseBackgroundBlack, viewrecognizefacility.RequiredFields,
+		viewrecognizefacility.LoadDefectiveForms, viewrecognizefacility.CommentsForSupplier, *inputfiles, dtorecognizefacility.RequestsSend,
+		dtorecognizefacility.RequestsCancel, *supplierrequests, dtorecognizefacility.Cost, dtorecognizefacility.CostFactual,
+		*models.NewApiInputFtp(inputftp.Ready, inputftp.Customer_Table_ID, inputftp.Host, inputftp.Port, inputftp.Path, inputftp.Login, inputftp.Password),
+		*resulttables, *worktables), nil
 }
 
 func GetVerifyOrder(dtoorder *models.DtoOrder, r render.Render, facilityrepository services.FacilityRepository,
-	verifyfacilityrepository services.VerifyFacilityRepository, datacolumnrepository services.DataColumnRepository,
-	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
-	language string) (apiverifyfacility *models.ApiVerifyFacility, err error) {
+	verifyfacilityrepository services.VerifyFacilityRepository, dataproductrepository services.DataProductRepository,
+	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, language string) (apiverifyfacility *models.ApiVerifyFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_VERIFY, r, facilityrepository, language)
 	if err != nil {
 		return nil, err
 	}
 
 	dtoverifyfacility, err := verifyfacilityrepository.Get(dtoorder.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	dataproducts, err := dataproductrepository.GetByOrder(dtoorder.ID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
@@ -790,7 +855,7 @@ func GetVerifyOrder(dtoorder *models.DtoOrder, r render.Render, facilityreposito
 		return nil, err
 	}
 
-	return models.NewApiVerifyFacility(dtoverifyfacility.EstimatedNumbersRecords, dtoverifyfacility.TablesDataId,
+	return models.NewApiVerifyFacility(dtoverifyfacility.EstimatedNumbersRecords, *dataproducts, dtoverifyfacility.TablesDataId,
 		dtoverifyfacility.TablesDataDelete, *datacolumns, dtoverifyfacility.Cost, dtoverifyfacility.CostFactual,
 		*resulttables, *worktables), nil
 }
@@ -798,9 +863,9 @@ func GetVerifyOrder(dtoorder *models.DtoOrder, r render.Render, facilityreposito
 func UpdateVerifyOrder(dtoorder *models.DtoOrder, viewverifyfacility models.ViewVerifyFacility, r render.Render,
 	facilityrepository services.FacilityRepository, verifyfacilityrepository services.VerifyFacilityRepository,
 	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
-	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
-	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, checkaccess bool, userid int64,
+	columntyperepository services.ColumnTypeRepository, verifyproductrepository services.VerifyProductRepository,
+	tablecolumnrepository services.TableColumnRepository, datacolumnrepository services.DataColumnRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, checkaccess bool, userid int64,
 	language string) (apiverifyfacility *models.ApiVerifyFacility, err error) {
 	err = CheckFacilityAlias(dtoorder.Facility_ID, models.SERVICE_TYPE_VERIFY, r, facilityrepository, language)
 	if err != nil {
@@ -831,6 +896,14 @@ func UpdateVerifyOrder(dtoorder *models.DtoOrder, viewverifyfacility models.View
 	}
 
 	dtoverifyfacility.EstimatedNumbersRecords = viewverifyfacility.EstimatedNumbersRecords
+	for _, dataproduct := range viewverifyfacility.DataProducts {
+		_, err = CheckVerifyProduct(dataproduct.Product_ID, r, verifyproductrepository, language)
+		if err != nil {
+			return nil, err
+		}
+		dtoverifyfacility.DataProducts = append(dtoverifyfacility.DataProducts, *models.NewDtoDataProduct(dtoorder.ID,
+			dataproduct.Product_ID))
+	}
 
 	_, err = IsTableAvailable(r, customertablerepository, viewverifyfacility.TablesDataId, language)
 	if err != nil {
@@ -884,7 +957,423 @@ func UpdateVerifyOrder(dtoorder *models.DtoOrder, viewverifyfacility models.View
 		return nil, err
 	}
 
-	return models.NewApiVerifyFacility(viewverifyfacility.EstimatedNumbersRecords, viewverifyfacility.TablesDataId,
+	return models.NewApiVerifyFacility(viewverifyfacility.EstimatedNumbersRecords, viewverifyfacility.DataProducts, viewverifyfacility.TablesDataId,
 		viewverifyfacility.TablesDataDelete, *datacolumns, dtoverifyfacility.Cost, dtoverifyfacility.CostFactual,
 		*resulttables, *worktables), nil
+}
+
+func CalculateSMSQuantity(sms string) (count int) {
+	count = 0
+	runes := []rune(sms)
+	isASCII := true
+	for _, current_rune := range runes {
+		if current_rune > unicode.MaxASCII {
+			isASCII = false
+			break
+		}
+	}
+	length := 0
+	if isASCII {
+		length = SMS_LENGTH_ASCII
+		count = len(runes) / length
+
+	} else {
+		length = SMS_LENGTH_UICODE
+		count = len(runes) / length
+	}
+	if math.Mod(float64(len(runes)), float64(length)) != 0 {
+		count++
+	}
+
+	return count
+}
+
+func ExecuteSMSOrder(order_id int64, orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
+	smsfacilityrepository services.SMSFacilityRepository, orderstatusrepository services.OrderStatusRepository,
+	customertablerepository services.CustomerTableRepository, smstablerepository services.SMSTableRepository,
+	smssenderrepository services.SMSSenderRepository, resulttablerepository services.ResultTableRepository,
+	worktablerepository services.WorkTableRepository, invoicerepository services.InvoiceRepository,
+	companyrepository services.CompanyRepository, operationrepository services.OperationRepository,
+	transactiontyperepository services.TransactionTypeRepository, tablecolumnrepository services.TableColumnRepository,
+	unitrepository services.UnitRepository, tablerowrepository services.TableRowRepository, pricerepository services.PriceRepository,
+	mobileoperatorrepository services.MobileOperatorRepository) {
+	dtoorder, err := orderrepository.Get(order_id)
+	if err != nil {
+		return
+	}
+
+	dtofacility, err := facilityrepository.Get(dtoorder.Facility_ID)
+	if err != nil {
+		return
+	}
+	if dtofacility.Alias != models.SERVICE_TYPE_SMS {
+		log.Error("Order service is not macthed to the service method %v", dtoorder.Facility_ID)
+		return
+	}
+
+	dtosmsfacility, err := smsfacilityrepository.Get(dtoorder.ID)
+	if err != nil {
+		return
+	}
+
+	dtoorderstatuses, err := orderstatusrepository.GetByOrder(dtoorder.ID)
+	if err != nil {
+		return
+	}
+	order := models.NewApiLongOrderFromDto(dtoorder, dtoorderstatuses)
+
+	if order.IsAssembled {
+		dtoorderstatus := models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_MODERATOR_CONFIRMED, true, "", time.Now())
+		err = orderstatusrepository.Save(dtoorderstatus, nil)
+		if err != nil {
+			return
+		}
+
+		if dtosmsfacility.DeliveryType == models.TYPE_DELIVERY_ONCE {
+			schhour, schmin, schsec := dtosmsfacility.DeliveryBaseTime.Local().Clock()
+			hour, min, sec := time.Now().Clock()
+			if schhour == hour && schmin == min && schsec == sec {
+				dtodatatable, err := customertablerepository.Get(dtosmsfacility.DeliveryDataId)
+				if err != nil {
+					return
+				}
+				smstable, err := smstablerepository.Get(dtodatatable.ID)
+				if err != nil {
+					return
+				}
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_OPEN, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+
+				if dtosmsfacility.MessageFromInColumnId != 0 {
+					found := false
+					for _, smssender := range smstable.SMSSenders {
+						if smssender.ID == dtosmsfacility.MessageFromInColumnId {
+							found = true
+							break
+						}
+					}
+					if !found {
+						log.Error("Can find sms sender column %v in table %v", dtosmsfacility.MessageFromInColumnId, dtosmsfacility.DeliveryDataId)
+						return
+					}
+					dtotablecolumn, err := tablecolumnrepository.Get(dtosmsfacility.MessageFromInColumnId)
+					if err != nil {
+						return
+					}
+					found, err = smssenderrepository.Belongs(dtotablecolumn, dtoorder.Unit_ID)
+					if err != nil {
+						return
+					}
+					if !found {
+						log.Error("SMS sender column %v data doesn't belong to unit %v", dtotablecolumn.ID, dtoorder.Unit_ID)
+						return
+					}
+				} else {
+					dtosmsender, err := smssenderrepository.Get(dtosmsfacility.MessageFromInColumnId)
+					if err != nil {
+						return
+					}
+					if dtosmsender.Unit_ID != dtoorder.Unit_ID {
+						log.Error("SMS sender %v unit doesn't match order %v unit", dtosmsender.ID, dtoorder.ID)
+						return
+					}
+				}
+
+				var columnmobilephone_id int64
+				if dtosmsfacility.MessageToInColumnId != 0 {
+					found := false
+					for _, mobilephone := range smstable.MobilePhones {
+						if mobilephone.ID == dtosmsfacility.MessageToInColumnId {
+							found = true
+							columnmobilephone_id = dtosmsfacility.MessageToInColumnId
+							break
+						}
+					}
+					if !found {
+						log.Error("Can find mobile phone column %v in table %v", dtosmsfacility.MessageToInColumnId, dtosmsfacility.DeliveryDataId)
+						return
+					}
+				} else {
+					if len(smstable.MobilePhones) == 0 {
+						log.Error("Can find mobile column in table %v", dtosmsfacility.DeliveryDataId)
+						return
+					} else {
+						columnmobilephone_id = smstable.MobilePhones[0].ID
+					}
+				}
+
+				if dtosmsfacility.MessageBodyInColumnId != 0 {
+					found := false
+					for _, message := range smstable.Messages {
+						if message.ID == dtosmsfacility.MessageBodyInColumnId {
+							found = true
+							break
+						}
+					}
+					if !found {
+						log.Error("Can find message column %v in table %v", dtosmsfacility.MessageBodyInColumnId, dtosmsfacility.DeliveryDataId)
+						return
+					}
+				}
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_SUPPLIER_COST_NEW, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+
+				tablecolumns := []models.DtoTableColumn{}
+				var columnmessage, columnmobilephone *models.DtoTableColumn
+				if dtosmsfacility.MessageBodyInColumnId != 0 {
+					columnmessage, err = tablecolumnrepository.Get(dtosmsfacility.MessageBodyInColumnId)
+					if err != nil {
+						return
+					}
+					tablecolumns = append(tablecolumns, *columnmessage)
+				}
+				columnmobilephone, err = tablecolumnrepository.Get(columnmobilephone_id)
+				if err != nil {
+					return
+				}
+				tablecolumns = append(tablecolumns, *columnmobilephone)
+
+				apitablerows, err := tablerowrepository.GetAll("", "", dtosmsfacility.DeliveryDataId, &tablecolumns)
+				if err != nil {
+					return
+				}
+				mobileoperatorsmses := make(map[int]int)
+				for _, apitablerow := range *apitablerows {
+					smscount := 0
+					mobileoperator_id := 0
+					for _, apitablecell := range apitablerow.Cells {
+						if apitablecell.Table_Column_ID == columnmessage.ID {
+							if dtosmsfacility.MessageBodyInColumnId != 0 {
+								smscount = CalculateSMSQuantity(apitablecell.Value)
+							} else {
+								smscount = CalculateSMSQuantity(dtosmsfacility.MessageBody)
+							}
+						}
+						if apitablecell.Table_Column_ID == columnmobilephone_id {
+							mobileoperator_id, _ = strconv.Atoi(apitablecell.Value)
+						}
+					}
+					mobileoperatorsmses[mobileoperator_id] += smscount
+				}
+
+				smshlrprices, err := GetSMSHLRPricesInternal(models.SERVICE_TYPE_SMS, pricerepository, tablecolumnrepository, tablerowrepository,
+					mobileoperatorrepository)
+				if err != nil {
+					return
+				}
+				dtosmsfacility.Cost = 0
+				for _, smshlrprice := range *smshlrprices {
+					count := mobileoperatorsmses[smshlrprice.Mobile_Operator_ID]
+					if smshlrprice.Supplier_ID == dtoorder.Supplier_ID && count != 0 &&
+						count >= smshlrprice.AmountRange.Begin && (count <= smshlrprice.AmountRange.End || smshlrprice.AmountRange.End == 0) {
+						dtosmsfacility.Cost += float64(count) * smshlrprice.Price
+						delete(mobileoperatorsmses, smshlrprice.Mobile_Operator_ID)
+					}
+				}
+				if len(mobileoperatorsmses) != 0 {
+					log.Error("Can't find price list for supplier%v", dtoorder.Supplier_ID)
+					return
+				}
+
+				dtosmsfacility.CostFactual = dtosmsfacility.Cost
+				err = smsfacilityrepository.Update(dtosmsfacility, true, false)
+				if err != nil {
+					return
+				}
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_CUSTOMER_NEW_COST_CONFIRMED, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_MODERATOR_BEGIN, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+
+				dtocompany, err := companyrepository.GetPrimaryByUnit(dtoorder.Unit_ID)
+				if err != nil {
+					return
+				}
+
+				balance, err := operationrepository.CalculateBalance(dtoorder.Unit_ID)
+				if err != nil {
+					return
+				}
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_MODERATOR_BEGIN, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+
+				if balance < dtosmsfacility.Cost {
+					log.Error("Not enough money at unit balance %v to pay for order %v execution", dtoorder.Unit_ID, dtoorder.ID)
+					return
+				}
+
+				dtounit, err := unitrepository.Get(config.Configuration.SystemAccount)
+				if err != nil {
+					return
+				}
+				dtotransactiontype, err := transactiontyperepository.Get(models.TRANSACTION_TYPE_SERVICE_FEE_SMS)
+				if err != nil {
+					return
+				}
+
+				dtotransaction := new(models.DtoTransaction)
+				dtotransaction.Source_ID = dtoorder.Unit_ID
+				dtotransaction.Destination_ID = dtounit.ID
+				dtotransaction.Type_ID = dtotransactiontype.ID
+
+				dtoinvoice := new(models.DtoInvoice)
+				dtoinvoice.Company_ID = dtocompany.ID
+				if dtocompany.VAT != 0 {
+					dtoinvoice.VAT = (dtosmsfacility.Cost / (1 + float64(dtocompany.VAT)/100)) * float64(dtocompany.VAT) / 100
+				}
+				dtoinvoice.Total = dtosmsfacility.Cost
+				dtoinvoice.Paid = true
+				dtoinvoice.Created = time.Now()
+				dtoinvoice.Active = true
+				dtoinvoice.InvoiceItems = []models.DtoInvoiceItem{*models.NewDtoInvoiceItem(0, 0, dtotransactiontype.Name, models.INVOICE_ITEM_TYPE_ROUBLE,
+					1, dtoinvoice.Total, dtoinvoice.Total)}
+
+				err = invoicerepository.PaidForOrder(dtoorder.ID, dtoinvoice, dtotransaction, true)
+				if err != nil {
+					return
+				}
+
+				dtoworkdatatable, err := customertablerepository.Copy(dtodatatable, true)
+				if err != nil {
+					return
+				}
+				dtodatatable.TypeID = models.TABLE_TYPE_READONLY
+				err = customertablerepository.Update(dtodatatable)
+				if err != nil {
+					return
+				}
+				dtoworkdatatable.TypeID = models.TABLE_TYPE_HIDDEN
+				err = customertablerepository.Update(dtoworkdatatable)
+				if err != nil {
+					return
+				}
+
+				dtoworktable := models.NewDtoWorkTable(dtoorder.ID, dtoworkdatatable.ID)
+				err = worktablerepository.Create(dtoworktable, nil)
+				if err != nil {
+					return
+				}
+
+				position, err := tablecolumnrepository.GetDefaultPosition(dtoworkdatatable.ID)
+				if err != nil {
+					return
+				}
+				position++
+				fieldnum, err := FindFreeColumnInternal(dtoworkdatatable.ID, 0, tablecolumnrepository)
+				if err != nil {
+					return
+				}
+
+				dtotablecolumn := new(models.DtoTableColumn)
+				dtotablecolumn.Created = time.Now()
+				dtotablecolumn.Position = position
+				dtotablecolumn.Name = "Status"
+				dtotablecolumn.Customer_Table_ID = dtoworkdatatable.ID
+				dtotablecolumn.Column_Type_ID = models.COLUMN_TYPE_DEFAULT
+				dtotablecolumn.Prebuilt = true
+				dtotablecolumn.FieldNum = fieldnum
+				dtotablecolumn.Active = true
+				dtotablecolumn.Edition = 0
+
+				err = tablecolumnrepository.Create(dtotablecolumn, nil)
+				if err != nil {
+					return
+				}
+
+				tablecolumns = []models.DtoTableColumn{*dtotablecolumn}
+				apitablerows, err = tablerowrepository.GetAll("", "", dtoworkdatatable.ID, &tablecolumns)
+				if err != nil {
+					return
+				}
+
+				workdatatablecolumns, err := tablecolumnrepository.GetByTable(dtoworkdatatable.ID)
+				if err != nil {
+					return
+				}
+
+				for _, apitablerow := range *apitablerows {
+					tablerow, err := tablerowrepository.Get(apitablerow.ID)
+					if err != nil {
+						return
+					}
+
+					tablecells, err := tablerow.TableRowToDtoTableCells(workdatatablecolumns)
+					if err != nil {
+						return
+					}
+
+					for i, _ := range *tablecells {
+						for j, _ := range tablecolumns {
+							if (*tablecells)[i].Table_Column_ID == tablecolumns[j].ID {
+								(*tablecells)[i].Value = strconv.Itoa(i * j)
+								(*tablecells)[i].Checked = true
+								(*tablecells)[i].Valid = true
+							}
+						}
+					}
+
+					err = tablerow.TableCellsToTableRow(tablecells, workdatatablecolumns)
+					if err != nil {
+						return
+					}
+
+					err = tablerowrepository.Update(tablerow, nil, true, false)
+					if err != nil {
+						return
+					}
+				}
+
+				if dtosmsfacility.DeliveryDataDelete {
+					err = customertablerepository.Deactivate(dtodatatable)
+					if err != nil {
+						return
+					}
+				} else {
+					dtodatatable.TypeID = models.TABLE_TYPE_DEFAULT
+					err = customertablerepository.Update(dtodatatable)
+					if err != nil {
+						return
+					}
+				}
+
+				worktables, err := worktablerepository.GetByOrder(dtoorder.ID)
+				if err != nil {
+					return
+				}
+				for _, worktable := range *worktables {
+					dtocustomertable, err := customertablerepository.Get(worktable.Customer_Table_ID)
+					if err != nil {
+						return
+					}
+					err = customertablerepository.Deactivate(dtocustomertable)
+					if err != nil {
+						return
+					}
+				}
+
+				dtoorderstatus = models.NewDtoOrderStatus(dtoorder.ID, models.ORDER_STATUS_SUPPLIER_CLOSE, true, "", time.Now())
+				err = orderstatusrepository.Save(dtoorderstatus, nil)
+				if err != nil {
+					return
+				}
+
+			}
+		}
+	}
+
 }
