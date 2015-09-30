@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image/jpeg"
-	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"types"
@@ -72,7 +72,7 @@ func GetCaptcha(r render.Render, captcharepository services.CaptchaRepository, s
 func ConfirmEmail(errors binding.Errors, confirm models.EmailConfirm, request *http.Request, r render.Render,
 	emailrepository services.EmailRepository, sessionrepository services.SessionRepository, userrepository services.UserRepository,
 	templaterepository services.TemplateRepository) {
-	if helpers.CheckValidation(&confirm, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
@@ -231,9 +231,101 @@ func GetAddressTypes(w http.ResponseWriter, r render.Render, addresstypereposito
 	helpers.RenderJSONArray(addresstypes, len(*addresstypes), w, r)
 }
 
+// get /api/v1.0/services/suppliers/
+func GetSuppliers(w http.ResponseWriter, request *http.Request, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository,
+	unitrepository services.UnitRepository, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
+	session *models.DtoSession) {
+	dtounit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.SupplierFacilitySearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				switch field {
+				case "project":
+					project_id, err := strconv.ParseInt(filter.Value, 0, 64)
+					if err != nil {
+						log.Error("Can't convert to number %v with value %v", err, filter.Value)
+						r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+						return
+					}
+					err = helpers.CheckProjectAccess(project_id, session.UserID, r, projectrepository, session.Language)
+					if err != nil {
+						return
+					}
+					exps = append(exps, fmt.Sprintf("f.supplier_id in (select supplier_id from orders where project_id %v %v)",
+						filter.Op, project_id))
+				case "order":
+					order_id, err := strconv.ParseInt(filter.Value, 0, 64)
+					if err != nil {
+						log.Error("Can't convert to number %v with value %v", err, filter.Value)
+						r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+						return
+					}
+					err = helpers.CheckOrderAccess(order_id, session.UserID, r, orderrepository, session.Language)
+					if err != nil {
+						return
+					}
+					exps = append(exps, fmt.Sprintf("f.supplier_id in (select supplier_id from orders where id %v %v)",
+						filter.Op, order_id))
+				default:
+					exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+				}
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.SupplierFacilitySort), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	facilities, err := supplierfacilityrepository.GetByUnit(dtounit.ID, query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(facilities, len(*facilities), w, r)
+}
+
 // get /api/v1.0/services/suppliers/sms/
 func GetSMSSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
-	smsfacilities, err := supplierfacilityrepository.GetAll(models.SERVICE_TYPE_SMS)
+	smsfacilities, err := supplierfacilityrepository.GetByAlias(models.SERVICE_TYPE_SMS)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -243,9 +335,21 @@ func GetSMSSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrep
 	helpers.RenderJSONArray(smsfacilities, len(*smsfacilities), w, r)
 }
 
+// get /api/v1.0/services/suppliers/header/
+func GetHeaderSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
+	headerfacilities, err := supplierfacilityrepository.GetByAlias(models.SERVICE_TYPE_HEADER)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(headerfacilities, len(*headerfacilities), w, r)
+}
+
 // get /api/v1.0/services/suppliers/hlr/
 func GetHLRSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
-	hlrfacilities, err := supplierfacilityrepository.GetAll(models.SERVICE_TYPE_HLR)
+	hlrfacilities, err := supplierfacilityrepository.GetByAlias(models.SERVICE_TYPE_HLR)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -257,7 +361,7 @@ func GetHLRSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrep
 
 // get /api/v1.0/services/suppliers/recognize/
 func GetRecognizeSuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
-	recognizefacilities, err := supplierfacilityrepository.GetAll(models.SERVICE_TYPE_RECOGNIZE)
+	recognizefacilities, err := supplierfacilityrepository.GetByAlias(models.SERVICE_TYPE_RECOGNIZE)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -269,7 +373,7 @@ func GetRecognizeSuppliers(w http.ResponseWriter, r render.Render, supplierfacil
 
 // get /api/v1.0/services/suppliers/verification/
 func GetVerifySuppliers(w http.ResponseWriter, r render.Render, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
-	verifyfacilities, err := supplierfacilityrepository.GetAll(models.SERVICE_TYPE_VERIFY)
+	verifyfacilities, err := supplierfacilityrepository.GetByAlias(models.SERVICE_TYPE_VERIFY)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -282,8 +386,8 @@ func GetVerifySuppliers(w http.ResponseWriter, r render.Render, supplierfacility
 // get /api/v1.0/services/suppliers/sms/price/
 func GetSMSPrices(w http.ResponseWriter, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, mobileoperatorrepository services.MobileOperatorRepository, session *models.DtoSession) {
-	smshlrprices, err := helpers.GetSMSHLRPrices(models.SERVICE_TYPE_SMS, r, pricerepository, tablecolumnrepository,
-		tablerowrepository, mobileoperatorrepository, session.Language)
+	smshlrprices, err := helpers.GetSMSHLRPrices(models.SERVICE_TYPE_SMS, 0, r, pricerepository, tablecolumnrepository,
+		tablerowrepository, mobileoperatorrepository, session.Language, false)
 	if err != nil {
 		return
 	}
@@ -294,8 +398,8 @@ func GetSMSPrices(w http.ResponseWriter, r render.Render, pricerepository servic
 // get /api/v1.0/services/suppliers/hlr/price/
 func GetHLRPrices(w http.ResponseWriter, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, mobileoperatorrepository services.MobileOperatorRepository, session *models.DtoSession) {
-	smshlrprices, err := helpers.GetSMSHLRPrices(models.SERVICE_TYPE_HLR, r, pricerepository, tablecolumnrepository,
-		tablerowrepository, mobileoperatorrepository, session.Language)
+	smshlrprices, err := helpers.GetSMSHLRPrices(models.SERVICE_TYPE_HLR, 0, r, pricerepository, tablecolumnrepository,
+		tablerowrepository, mobileoperatorrepository, session.Language, false)
 	if err != nil {
 		return
 	}
@@ -327,11 +431,35 @@ func GetVerifyProducts(w http.ResponseWriter, r render.Render, verifyproductrepo
 	helpers.RenderJSONArray(verifyproducts, len(*verifyproducts), w, r)
 }
 
+// get /api/v1.0/classification/header/
+func GetHeaderProducts(w http.ResponseWriter, r render.Render, headerproductrepository services.HeaderProductRepository, session *models.DtoSession) {
+	headerproducts, err := headerproductrepository.GetAll()
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(headerproducts, len(*headerproducts), w, r)
+}
+
+// get /api/v1.0/services/suppliers/header/price/
+func GetHeaderPrices(w http.ResponseWriter, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
+	tablerowrepository services.TableRowRepository, headerproductrepository services.HeaderProductRepository, session *models.DtoSession) {
+	headerprices, err := helpers.GetHeaderPrices(models.SERVICE_TYPE_HEADER, 0, r, pricerepository, tablecolumnrepository, tablerowrepository,
+		headerproductrepository, session.Language, false)
+	if err != nil {
+		return
+	}
+
+	helpers.RenderJSONArray(headerprices, len(*headerprices), w, r)
+}
+
 // get /api/v1.0/services/suppliers/recognize/price/
 func GetRecognizePrices(w http.ResponseWriter, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, recognizeproductrepository services.RecognizeProductRepository, session *models.DtoSession) {
-	recognizeprices, err := helpers.GetRecognizePrices(models.SERVICE_TYPE_RECOGNIZE, r, pricerepository, tablecolumnrepository,
-		tablerowrepository, recognizeproductrepository, session.Language)
+	recognizeprices, err := helpers.GetRecognizePrices(models.SERVICE_TYPE_RECOGNIZE, 0, r, pricerepository, tablecolumnrepository,
+		tablerowrepository, recognizeproductrepository, session.Language, false)
 	if err != nil {
 		return
 	}
@@ -342,8 +470,8 @@ func GetRecognizePrices(w http.ResponseWriter, r render.Render, pricerepository 
 // get /api/v1.0/services/suppliers/verification/price/
 func GetVerifyPrices(w http.ResponseWriter, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, verifyproductrepository services.VerifyProductRepository, session *models.DtoSession) {
-	verifyprices, err := helpers.GetVerifyPrices(models.SERVICE_TYPE_VERIFY, r, pricerepository, tablecolumnrepository, tablerowrepository,
-		verifyproductrepository, session.Language)
+	verifyprices, err := helpers.GetVerifyPrices(models.SERVICE_TYPE_VERIFY, 0, r, pricerepository, tablecolumnrepository, tablerowrepository,
+		verifyproductrepository, session.Language, false)
 	if err != nil {
 		return
 	}
@@ -363,11 +491,24 @@ func GetComplexStatuses(w http.ResponseWriter, r render.Render, complexstatusrep
 	helpers.RenderJSONArray(complexstatuses, len(*complexstatuses), w, r)
 }
 
+// get /api/v1.0/classification/tariffplans/
+func GetTariffPlans(w http.ResponseWriter, r render.Render, tariffplanrepository services.TariffPlanRepository, session *models.DtoSession) {
+	tariffplans, err := tariffplanrepository.GetAll()
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(tariffplans, len(*tariffplans), w, r)
+}
+
 // post /api/v1.0/sayhello/
 func CreateFeedback(errors binding.Errors, viewfeedback models.ViewFeedback, request *http.Request, r render.Render,
 	feedbackrepository services.FeedbackRepository, captcharepository services.CaptchaRepository,
-	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, templaterepository services.TemplateRepository) {
-	if helpers.CheckValidation(&viewfeedback, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, templaterepository services.TemplateRepository,
+	accesslogrepository services.AccessLogRepository) {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	var user_id int64 = 0
@@ -392,22 +533,12 @@ func CreateFeedback(errors binding.Errors, viewfeedback models.ViewFeedback, req
 	dtofeedback.Name = viewfeedback.Name
 	dtofeedback.Email = strings.ToLower(viewfeedback.Email)
 	dtofeedback.Message = viewfeedback.Message
-	dtofeedback.Created = time.Now()
-	host, _, err := net.SplitHostPort(request.RemoteAddr)
+
+	dtoaccesslog, err := helpers.CreateAccessLog(request.RequestURI, request, r, accesslogrepository, config.Configuration.Server.DefaultLanguage)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
-	dtofeedback.IP_Address = host
-	dnses, err := net.LookupAddr(dtofeedback.IP_Address)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
-		return
-	}
-	dtofeedback.Reverse_DNS = strings.Join(dnses, ",")
-	dtofeedback.User_Agent = request.UserAgent()
+	dtofeedback.AccessLog_ID = dtoaccesslog.ID
 
 	err = feedbackrepository.Create(dtofeedback)
 	if err != nil {
@@ -417,7 +548,7 @@ func CreateFeedback(errors binding.Errors, viewfeedback models.ViewFeedback, req
 	}
 
 	buf, err := templaterepository.GenerateText(models.NewDtoHTMLTemplate(dtofeedback.Message, config.Configuration.Server.DefaultLanguage),
-		services.TEMPLATE_FEEDBACK, "")
+		services.TEMPLATE_FEEDBACK, services.TEMPLATE_DIRECTORY_EMAILS, "")
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})

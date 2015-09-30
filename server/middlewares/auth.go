@@ -421,6 +421,37 @@ func RequireReportRights(r render.Render, params martini.Params, userrepository 
 	}
 }
 
+func RequireDocumentRights(r render.Render, params martini.Params, documentrepository services.DocumentRepository, session *models.DtoSession) {
+	if !IsAdmin(session.Roles) {
+		var allowed bool = false
+		if IsUser(session.Roles) {
+			param := params[helpers.PARAM_NAME_DOCUMENT_ID]
+			if param != "" && len(param) <= helpers.PARAM_LENGTH_MAX {
+				documentid, err := strconv.ParseInt(param, 0, 64)
+				if err == nil {
+					allowed, err = documentrepository.CheckUserAccess(session.UserID, documentid)
+					if err == nil {
+						if !allowed {
+							log.Error("Document %v is not accessible for user %v", documentid, session.UserID)
+						}
+					}
+				} else {
+					log.Error("Can't convert parameter %v with value %v", err, param)
+				}
+			} else {
+				log.Error("Parameter value is wrong %v", param)
+			}
+		} else {
+			log.Error("There is no required role for user %v", session.UserID)
+		}
+		if !allowed {
+			r.JSON(http.StatusForbidden, types.Error{Code: types.TYPE_ERROR_METHOD_NOTALLOWED,
+				Message: config.Localization[session.Language].Errors.Api.Method_NotAllowed})
+			return
+		}
+	}
+}
+
 func IsUserRoleAllowed(existingRoles []models.UserRole, requiredRoles []models.UserRole) bool {
 	for _, requiredRole := range requiredRoles {
 		for _, existingRole := range existingRoles {

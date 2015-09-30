@@ -50,7 +50,7 @@ func (recognizeproductservice *RecognizeProductService) FindByName(name string) 
 func (recognizeproductservice *RecognizeProductService) Get(id int) (recognizeproduct *models.DtoRecognizeProduct, err error) {
 	recognizeproduct = new(models.DtoRecognizeProduct)
 	err = recognizeproductservice.DbContext.SelectOne(recognizeproduct,
-		"select * from "+recognizeproductservice.Table+" where id = ? order by position asc", id)
+		"select * from "+recognizeproductservice.Table+" where id = ?", id)
 	if err != nil {
 		log.Error("Error during getting recognize product object from database %v with value %v", err, id)
 		return nil, err
@@ -62,7 +62,7 @@ func (recognizeproductservice *RecognizeProductService) Get(id int) (recognizepr
 func (recognizeproductservice *RecognizeProductService) GetAll() (recognizeproducts *[]models.ApiRecognizeProduct, err error) {
 	recognizeproducts = new([]models.ApiRecognizeProduct)
 	_, err = recognizeproductservice.DbContext.Select(recognizeproducts,
-		"select id, position, name, description, increase from "+recognizeproductservice.Table+" where active = 1")
+		"select id, position, name, description, increase from "+recognizeproductservice.Table+" where active = 1 order by position asc")
 	if err != nil {
 		log.Error("Error during getting all recognize product object from database %v", err)
 		return nil, err

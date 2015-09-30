@@ -3,7 +3,6 @@ package models
 import (
 	"github.com/martini-contrib/binding"
 	"net/http"
-	"time"
 )
 
 // Структура для организации хранения обращения
@@ -16,30 +15,23 @@ type ViewFeedback struct {
 }
 
 type DtoFeedback struct {
-	ID          int64     `db:"id"`          // Уникальный идентификатор обращения
-	User_ID     int64     `db:"user_id"`     // Идентификатор пользователя
-	Name        string    `db:"name"`        // Имя пользователя
-	Email       string    `db:"email"`       // Email пользователя
-	Message     string    `db:"message"`     // Сообщение
-	Created     time.Time `db:"created"`     // Время обращения
-	IP_Address  string    `db:"ip_address"`  // IP адрес обращения
-	Reverse_DNS string    `db:"reverse_dns"` // Обратный DNS обращения
-	User_Agent  string    `db:"user_agent"`  // User Agent обращения
+	ID           int64  `db:"id"`           // Уникальный идентификатор обращения
+	User_ID      int64  `db:"user_id"`      // Идентификатор пользователя
+	Name         string `db:"name"`         // Имя пользователя
+	Email        string `db:"email"`        // Email пользователя
+	Message      string `db:"message"`      // Сообщение
+	AccessLog_ID int64  `db:"accesslog_id"` // Идентификатор лога
 }
 
 // Конструктор создания объекта обращения в бд
-func NewDtoFeedback(id int64, user_id int64, name string, email string, message string, created time.Time, ip_address string,
-	reverse_dns string, user_agent string) *DtoFeedback {
+func NewDtoFeedback(id int64, user_id int64, name string, email string, message string, accesslog_id int64) *DtoFeedback {
 	return &DtoFeedback{
-		ID:          id,
-		User_ID:     user_id,
-		Name:        name,
-		Email:       email,
-		Message:     message,
-		Created:     created,
-		IP_Address:  ip_address,
-		Reverse_DNS: reverse_dns,
-		User_Agent:  user_agent,
+		ID:           id,
+		User_ID:      user_id,
+		Name:         name,
+		Email:        email,
+		Message:      message,
+		AccessLog_ID: accesslog_id,
 	}
 }
 

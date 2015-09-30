@@ -6,7 +6,9 @@ import (
 	"application/services"
 	"errors"
 	"github.com/martini-contrib/render"
+	"net"
 	"net/http"
+	"time"
 	"types"
 )
 
@@ -149,8 +151,19 @@ func SendConfirmations(dtouser *models.DtoUser, session *models.DtoSession, requ
 					subject = config.Localization[confEmail.Language].Messages.EmailSubject
 				}
 
+				host := request.Header.Get(REQUEST_HEADER_X_FORWARDED_FOR)
+				if host == "" {
+					host, _, err = net.SplitHostPort(request.RemoteAddr)
+					if err != nil {
+						log.Error("Can't detect ip address %v from %v", err, request.RemoteAddr)
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+							Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+						return err
+					}
+				}
 				buf, err := templaterepository.GenerateText(models.NewDtoCodeTemplate(models.NewDtoTemplate(confEmail.Email, confEmail.Language,
-					request.Host), confEmail.Code), services.TEMPLATE_EMAIL_CONFIRMATION, services.TEMPLATE_LAYOUT)
+					request.Host, time.Now(), host), confEmail.Code), services.TEMPLATE_EMAIL_CONFIRMATION, services.TEMPLATE_DIRECTORY_EMAILS,
+					services.TEMPLATE_LAYOUT)
 				if err != nil {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[session.Language].Errors.Api.Object_NotExist})

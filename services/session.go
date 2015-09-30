@@ -10,6 +10,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -71,8 +72,9 @@ func (sessionservice *SessionService) GetAndSaveSession(request *http.Request, r
 	if token == "" {
 		cookie, errCookie := request.Cookie(ACCESS_TOKEN_COOKIE_NAME)
 		if errCookie == nil {
-			if (cookie.Expires.Sub(time.Now()) > 0) && (cookie.Domain == config.Configuration.Server.Host) {
-				token = cookie.Value
+			token, err = url.QueryUnescape(cookie.Value)
+			if err != nil {
+				log.Error("Can't unescape session cookie %v with value %v", err, cookie.Value)
 			}
 		}
 	}
@@ -103,9 +105,6 @@ func (sessionservice *SessionService) GetAndSaveSession(request *http.Request, r
 		session.LastActivity = time.Now()
 		err = sessionservice.Update(session, true, false)
 		if err != nil {
-			if !quietMode {
-				log.Error("Can't update session object in database %v with value %v", err, token)
-			}
 			return nil, token, err
 		}
 	}

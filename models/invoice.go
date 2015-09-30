@@ -6,7 +6,12 @@ import (
 	"github.com/martini-contrib/binding"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+)
+
+const (
+	DATA_FORMAT_EXPORT_PDF = "pdf"
 )
 
 // Структура для организации хранения счета
@@ -23,39 +28,46 @@ type ApiMetaInvoice struct {
 }
 
 type ApiShortInvoice struct {
-	ID         int64   `json:"id" db:"id"`                         // Уникальный идентификатор счета
-	Company_ID int64   `json:"organisationId" db:"organisationId"` // Идентификатор компании
-	Total      float64 `json:"total" db:"total"`                   // Всего
-	Paid       bool    `json:"paid" db:"paid"`                     // Оплачен
-	Deleted    bool    `json:"del" db:"del"`                       // Удален
+	ID         int64     `json:"id" db:"id"`                         // Уникальный идентификатор счета
+	Company_ID int64     `json:"organisationId" db:"organisationId"` // Идентификатор компании
+	Created    time.Time `json:"created" db:"created"`               // Время создания
+	Total      float64   `json:"total" db:"total"`                   // Всего
+	Paid       bool      `json:"paid" db:"paid"`                     // Оплачен
+	PaidAt     time.Time `json:"paidDate" db:"paidDate"`             // Время оплаты
+	Deleted    bool      `json:"del" db:"del"`                       // Удален
 }
 
 type ApiLongInvoice struct {
 	Company_ID   int64            `json:"organisationId" db:"company_id"` // Идентификатор компании
+	Created      time.Time        `json:"created" db:"created"`           // Время создания
 	VAT          float64          `json:"vat" db:"vat"`                   // НДС
 	Total        float64          `json:"total" db:"total"`               // Всего
 	InvoiceItems []ApiInvoiceItem `json:"goods,omitempty" db:"-"`         // Позиции счета
 	Paid         bool             `json:"paid" db:"paid"`                 // Оплачен
+	PaidAt       time.Time        `json:"paidDate" db:"paid_at"`          // Время оплаты
 	Deleted      bool             `json:"del" db:"del"`                   // Удален
 }
 
 type ApiFullInvoice struct {
 	ID           int64            `json:"id" db:"id"`                     // Уникальный идентификатор счета
 	Company_ID   int64            `json:"organisationId" db:"company_id"` // Идентификатор компании
+	Created      time.Time        `json:"created" db:"created"`           // Время создания
 	VAT          float64          `json:"vat" db:"vat"`                   // НДС
 	Total        float64          `json:"total" db:"total"`               // Всего
 	InvoiceItems []ApiInvoiceItem `json:"goods,omitempty" db:"-"`         // Позиции счета
 	Paid         bool             `json:"paid" db:"paid"`                 // Оплачен
+	PaidAt       time.Time        `json:"paidDate" db:"paid_at"`          // Время оплаты
 	Deleted      bool             `json:"del" db:"del"`                   // Удален
 }
 
 type InvoiceSearch struct {
-	ID         int64   `query:"id" search:"id"`                     // Уникальный идентификатор счета
-	Company_ID int64   `query:"organisationId" search:"company_id"` // Идентификатор компании
-	Total      float64 `query:"total" search:"total"`               // Всего
-	Paid       bool    `query:"paid" search:"paid"`                 // Оплачен
-	Deleted    bool    `query:"del" search:"(not active)"`          // Удален
-
+	ID         int64     `query:"id" search:"id"`                                                // Уникальный идентификатор счета
+	Company_ID int64     `query:"organisationId" search:"company_id"`                            // Идентификатор компании
+	Created    time.Time `query:"created" search:"created" group:"convert(created using utf8)"`  // Время создания
+	Total      float64   `query:"total" search:"total" group:"total"`                            // Всего
+	Paid       bool      `query:"paid" search:"paid"`                                            // Оплачен
+	PaidAt     time.Time `query:"paidDate" search:"paid_at" group:"convert(paid_at using utf8)"` // Время оплаты
+	Deleted    bool      `query:"del" search:"(not active)"`                                     // Удален
 }
 
 type DtoInvoice struct {
@@ -67,6 +79,7 @@ type DtoInvoice struct {
 	Paid         bool             `db:"paid"`       // Оплачен
 	Created      time.Time        `db:"created"`    // Время создания
 	Active       bool             `db:"active"`     // Aктивен
+	PaidAt       time.Time        `db:"paid_at"`    // Время оплаты
 }
 
 // Конструктор создания объекта счета в api
@@ -79,41 +92,51 @@ func NewApiMetaInvoice(total int64, unpaid int64, companies int64, deleted int64
 	}
 }
 
-func NewApiShortInvoice(id int64, company_id int64, vat float64, total float64, paid bool, deleted bool) *ApiShortInvoice {
+func NewApiShortInvoice(id int64, company_id int64, created time.Time, vat float64, total float64,
+	paid bool, paidat time.Time, deleted bool) *ApiShortInvoice {
 	return &ApiShortInvoice{
 		ID:         id,
 		Company_ID: company_id,
+		Created:    created,
 		Total:      total,
 		Paid:       paid,
+		PaidAt:     paidat,
 		Deleted:    deleted,
 	}
 }
 
-func NewApiLongInvoice(company_id int64, vat float64, total float64, invoiceitems []ApiInvoiceItem, paid bool, deleted bool) *ApiLongInvoice {
+func NewApiLongInvoice(company_id int64, created time.Time, vat float64, total float64, invoiceitems []ApiInvoiceItem,
+	paid bool, paidat time.Time, deleted bool) *ApiLongInvoice {
 	return &ApiLongInvoice{
 		Company_ID:   company_id,
+		Created:      created,
 		VAT:          vat,
 		Total:        total,
 		InvoiceItems: invoiceitems,
 		Paid:         paid,
+		PaidAt:       paidat,
 		Deleted:      deleted,
 	}
 }
 
-func NewApiFullInvoice(id int64, company_id int64, vat float64, total float64, invoiceitems []ApiInvoiceItem, paid bool, deleted bool) *ApiFullInvoice {
+func NewApiFullInvoice(id int64, company_id int64, created time.Time, vat float64, total float64, invoiceitems []ApiInvoiceItem,
+	paid bool, paidat time.Time, deleted bool) *ApiFullInvoice {
 	return &ApiFullInvoice{
 		ID:           id,
 		Company_ID:   company_id,
+		Created:      created,
 		VAT:          vat,
 		Total:        total,
 		InvoiceItems: invoiceitems,
 		Paid:         paid,
+		PaidAt:       paidat,
 		Deleted:      deleted,
 	}
 }
 
 // Конструктор создания объекта счета в бд
-func NewDtoInvoice(id int64, company_id int64, vat float64, total float64, invoiceitems []DtoInvoiceItem, paid bool, created time.Time, active bool) *DtoInvoice {
+func NewDtoInvoice(id int64, company_id int64, vat float64, total float64, invoiceitems []DtoInvoiceItem,
+	paid bool, created time.Time, active bool, paidat time.Time) *DtoInvoice {
 	return &DtoInvoice{
 		ID:           id,
 		Company_ID:   company_id,
@@ -123,6 +146,7 @@ func NewDtoInvoice(id int64, company_id int64, vat float64, total float64, invoi
 		Paid:         paid,
 		Created:      created,
 		Active:       active,
+		PaidAt:       paidat,
 	}
 }
 
@@ -146,6 +170,13 @@ func (invoice *InvoiceSearch) Extract(infield string, invalue string) (outfield 
 			break
 		}
 		outvalue = invalue
+	case "created":
+		fallthrough
+	case "paidDate":
+		if strings.Contains(invalue, "'") {
+			invalue = strings.Replace(invalue, "'", "''", -1)
+		}
+		outvalue = "'" + invalue + "'"
 	case "total":
 		_, errConv := strconv.ParseFloat(invalue, 64)
 		if errConv != nil {
@@ -170,7 +201,7 @@ func (invoice *InvoiceSearch) Extract(infield string, invalue string) (outfield 
 }
 
 func (invoice *InvoiceSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(invoice)
+	return GetAllGroupTags(invoice)
 }
 
 func (invoice *ViewInvoice) Validate(errors binding.Errors, req *http.Request) binding.Errors {

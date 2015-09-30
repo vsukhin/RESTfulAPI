@@ -7,10 +7,10 @@ import (
 	"text/template"
 )
 
-func (templateservice *TemplateService) GenerateText(object interface{}, name string, layout string) (buf *bytes.Buffer, err error) {
+func (templateservice *TemplateService) GenerateText(object interface{}, name string, directory string, layout string) (buf *bytes.Buffer, err error) {
 	var tpl *template.Template
 	buf = new(bytes.Buffer)
-	path := filepath.Join(config.Configuration.TemplateStorage, "/mailers")
+	path := filepath.Join(config.Configuration.TemplateStorage, directory)
 
 	if layout == "" {
 		tpl, err = template.ParseFiles(filepath.Join(path, name))

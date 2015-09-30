@@ -9,13 +9,67 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"strings"
 	"time"
 	"types"
 )
 
 // get /api/v1.0/tables/fieldtypes/
-func GetColumnTypes(w http.ResponseWriter, r render.Render, columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
-	columntypes, err := columntyperepository.GetAll()
+func GetColumnTypes(w http.ResponseWriter, request *http.Request, r render.Render, columntyperepository services.ColumnTypeRepository,
+	session *models.DtoSession) {
+	query := ""
+	default_filter := false
+	var filters *[]models.FilterExp
+	filters, err := helpers.GetFilterArray(new(models.ColumnTypeSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				if field == "private" {
+					default_filter = true
+				}
+				if field == "private" && ((filter.Op == "=" && filter.Value == "true") || (filter.Op == "!=" && filter.Value == "false") ||
+					(filter.Op == "like" && filter.Value == "true")) {
+					exps = append(exps, "`private` = false", "`private` = true")
+				} else {
+					exps = append(exps, "`"+field+"` "+filter.Op+" "+filter.Value)
+				}
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+	if !default_filter {
+		query += " and (`private` = false)"
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.ColumnTypeSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " `"+sort.Field+"` "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	columntypes, err := columntyperepository.GetAll(query)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -29,7 +83,7 @@ func GetColumnTypes(w http.ResponseWriter, r render.Render, columntyperepository
 func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewtablecolumn, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
@@ -47,7 +101,17 @@ func CreateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	dtotablecolumn := new(models.DtoTableColumn)
 	dtotablecolumn.Name = viewtablecolumn.Name
 	dtotablecolumn.Created = time.Now()
-	dtotablecolumn.Position = viewtablecolumn.Position
+	if viewtablecolumn.Position == 0 {
+		dtotablecolumn.Position, err = tablecolumnrepository.GetDefaultPosition(tableid)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		dtotablecolumn.Position++
+	} else {
+		dtotablecolumn.Position = viewtablecolumn.Position
+	}
 	dtotablecolumn.Column_Type_ID = viewtablecolumn.TypeID
 	dtotablecolumn.Customer_Table_ID = tableid
 	dtotablecolumn.Prebuilt = false
@@ -109,8 +173,8 @@ func GetTableColumn(r render.Render, params martini.Params, customertablereposit
 // put /api/v1.0/tables/:tid/field/:cid/
 func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTableColumn, r render.Render, params martini.Params,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
-	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewtablecolumn, errors, r, session.Language) != nil {
+	tablecolumnrepository services.TableColumnRepository, tablerowrepository services.TableRowRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	oldtablecolumn, err := helpers.CheckTableColumn(r, params, columntyperepository, customertablerepository, tablecolumnrepository, session.Language)
@@ -131,7 +195,17 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 	*newtablecolumn = *oldtablecolumn
 
 	newtablecolumn.Name = viewtablecolumn.Name
-	newtablecolumn.Position = viewtablecolumn.Position
+	if viewtablecolumn.Position == 0 {
+		newtablecolumn.Position, err = tablecolumnrepository.GetDefaultPosition(newtablecolumn.Customer_Table_ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+		newtablecolumn.Position++
+	} else {
+		newtablecolumn.Position = viewtablecolumn.Position
+	}
 	newtablecolumn.Column_Type_ID = viewtablecolumn.TypeID
 	newtablecolumn.Created = time.Now()
 	newtablecolumn.Edition += 1
@@ -146,6 +220,8 @@ func UpdateTableColumn(errors binding.Errors, viewtablecolumn models.ViewApiTabl
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
+
+	go helpers.CheckTableColumnCells(newtablecolumn, columntyperepository, tablerowrepository)
 
 	r.JSON(http.StatusOK, models.NewViewApiTableColumn(newtablecolumn.Name, newtablecolumn.Column_Type_ID, newtablecolumn.Position))
 }
@@ -178,7 +254,7 @@ func DeleteTableColumn(r render.Render, params martini.Params, customertablerepo
 func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.ViewApiOrderTableColumns, w http.ResponseWriter, r render.Render,
 	params martini.Params, customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&viewordertablecolumns, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TABLE_ID], session.Language)
@@ -197,7 +273,17 @@ func UpdateOrderTableColumn(errors binding.Errors, viewordertablecolumns models.
 	for i, _ := range *dtotablecolumns {
 		for _, viewordertablecolumn := range viewordertablecolumns {
 			if (*dtotablecolumns)[i].ID == viewordertablecolumn.ID {
-				(*dtotablecolumns)[i].Position = viewordertablecolumn.Position
+				if viewordertablecolumn.Position == 0 {
+					(*dtotablecolumns)[i].Position, err = tablecolumnrepository.GetDefaultPosition(tableid)
+					if err != nil {
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+							Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+						return
+					}
+					(*dtotablecolumns)[i].Position++
+				} else {
+					(*dtotablecolumns)[i].Position = viewordertablecolumn.Position
+				}
 			}
 		}
 	}

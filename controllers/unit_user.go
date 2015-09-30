@@ -4,7 +4,6 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
-	"application/server/middlewares"
 	"application/services"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -82,11 +81,12 @@ func GetUnitUsers(w http.ResponseWriter, request *http.Request, r render.Render,
 }
 
 // post /api/v1.0/user/administration/users/
-func CreateUnitUser(errors binding.Errors, user models.ViewShortUnitUser, request *http.Request, r render.Render,
+func CreateUnitUser(errors binding.Errors, user models.ViewUnitUser, request *http.Request, r render.Render,
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
-	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
+	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository,
+	accesslogrepository services.AccessLogRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -97,6 +97,12 @@ func CreateUnitUser(errors binding.Errors, user models.ViewShortUnitUser, reques
 	dtouser.Confirmed = false
 	dtouser.Surname = user.Surname
 	dtouser.Name = user.Name
+	if dtouser.Surname == "" {
+		dtouser.Surname = models.USER_SURNAME_DEFAULT
+	}
+	if dtouser.Name == "" {
+		dtouser.Name = models.USER_NAME_DEFAULT
+	}
 	dtouser.MiddleName = user.MiddleName
 	dtouser.WorkPhone = user.WorkPhone
 	dtouser.JobTitle = user.JobTitle
@@ -105,6 +111,7 @@ func CreateUnitUser(errors binding.Errors, user models.ViewShortUnitUser, reques
 	dtouser.Password = ""
 	dtouser.ReportAccess = true
 	dtouser.CaptchaRequired = false
+	dtouser.NewsBlocked = false
 
 	roles, err := grouprepository.GetDefault()
 	if err != nil {
@@ -124,14 +131,22 @@ func CreateUnitUser(errors binding.Errors, user models.ViewShortUnitUser, reques
 	dtouser.UnitID = unit.ID
 	dtouser.UnitAdmin = user.UnitAdmin
 
-	if helpers.CheckPrimaryUnitUserEmail(user.Emails, session.Language, r) != nil {
+	emailcount, err := helpers.CheckPrimaryUnitUserEmail(user.Emails, session.Language, r)
+	if err != nil {
 		return
 	}
 	dtouser.Emails = new([]models.DtoEmail)
-	if helpers.CheckPrimaryUnitUserMobilePhone(user.MobilePhones, session.Language, r) != nil {
+	mobilephonecount, err := helpers.CheckPrimaryUnitUserMobilePhone(user.MobilePhones, session.Language, r)
+	if err != nil {
 		return
 	}
 	dtouser.MobilePhones = new([]models.DtoMobilePhone)
+	if emailcount == 0 && mobilephonecount == 0 {
+		log.Error("Either primary email or primary mobile phone must be provided")
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
 
 	for _, updEmail := range user.Emails {
 		updEmail.Email = strings.ToLower(updEmail.Email)
@@ -191,6 +206,12 @@ func CreateUnitUser(errors binding.Errors, user models.ViewShortUnitUser, reques
 		})
 	}
 
+	dtoaccesslog, err := helpers.CreateAccessLog(dtouser.Code, request, r, accesslogrepository, session.Language)
+	if err != nil {
+		return
+	}
+	dtouser.Subscr_AccessLog_ID = dtoaccesslog.ID
+
 	err = userrepository.Create(dtouser, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -226,43 +247,45 @@ func GetUnitUser(r render.Render, params martini.Params, userrepository services
 	r.JSON(http.StatusOK, apiuser)
 }
 
-// put /api/v1.0/user/administration/users/:uid/
-func UpdateUnitUser(errors binding.Errors, user models.ViewLongUnitUser, request *http.Request, r render.Render, params martini.Params,
+// patch /api/v1.0/user/administration/users/:uid/
+func UpdateUnitUser(errors binding.Errors, user models.ViewUnitUser, request *http.Request, r render.Render, params martini.Params,
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtouser, err := helpers.CheckUnitUser(session.UserID, r, params, userrepository, session.Language)
 	if err != nil {
 		return
 	}
-
 	dtouser.Surname = user.Surname
 	dtouser.Name = user.Name
+	if dtouser.Surname == "" {
+		dtouser.Surname = models.USER_SURNAME_DEFAULT
+	}
+	if dtouser.Name == "" {
+		dtouser.Name = models.USER_NAME_DEFAULT
+	}
 	dtouser.MiddleName = user.MiddleName
 	dtouser.WorkPhone = user.WorkPhone
 	dtouser.JobTitle = user.JobTitle
 	dtouser.Language = strings.ToLower(user.Language)
-
-	if helpers.CheckUserRoles(user.Roles, session.Language, r, grouprepository) != nil {
-		return
-	}
-	if middlewares.IsAdmin(user.Roles) {
-		log.Error("Can't give administrator role to user at unit administration")
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
-	}
-	dtouser.Roles = user.Roles
 	dtouser.UnitAdmin = user.UnitAdmin
 
-	if helpers.CheckPrimaryUnitUserEmail(user.Emails, session.Language, r) != nil {
+	emailcount, err := helpers.CheckPrimaryUnitUserEmail(user.Emails, session.Language, r)
+	if err != nil {
 		return
 	}
-	if helpers.CheckPrimaryUnitUserMobilePhone(user.MobilePhones, session.Language, r) != nil {
+	mobilephonecount, err := helpers.CheckPrimaryUnitUserMobilePhone(user.MobilePhones, session.Language, r)
+	if err != nil {
+		return
+	}
+	if emailcount == 0 && mobilephonecount == 0 {
+		log.Error("Either primary email or primary mobile phone must be provided")
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 		return
 	}
 
@@ -326,10 +349,18 @@ func UpdateUnitUser(errors binding.Errors, user models.ViewLongUnitUser, request
 		}
 
 		if updEmail.Primary {
-			if !found || !curEmail.Confirmed {
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-				return
+			if dtouser.Confirmed {
+				if !found || !curEmail.Confirmed {
+					log.Error("Primary email is not confirmed %v", updEmail.Email)
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_EMAIL_NOTCONFIRMED,
+						Message: config.Localization[session.Language].Errors.Api.PrimaryEmail_NotConfirmed})
+					return
+				}
+			} else {
+				if !found || !curEmail.Confirmed {
+					dtouser.Code = (*arrOutEmails)[len(*arrOutEmails)-1].Code
+					dtouser.Password = (*arrOutEmails)[len(*arrOutEmails)-1].Code
+				}
 			}
 		}
 	}
@@ -379,6 +410,17 @@ func UpdateUnitUser(errors binding.Errors, user models.ViewLongUnitUser, request
 
 			*arrOutMobilePhones = append(*arrOutMobilePhones, curMobilePhone)
 		}
+
+		if updMobilePhone.Primary {
+			if dtouser.Confirmed {
+				if !found || !curMobilePhone.Confirmed {
+					log.Error("Primary mobile phone is not confirmed %v", updMobilePhone.Phone)
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_MOBILEPHONE_NOTCONFIRMED,
+						Message: config.Localization[session.Language].Errors.Api.PrimaryMobilePhone_NotConfirmed})
+					return
+				}
+			}
+		}
 	}
 
 	dtouser.Emails = arrOutEmails
@@ -390,7 +432,7 @@ func UpdateUnitUser(errors binding.Errors, user models.ViewLongUnitUser, request
 		return
 	}
 
-	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, false) != nil {
+	if helpers.SendConfirmations(dtouser, session, request, r, emailrepository, templaterepository, true) != nil {
 		return
 	}
 

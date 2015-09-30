@@ -9,6 +9,7 @@ import (
 	"application/config"
 	"application/db"
 	"application/services"
+	"application/workflows"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -99,6 +100,22 @@ var (
 	transactiontypeservice         *services.TransactionTypeService
 	operationtypeservice           *services.OperationTypeService
 	orderinvoiceservice            *services.OrderInvoiceService
+	accesslogservice               *services.AccessLogService
+	documenttypeservice            *services.DocumentTypeService
+	contractservice                *services.ContractService
+	appendixservice                *services.AppendixService
+	documentservice                *services.DocumentService
+	financeservice                 *services.FinanceService
+	dataencodingservice            *services.DataEncodingService
+	headerfacilityservice          *services.HeaderFacilityService
+	tariffplanservice              *services.TariffPlanService
+	paymentservice                 *services.PaymentService
+	headerproductservice           *services.HeaderProductService
+	headerworkflow                 *workflows.HeaderWorkflow
+	smsworkflow                    *workflows.SMSWorkflow
+	hlrworkflow                    *workflows.HLRWorkflow
+	verifyworkflow                 *workflows.VerifyWorkflow
+	orderworkflow                  *workflows.OrderWorkflow
 )
 
 func Start() {
@@ -218,6 +235,34 @@ func Start() {
 	transactiontypeservice = services.NewTransactionTypeService(services.NewRepository(db.DbMap, db.TABLE_TRANSACTION_TYPES))
 	operationtypeservice = services.NewOperationTypeService(services.NewRepository(db.DbMap, db.TABLE_OPERATION_TYPES))
 	orderinvoiceservice = services.NewOrderInvoiceService(services.NewRepository(db.DbMap, db.TABLE_ORDER_INVOICES))
+	accesslogservice = services.NewAccessLogService(services.NewRepository(db.DbMap, db.TABLE_ACCESS_LOG))
+	documenttypeservice = services.NewDocumentTypeService(services.NewRepository(db.DbMap, db.TABLE_DOCUMENT_TYPES))
+	contractservice = services.NewContractService(services.NewRepository(db.DbMap, db.TABLE_CONTRACTS))
+	appendixservice = services.NewAppendixService(services.NewRepository(db.DbMap, db.TABLE_APPENDICES))
+	documentservice = services.NewDocumentService(services.NewRepository(db.DbMap, db.TABLE_DOCUMENTS))
+	financeservice = services.NewFinanceService(services.NewRepository(db.DbMap, ""))
+	dataencodingservice = services.NewDataEncodingService(services.NewRepository(db.DbMap, db.TABLE_DATA_ENCODINGS))
+	headerfacilityservice = services.NewHeaderFacilityService(services.NewRepository(db.DbMap, db.TABLE_HEADER_FACILITIES))
+	tariffplanservice = services.NewTariffPlanService(services.NewRepository(db.DbMap, db.TABLE_TARIFF_PLANS))
+	paymentservice = services.NewPaymentService(services.NewRepository(db.DbMap, db.TABLE_PAYMENTS))
+	headerproductservice = services.NewHeaderProductService(services.NewRepository(db.DbMap, db.TABLE_HEADER_PRODUCTS))
+
+	headerworkflow = workflows.NewHeaderWorkflow(orderservice, facilityservice, headerfacilityservice, orderstatusservice,
+		invoiceservice, companyservice, operationservice, transactiontypeservice, tablecolumnservice, unitservice,
+		tablerowservice, priceservice, headerproductservice, templateservice, emailservice)
+	smsworkflow = workflows.NewSMSWorkflow(orderservice, facilityservice, smsfacilityservice, orderstatusservice,
+		customertableservice, smstableservice, smssenderservice, resulttableservice, worktableservice, invoiceservice,
+		companyservice, operationservice, transactiontypeservice, tablecolumnservice, unitservice, tablerowservice,
+		priceservice, mobileoperatorservice, columntypeservice)
+	hlrworkflow = workflows.NewHLRWorkflow(orderservice, facilityservice, hlrfacilityservice, orderstatusservice,
+		customertableservice, hlrtableservice, resulttableservice, worktableservice, invoiceservice, companyservice,
+		operationservice, transactiontypeservice, tablecolumnservice, unitservice, tablerowservice, priceservice,
+		mobileoperatorservice, columntypeservice)
+	verifyworkflow = workflows.NewVerifyWorkflow(orderservice, facilityservice, verifyfacilityservice, orderstatusservice,
+		customertableservice, verifytableservice, resulttableservice, worktableservice, invoiceservice, companyservice,
+		operationservice, transactiontypeservice, tablecolumnservice, unitservice, tablerowservice, priceservice,
+		verifyproductservice, datacolumnservice)
+	orderworkflow = workflows.NewOrderWorkflow(orderservice, facilityservice, headerworkflow, smsworkflow, hlrworkflow, verifyworkflow)
 
 	userservice.SessionRepository = sessionservice
 	userservice.EmailRepository = emailservice
@@ -272,7 +317,7 @@ func Start() {
 	invoiceservice.TransactionRepository = transactionservice
 	invoiceservice.OperationRepository = operationservice
 	invoiceservice.OrderInvoiceRepository = orderinvoiceservice
-	invoiceservice.OrderStatusRepository = orderstatusservice
+	invoiceservice.OrderRepository = orderservice
 
 	reportservice.UserRepository = userservice
 	reportservice.ReportPeriodRepository = reportperiodservice
@@ -283,8 +328,18 @@ func Start() {
 	reportservice.ReportSupplierRepository = reportsupplierservice
 	reportservice.ReportSettingsRepository = reportsettingsservice
 
-	go fileservice.ClearExpiredFiles()
-	go customertableservice.ClearExpiredTables()
+	contractservice.AppendixRepository = appendixservice
+
+	financeservice.OperationRepository = operationservice
+
+	go workflows.NewFileWorkflow(fileservice).ClearExpired()
+	go workflows.NewCustomerTableWorkflow(customertableservice).ClearExpired()
+	go orderworkflow.Execute()
+
+	_, err = sessionservice.Get("beypiIA2mG_4OwJe5kiHJ1RxLdzrI79YCRog_VEAGRLc-cIQpokqLiVCCNm6tOQ-zwE5CYtwfVKtIPWBeYblxw==")
+	if err != nil {
+		log.Error("%v", err)
+	}
 
 	routes := Routes()
 	mrt := martini.New()
@@ -406,5 +461,16 @@ func bootstrap() martini.Handler {
 		context.Map(transactiontypeservice)
 		context.Map(operationtypeservice)
 		context.Map(orderinvoiceservice)
+		context.Map(accesslogservice)
+		context.Map(documenttypeservice)
+		context.Map(contractservice)
+		context.Map(appendixservice)
+		context.Map(documentservice)
+		context.Map(financeservice)
+		context.Map(dataencodingservice)
+		context.Map(headerfacilityservice)
+		context.Map(tariffplanservice)
+		context.Map(paymentservice)
+		context.Map(headerproductservice)
 	}
 }

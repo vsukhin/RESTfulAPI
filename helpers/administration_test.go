@@ -112,6 +112,22 @@ func (testUserRepository *TestUserRepository) Update(user *models.DtoUser, brief
 	return nil
 }
 
+func (testUserRepository *TestUserRepository) UpdateProfile(user *models.DtoUser) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdatePassword(user *models.DtoUser) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdateEmails(user *models.DtoUser, inTrans bool) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdateMobilePhones(user *models.DtoUser, inTrans bool) (err error) {
+	return nil
+}
+
 func (testUserRepository *TestUserRepository) Delete(userid int64, inTrans bool) (err error) {
 	return nil
 }
@@ -202,7 +218,8 @@ type TestTemplateRepository struct {
 	Err error
 }
 
-func (testTemplateRepository *TestTemplateRepository) GenerateText(object interface{}, name string, layout string) (buf *bytes.Buffer, err error) {
+func (testTemplateRepository *TestTemplateRepository) GenerateText(object interface{}, name string, directory string,
+	layout string) (buf *bytes.Buffer, err error) {
 	return testTemplateRepository.Buf, testTemplateRepository.Err
 }
 
@@ -560,7 +577,7 @@ func TestSendConfirmationsZero(t *testing.T) {
 	var dtouser = &(models.DtoUser{})
 	dtouser.Emails = &([]models.DtoEmail{{Confirmed: true}})
 	var session = &(models.DtoSession{Language: "eng"})
-	var request = &(http.Request{Host: "http://host.com"})
+	var request = &(http.Request{RemoteAddr: "localhost:80"})
 	var r = new(Renderer)
 	var emailrepository = new(TestEmailRepository)
 	var templaterepository = new(TestTemplateRepository)
@@ -575,7 +592,7 @@ func TestSendConfirmationTemplateErr(t *testing.T) {
 	var dtouser = &(models.DtoUser{})
 	dtouser.Emails = &([]models.DtoEmail{{Confirmed: false, Primary: true, Language: "eng"}})
 	var session = &(models.DtoSession{Language: "eng"})
-	var request = &(http.Request{Host: "http://host.com"})
+	var request = &(http.Request{RemoteAddr: "localhost:80"})
 	var r = new(Renderer)
 	var emailrepository = new(TestEmailRepository)
 	var templaterepository = new(TestTemplateRepository)
@@ -585,7 +602,7 @@ func TestSendConfirmationTemplateErr(t *testing.T) {
 	if err == nil {
 		t.Error("Send confirmations should return error")
 	}
-	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_DATA_WRONG {
+	if r.StatusValue != http.StatusNotFound || r.ErrorValue.Code != types.TYPE_ERROR_OBJECT_NOTEXIST {
 		t.Error("Send confirmations wrong http status and error code")
 	}
 }
@@ -594,7 +611,7 @@ func TestSendConfirmationEmailErr(t *testing.T) {
 	var dtouser = &(models.DtoUser{})
 	dtouser.Emails = &([]models.DtoEmail{{Confirmed: false, Primary: false, Language: "rus"}})
 	var session = &(models.DtoSession{Language: "eng"})
-	var request = &(http.Request{Host: "http://host.com"})
+	var request = &(http.Request{RemoteAddr: "localhost:80"})
 	var r = new(Renderer)
 	var emailrepository = new(TestEmailRepository)
 	emailrepository.SendErr = errors.New("Email error")
@@ -615,7 +632,7 @@ func TestSendConfirmationsOk(t *testing.T) {
 	var dtouser = &(models.DtoUser{})
 	dtouser.Emails = &([]models.DtoEmail{{Confirmed: false, Primary: true, Language: "rus"}})
 	var session = &(models.DtoSession{Language: "eng"})
-	var request = &(http.Request{Host: "http://host.com"})
+	var request = &(http.Request{RemoteAddr: "localhost:80"})
 	var r = new(Renderer)
 	var emailrepository = new(TestEmailRepository)
 	emailrepository.SendErr = nil

@@ -52,13 +52,13 @@ type ApiLongMessage struct {
 }
 
 type MessageSearch struct {
-	ID          int64  `query:"id" search:"m.id"`                  // Уникальный идентификатор
-	Created     string `query:"created" search:"m.created"`        // Время создания
-	IsNew       bool   `query:"new" search:"new"`                  // Новое
-	IsCreator   bool   `query:"isMine" search:"isMine"`            // Прочитано
-	User_ID     int64  `query:"userId" search:"m.user_id"`         // Идентификатор автора
-	Receiver_ID int64  `query:"receiverId" search:"m.receiver_id"` // Идентификатор получателя
-	Content     string `query:"message" search:"m.content"`        // Содержание
+	ID          int64  `query:"id" search:"m.id"`                                                 // Уникальный идентификатор
+	Created     string `query:"created" search:"m.created" group:"convert(m.created using utf8)"` // Время создания
+	IsNew       bool   `query:"new" search:"new"`                                                 // Новое
+	IsCreator   bool   `query:"isMine" search:"isMine"`                                           // Прочитано
+	User_ID     int64  `query:"userId" search:"m.user_id"`                                        // Идентификатор автора
+	Receiver_ID int64  `query:"receiverId" search:"m.receiver_id"`                                // Идентификатор получателя
+	Content     string `query:"message" search:"m.content" group:"m.content"`                     // Содержание
 }
 
 type DtoMessage struct {
@@ -150,8 +150,7 @@ func (message *MessageSearch) Extract(infield string, invalue string) (outfield 
 		fallthrough
 	case "created":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "new":
@@ -171,7 +170,7 @@ func (message *MessageSearch) Extract(infield string, invalue string) (outfield 
 }
 
 func (message *MessageSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(message)
+	return GetAllGroupTags(message)
 }
 
 func (message *ViewLongMessage) Validate(errors binding.Errors, req *http.Request) binding.Errors {

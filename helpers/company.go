@@ -136,7 +136,7 @@ func FillCompany(viewcompany *models.ViewCompany, dtocompany *models.DtoCompany,
 	dtocompany.ShortName_Rus = viewcompany.ShortName_Rus
 	dtocompany.ShortName_Eng = viewcompany.ShortName_Eng
 	dtocompany.Resident = viewcompany.Resident
-	dtocompany.Active = !viewcompany.Deleted
+	dtocompany.VAT = viewcompany.VAT
 
 	codeclasses := make(map[int]int)
 	for _, viewcode := range viewcompany.CompanyCodes {
@@ -218,42 +218,47 @@ func FillCompany(viewcompany *models.ViewCompany, dtocompany *models.DtoCompany,
 			primaryaddresses[addresstype.ID]++
 		}
 		if viewaddress.Ditto == 0 {
-			if viewaddress.Zip == "" && addresstype.Required {
-				log.Error("Zip field could not be empty")
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return errors.New("Empty zip")
+			if addresstype.Required {
+				if viewaddress.Full == "" {
+					if viewaddress.Zip == "" {
+						log.Error("Zip field could not be empty")
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[language].Errors.Api.Data_Wrong})
+						return errors.New("Empty zip")
+					}
+					if viewaddress.Country == "" {
+						log.Error("Country field could not be empty")
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[language].Errors.Api.Data_Wrong})
+						return errors.New("Empty country")
+					}
+					if viewaddress.City == "" {
+						log.Error("City field could not be empty")
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[language].Errors.Api.Data_Wrong})
+						return errors.New("Empty city")
+					}
+					if viewaddress.Street == "" {
+						log.Error("Street field could not be empty")
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[language].Errors.Api.Data_Wrong})
+						return errors.New("Empty street")
+					}
+					if viewaddress.Building == "" {
+						log.Error("Building field could not be empty")
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[language].Errors.Api.Data_Wrong})
+						return errors.New("Empty building")
+					}
+				}
 			}
+			dtocompanyaddress.Full = viewaddress.Full
 			dtocompanyaddress.Zip = viewaddress.Zip
-			if viewaddress.Country == "" && addresstype.Required {
-				log.Error("Country field could not be empty")
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return errors.New("Empty country")
-			}
 			dtocompanyaddress.Country = viewaddress.Country
-			dtocompanyaddress.Region = viewaddress.Region
-			if viewaddress.City == "" && addresstype.Required {
-				log.Error("City field could not be empty")
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return errors.New("Empty city")
-			}
 			dtocompanyaddress.City = viewaddress.City
-			if viewaddress.Street == "" && addresstype.Required {
-				log.Error("Street field could not be empty")
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return errors.New("Empty street")
-			}
 			dtocompanyaddress.Street = viewaddress.Street
-			if viewaddress.Building == "" && addresstype.Required {
-				log.Error("Building field could not be empty")
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[language].Errors.Api.Data_Wrong})
-				return errors.New("Empty building")
-			}
 			dtocompanyaddress.Building = viewaddress.Building
+			dtocompanyaddress.Region = viewaddress.Region
 			dtocompanyaddress.Postbox = viewaddress.Postbox
 			dtocompanyaddress.Company = viewaddress.Company
 		}
@@ -368,4 +373,128 @@ func FillCompany(viewcompany *models.ViewCompany, dtocompany *models.DtoCompany,
 	}
 
 	return nil
+}
+
+func LoadCompany(dtocompany *models.DtoCompany, r render.Render, companycoderepository services.CompanyCodeRepository,
+	companyaddressrepository services.CompanyAddressRepository, companybankrepository services.CompanyBankRepository,
+	companyemployeerepository services.CompanyEmployeeRepository, language string) (apicompany *models.ApiMiddleCompany, err error) {
+	companycodes, err := companycoderepository.GetByCompany(dtocompany.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	companyaddresses, err := companyaddressrepository.GetByCompany(dtocompany.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	companybanks, err := companybankrepository.GetByCompany(dtocompany.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	companystaff, err := companyemployeerepository.GetByCompany(dtocompany.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, err
+	}
+
+	return models.NewApiMiddleCompany(dtocompany.Primary, dtocompany.Company_Type_ID,
+		dtocompany.FullName_Rus, dtocompany.FullName_Eng, dtocompany.ShortName_Rus, dtocompany.ShortName_Eng, dtocompany.Resident,
+		*companycodes, *companyaddresses, *companybanks, *companystaff, dtocompany.VAT, dtocompany.Locked, !dtocompany.Active), nil
+}
+
+func PrepareCompanyTemplate(company_id int64, apicompany *models.ApiMiddleCompany, r render.Render,
+	language string) (dtocompanytemplate *models.DtoCompanyTemplate, err error) {
+	dtocompanytemplate = new(models.DtoCompanyTemplate)
+	dtocompanytemplate.Name = apicompany.FullName_Rus
+	for _, company_class_id := range []int{models.CODE_TYPE_INN, models.CODE_TYPE_KPP} {
+		found := false
+		for _, companycode := range apicompany.CompanyCodes {
+			if companycode.Company_Class_ID == company_class_id {
+				found = true
+				switch company_class_id {
+				case models.CODE_TYPE_INN:
+					dtocompanytemplate.INN = companycode.Codes
+				case models.CODE_TYPE_KPP:
+					dtocompanytemplate.KPP = companycode.Codes
+				}
+				break
+			}
+		}
+		if !found {
+			log.Error("Company class is not found %v with value %v", company_class_id, company_id)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			return nil, errors.New("Not found company class")
+		}
+	}
+	found := false
+	for _, companyaddress := range apicompany.CompanyAddresses {
+		if companyaddress.Primary && companyaddress.Address_Type_ID == models.ADDRESS_TYPE_LEGAL {
+			if companyaddress.Full != "" {
+				found = true
+				dtocompanytemplate.Address = companyaddress.Full
+				break
+			} else if companyaddress.Country != "" && companyaddress.Zip != "" && companyaddress.City != "" && companyaddress.Street != "" &&
+				companyaddress.Building != "" {
+				found = true
+				dtocompanytemplate.Address = companyaddress.Country + ", " + companyaddress.Zip + ", "
+				if companyaddress.Region != "" {
+					dtocompanytemplate.Address += companyaddress.Region + ", "
+				}
+				dtocompanytemplate.Address += companyaddress.City + ", " + companyaddress.Street + ", " + companyaddress.Building
+				break
+			}
+		}
+	}
+	if !found {
+		log.Error("Company address is not found %v with value %v", models.ADDRESS_TYPE_LEGAL, company_id)
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return nil, errors.New("Not found company address")
+	}
+	for _, employee_type := range []string{models.EMPLOYEE_TYPE_CEO, models.EMPLOYEE_TYPE_ACCOUNTANT} {
+		found := false
+		for _, companyemployee := range apicompany.CompanyStaff {
+			if companyemployee.Employee_Type == employee_type && !companyemployee.Deleted {
+				found = true
+				fio := ""
+				for _, name := range []string{companyemployee.Name, companyemployee.MiddleName} {
+					runes := []rune(name)
+					if len(runes) != 0 {
+						fio += " " + string(runes[0]) + "."
+					}
+				}
+				switch employee_type {
+				case models.EMPLOYEE_TYPE_CEO:
+					dtocompanytemplate.CEO = companyemployee.Surname + fio
+					if companyemployee.Base != "" {
+						dtocompanytemplate.CEO += " (" + companyemployee.Base + ")"
+					}
+				case models.EMPLOYEE_TYPE_ACCOUNTANT:
+					dtocompanytemplate.Accountant = companyemployee.Surname + fio
+					if companyemployee.Base != "" {
+						dtocompanytemplate.Accountant += " (" + companyemployee.Base + ")"
+					}
+				}
+				break
+			}
+		}
+		if !found {
+			log.Error("Company employee is not found %v with value %v", employee_type, company_id)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			return nil, errors.New("Not found company employee")
+		}
+	}
+
+	return dtocompanytemplate, nil
 }

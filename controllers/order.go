@@ -9,6 +9,7 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"strings"
 	"time"
 	"types"
 )
@@ -32,14 +33,54 @@ func GetMetaProjectOrders(r render.Render, params martini.Params, projectreposit
 }
 
 // get /api/v1.0/projects/:prid/orders/
-func GetProjectOrders(w http.ResponseWriter, r render.Render, params martini.Params, projectrepository services.ProjectRepository,
+func GetProjectOrders(w http.ResponseWriter, request *http.Request, r render.Render, params martini.Params, projectrepository services.ProjectRepository,
 	orderrepository services.OrderRepository, session *models.DtoSession) {
 	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
 	if err != nil {
 		return
 	}
 
-	orders, err := orderrepository.GetByProject(dtoproject.ID)
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.OrderProjectSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.OrderProjectSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	orders, err := orderrepository.GetByProject(dtoproject.ID, query)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -53,7 +94,7 @@ func GetProjectOrders(w http.ResponseWriter, r render.Render, params martini.Par
 func CreateProjectOrder(errors binding.Errors, vieworder models.ViewShortOrder, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
@@ -77,7 +118,7 @@ func CreateProjectOrder(errors binding.Errors, vieworder models.ViewShortOrder, 
 
 	order := new(models.ViewLongOrder)
 	dtoorderstatuses := order.ToOrderStatuses(dtoorder.ID)
-	err = orderrepository.Create(dtoorder, dtoorderstatuses, true)
+	err = orderrepository.Create(dtoorder, dtoorderstatuses, nil, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -109,13 +150,18 @@ func GetProjectOrder(r render.Render, params martini.Params, projectrepository s
 func UpdateProjectOrder(errors binding.Errors, vieworder models.ViewMiddleOrder, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	facilityrepository services.FacilityRepository, orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
 	if err != nil {
 		return
 	}
+	err = helpers.CheckOrderEditability(dtoorder, r, orderstatusrepository, session.Language)
+	if err != nil {
+		return
+	}
+
 	if vieworder.Step > models.MAX_STEP_NUMBER {
 		log.Error("Order step number is too big %v", vieworder.Step)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -147,7 +193,7 @@ func UpdateProjectOrder(errors binding.Errors, vieworder models.ViewMiddleOrder,
 		{Order_ID: dtoorder.ID, Status_ID: models.ORDER_STATUS_CUSTOMER_NEW_COST_CONFIRMED, Value: vieworder.IsNewCostConfirmed, Created: time.Now()},
 	}
 
-	err = orderrepository.Update(dtoorder, dtoorderstatuses, true)
+	err = orderrepository.Update(dtoorder, dtoorderstatuses, nil, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -172,6 +218,11 @@ func DeleteProjectOrder(r render.Render, params martini.Params, projectrepositor
 	if err != nil {
 		return
 	}
+	err = helpers.CheckOrderEditability(dtoorder, r, orderstatusrepository, session.Language)
+	if err != nil {
+		return
+	}
+
 	confirmed, err := orderrepository.IsConfirmed(dtoorder.ID)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
@@ -224,8 +275,10 @@ func UpdateProjectSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMS
 	tablecolumnrepository services.TableColumnRepository, smssenderrepository services.SMSSenderRepository,
 	mobileoperatorrepository services.MobileOperatorRepository, periodrepository services.PeriodRepository,
 	eventrepository services.EventRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewsmsfacility, errors, r, session.Language) != nil {
+	smsperiodrepository services.SMSPeriodRepository, smseventrepository services.SMSEventRepository,
+	worktablerepository services.WorkTableRepository, mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -235,7 +288,8 @@ func UpdateProjectSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMS
 
 	apismsfacility, err := helpers.UpdateSMSOrder(dtoorder, viewsmsfacility, r, facilityrepository, smsfacilityrepository,
 		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, smssenderrepository,
-		mobileoperatorrepository, periodrepository, eventrepository, resulttablerepository, worktablerepository, true, session.UserID, session.Language)
+		mobileoperatorrepository, periodrepository, eventrepository, smsperiodrepository, smseventrepository,
+		resulttablerepository, worktablerepository, mobileoperatoroperationrepository, true, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
@@ -268,8 +322,9 @@ func UpdateProjectHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLR
 	hlrfacilityrepository services.HLRFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	tablecolumnrepository services.TableColumnRepository, mobileoperatorrepository services.MobileOperatorRepository,
+	mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewhlrfacility, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -279,7 +334,7 @@ func UpdateProjectHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLR
 
 	apihlrfacility, err := helpers.UpdateHLROrder(dtoorder, viewhlrfacility, r, facilityrepository, hlrfacilityrepository,
 		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, mobileoperatorrepository,
-		resulttablerepository, worktablerepository, true, session.UserID, session.Language)
+		mobileoperatoroperationrepository, resulttablerepository, worktablerepository, true, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
@@ -313,10 +368,11 @@ func UpdateProjectRecognizeOrder(errors binding.Errors, viewrecognizefacility mo
 	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
 	recognizefacilityrepository services.RecognizeFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	columntyperepository services.ColumnTypeRepository, recognizeproductrepository services.RecognizeProductRepository,
-	filerepository services.FileRepository, inputfilerepository services.InputFileRepository,
+	filerepository services.FileRepository, inputfieldrepository services.InputFieldRepository,
+	inputproductrepository services.InputProductRepository, inputfilerepository services.InputFileRepository,
 	supplierrequestrepository services.SupplierRequestRepository, inputftprepository services.InputFtpRepository,
 	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewrecognizefacility, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -325,8 +381,8 @@ func UpdateProjectRecognizeOrder(errors binding.Errors, viewrecognizefacility mo
 	}
 
 	apirecognizefacility, err := helpers.UpdateRecognizeOrder(dtoorder, viewrecognizefacility, r, facilityrepository, recognizefacilityrepository,
-		orderstatusrepository, columntyperepository, recognizeproductrepository, filerepository, inputfilerepository, supplierrequestrepository,
-		inputftprepository, resulttablerepository, worktablerepository, session.Language)
+		orderstatusrepository, columntyperepository, recognizeproductrepository, filerepository, inputfieldrepository, inputproductrepository,
+		inputfilerepository, supplierrequestrepository, inputftprepository, resulttablerepository, worktablerepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -359,9 +415,9 @@ func UpdateProjectVerifyOrder(errors binding.Errors, viewverifyfacility models.V
 	verifyfacilityrepository services.VerifyFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	customertablerepository services.CustomerTableRepository, columntyperepository services.ColumnTypeRepository,
 	verifyproductrepository services.VerifyProductRepository, tablecolumnrepository services.TableColumnRepository,
-	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewverifyfacility, errors, r, session.Language) != nil {
+	dataproductrepository services.DataProductRepository, datacolumnrepository services.DataColumnRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
@@ -370,11 +426,167 @@ func UpdateProjectVerifyOrder(errors binding.Errors, viewverifyfacility models.V
 	}
 
 	apiverifyfacility, err := helpers.UpdateVerifyOrder(dtoorder, viewverifyfacility, r, facilityrepository, verifyfacilityrepository,
-		orderstatusrepository, customertablerepository, columntyperepository, verifyproductrepository, tablecolumnrepository, datacolumnrepository,
-		resulttablerepository, worktablerepository, true, session.UserID, session.Language)
+		orderstatusrepository, customertablerepository, columntyperepository, verifyproductrepository, tablecolumnrepository,
+		dataproductrepository, datacolumnrepository, resulttablerepository, worktablerepository, true, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
 
 	r.JSON(http.StatusOK, apiverifyfacility)
+}
+
+// get /api/v1.0/projects/:prid/orders/:oid/service/header/
+func GetProjectHeaderOrder(r render.Render, params martini.Params, projectrepository services.ProjectRepository, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, headerfacilityrepository services.HeaderFacilityRepository, session *models.DtoSession) {
+	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	apiheaderfacility, err := helpers.GetHeaderOrder(dtoorder, r, facilityrepository, headerfacilityrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiheaderfacility)
+}
+
+// put /api/v1.0/projects/:prid/orders/:oid/service/header/
+func UpdateProjectHeaderOrder(errors binding.Errors, viewheaderfacility models.ViewHeaderFacility, r render.Render, params martini.Params,
+	projectrepository services.ProjectRepository, orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
+	headerfacilityrepository services.HeaderFacilityRepository, orderstatusrepository services.OrderStatusRepository,
+	session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	_, dtoorder, err := helpers.CheckProjectOrder(r, params, projectrepository, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	apiheaderfacility, err := helpers.UpdateHeaderOrder(dtoorder, viewheaderfacility, r, facilityrepository, headerfacilityrepository,
+		orderstatusrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiheaderfacility)
+}
+
+// options /api/v1.0/unit/finances/
+func GetFinance(r render.Render, financerepository services.FinanceRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
+	unit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	finance, err := financerepository.Get(unit.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	r.JSON(http.StatusOK, finance)
+}
+
+// get /api/v1.0/finances/orders/
+func GetFinanceOrders(w http.ResponseWriter, request *http.Request, r render.Render, orderrepository services.OrderRepository,
+	unitrepository services.UnitRepository, session *models.DtoSession) {
+	unit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.OrderFinanceSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.OrderFinanceSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " "+sort.Field+" "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	orders, err := orderrepository.GetFinance(unit.ID, query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(orders, len(*orders), w, r)
+}
+
+// options /api/v1.0/unit/finances/orders/
+func GetResultOrders(request *http.Request, r render.Render, orderrepository services.OrderRepository, unitrepository services.UnitRepository,
+	session *models.DtoSession) {
+	unit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.OrderFinanceSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	result, err := orderrepository.GetResult(unit.ID, query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	r.JSON(http.StatusOK, result)
 }

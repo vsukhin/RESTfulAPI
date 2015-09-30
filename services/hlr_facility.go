@@ -9,9 +9,9 @@ type HLRFacilityRepository interface {
 	Exists(orderid int64) (found bool, err error)
 	Get(order_id int64) (hlrfacility *models.DtoHLRFacility, err error)
 	SetArrays(hlrfacility *models.DtoHLRFacility, trans *gorp.Transaction) (err error)
-	Create(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error)
-	Update(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error)
-	Save(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error)
+	Create(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error)
+	Update(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error)
+	Save(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error)
 }
 
 type HLRFacilityService struct {
@@ -90,7 +90,7 @@ func (hlrfacilityservice *HLRFacilityService) SetArrays(hlrfacility *models.DtoH
 	return nil
 }
 
-func (hlrfacilityservice *HLRFacilityService) Create(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error) {
+func (hlrfacilityservice *HLRFacilityService) Create(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -114,12 +114,14 @@ func (hlrfacilityservice *HLRFacilityService) Create(hlrfacility *models.DtoHLRF
 		return err
 	}
 
-	err = hlrfacilityservice.SetArrays(hlrfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = hlrfacilityservice.SetArrays(hlrfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -133,7 +135,7 @@ func (hlrfacilityservice *HLRFacilityService) Create(hlrfacility *models.DtoHLRF
 	return nil
 }
 
-func (hlrfacilityservice *HLRFacilityService) Update(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error) {
+func (hlrfacilityservice *HLRFacilityService) Update(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -157,12 +159,14 @@ func (hlrfacilityservice *HLRFacilityService) Update(hlrfacility *models.DtoHLRF
 		return err
 	}
 
-	err = hlrfacilityservice.SetArrays(hlrfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = hlrfacilityservice.SetArrays(hlrfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -176,7 +180,7 @@ func (hlrfacilityservice *HLRFacilityService) Update(hlrfacility *models.DtoHLRF
 	return nil
 }
 
-func (hlrfacilityservice *HLRFacilityService) Save(hlrfacility *models.DtoHLRFacility, inTrans bool) (err error) {
+func (hlrfacilityservice *HLRFacilityService) Save(hlrfacility *models.DtoHLRFacility, briefly bool, inTrans bool) (err error) {
 	count, err := hlrfacilityservice.DbContext.SelectInt("select count(*) from "+hlrfacilityservice.Table+
 		" where order_id = ?", hlrfacility.Order_ID)
 	if err != nil {
@@ -184,9 +188,9 @@ func (hlrfacilityservice *HLRFacilityService) Save(hlrfacility *models.DtoHLRFac
 		return err
 	}
 	if count == 0 {
-		err = hlrfacilityservice.Create(hlrfacility, inTrans)
+		err = hlrfacilityservice.Create(hlrfacility, briefly, inTrans)
 	} else {
-		err = hlrfacilityservice.Update(hlrfacility, inTrans)
+		err = hlrfacilityservice.Update(hlrfacility, briefly, inTrans)
 	}
 
 	return err

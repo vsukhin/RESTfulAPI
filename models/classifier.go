@@ -36,9 +36,9 @@ type ApiLongClassifier struct {
 }
 
 type ClassifierSearch struct {
-	ID      int    `query:"id" search:"id"`            // Уникальный идентификатор классификатора
-	Name    string `query:"name" search:"name"`        // Название
-	Deleted bool   `query:"del" search:"(not active)"` // Удален
+	ID      int    `query:"id" search:"id"`                  // Уникальный идентификатор классификатора
+	Name    string `query:"name" search:"name" group:"name"` // Название
+	Deleted bool   `query:"del" search:"(not active)"`       // Удален
 }
 
 type DtoClassifier struct {
@@ -94,8 +94,7 @@ func (classifier *ClassifierSearch) Extract(infield string, invalue string) (out
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "del":
@@ -113,7 +112,7 @@ func (classifier *ClassifierSearch) Extract(infield string, invalue string) (out
 }
 
 func (classifier *ClassifierSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(classifier)
+	return GetAllGroupTags(classifier)
 }
 
 func (classifier *ViewClassifier) Validate(errors binding.Errors, req *http.Request) binding.Errors {

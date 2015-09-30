@@ -35,8 +35,9 @@ func (companyaddressservice *CompanyAddressService) Get(id int64) (companyaddres
 func (companyaddressservice *CompanyAddressService) GetByCompany(company_id int64) (companyaddresss *[]models.ViewApiCompanyAddress, err error) {
 	companyaddresss = new([]models.ViewApiCompanyAddress)
 	_, err = companyaddressservice.DbContext.Select(companyaddresss,
-		"select c.`primary`, c.ditto, c.address_type_id, c.zip, c.country, c.region, c.city, c.street, c.building, c.postbox, c.company, c.comments from "+
-			companyaddressservice.Table+" c inner join address_types a on c.address_type_id = a.id where company_id = ? and a.active = 1 order by a.position asc",
+		"select c.`primary`, c.ditto, c.address_type_id, c.full, c.zip, c.country, c.region, c.city,"+
+			" c.street, c.building, c.postbox, c.company, c.comments from "+companyaddressservice.Table+
+			" c inner join address_types a on c.address_type_id = a.id where company_id = ? and a.active = 1 order by a.position asc",
 		company_id)
 	if err != nil {
 		log.Error("Error during getting all company address object from database %v with value %v", err, company_id)

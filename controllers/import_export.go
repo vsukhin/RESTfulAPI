@@ -21,12 +21,33 @@ const (
 	URL_EXPORT_DATA = "/api/v1.0/tables/export"
 )
 
+// options /api/v1.0/tables/import/
+func GetImportDataMeta(request *http.Request, r render.Render, dataformatrepository services.DataFormatRepository,
+	dataencodingrepository services.DataEncodingRepository, session *models.DtoSession) {
+	dataformats, err := dataformatrepository.GetAll()
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	dataencodings, err := dataencodingrepository.GetAll()
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	r.JSON(http.StatusOK, models.NewApiMetaImportTable(*dataformats, *dataencodings))
+}
+
 // post /api/v1.0/tables/import/
 func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImportTable, r render.Render, userrepository services.UserRepository,
 	filerepository services.FileRepository, unitrepository services.UnitRepository, tabletyperepository services.TableTypeRepository,
 	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository,
-	columntyperepository services.ColumnTypeRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewimporttable, errors, r, session.Language) != nil {
+	columntyperepository services.ColumnTypeRepository, dataformatrepository services.DataFormatRepository,
+	dataencodingrepository services.DataEncodingRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -45,7 +66,25 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 		return
 	}
 
-	unitid, typeid, err := helpers.CheckCustomerTableParameters(r, 0, models.TABLE_TYPE_DEFAULT, session.UserID, session.Language,
+	if viewimporttable.DataFormat != models.DATA_FORMAT_UNKNOWN {
+		_, err = dataformatrepository.Get(int(viewimporttable.DataFormat))
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+	}
+
+	if viewimporttable.DataEncoding != models.DATA_ENCODING_UNKNOWN {
+		_, err = dataencodingrepository.Get(int(viewimporttable.DataEncoding))
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+	}
+
+	unitid, typeid, author, err := helpers.CheckCustomerTableParameters(r, 0, models.TABLE_TYPE_DEFAULT, session.UserID, session.Language,
 		userrepository, unitrepository, tabletyperepository)
 	if err != nil {
 		return
@@ -60,6 +99,9 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 	dtocustomertable.Permanent = false
 	dtocustomertable.Import_Ready = false
 	dtocustomertable.Import_Percentage = 25
+	dtocustomertable.Signature = author
+	dtocustomertable.Import_Error = false
+	dtocustomertable.Import_ErrorDescription = ""
 
 	err = customertablerepository.Create(dtocustomertable)
 	if err != nil {
@@ -76,7 +118,7 @@ func ImportDataFromFile(errors binding.Errors, viewimporttable models.ViewImport
 		return
 	}
 
-	go helpers.ImportData(viewimporttable, file, dtocustomertable, customertablerepository, importsteprepository, columntyperepository)
+	go helpers.ImportData(viewimporttable, file, dtocustomertable, customertablerepository, importsteprepository, columntyperepository, session.Language)
 
 	r.JSON(http.StatusOK, models.NewApiImportTable(dtocustomertable.ID))
 }
@@ -118,7 +160,7 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 	customertablerepository services.CustomerTableRepository, tablecolumnrepository services.TableColumnRepository,
 	columntyperepository services.ColumnTypeRepository, tablerowrepository services.TableRowRepository,
 	importsteprepository services.ImportStepRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewimportcolumns, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	tableid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_TEMPORABLE_TABLE_ID], session.Language)
@@ -164,7 +206,17 @@ func UpdateImportDataColumns(errors binding.Errors, viewimportcolumns models.Vie
 		}
 
 		dtotablecolumn.Name = viewimportcolumn.Name
-		dtotablecolumn.Position = viewimportcolumn.Position
+		if viewimportcolumn.Position == 0 {
+			dtotablecolumn.Position, err = tablecolumnrepository.GetDefaultPosition(tableid)
+			if err != nil {
+				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+					Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+				return
+			}
+			dtotablecolumn.Position++
+		} else {
+			dtotablecolumn.Position = viewimportcolumn.Position
+		}
 		if helpers.IsColumnTypeActive(r, columntyperepository, viewimportcolumn.TypeID, session.Language) != nil {
 			return
 		}
@@ -224,7 +276,8 @@ func GetImportDataStatus(r render.Render, params martini.Params, filerepository 
 	}
 
 	r.JSON(http.StatusOK, models.NewApiImportStatus(dtocustomertable.Import_Ready, dtocustomertable.Import_Percentage, *importsteps,
-		dtocustomertable.Import_Columns, dtocustomertable.Import_Rows, dtocustomertable.Import_WrongRows))
+		dtocustomertable.Import_Columns, dtocustomertable.Import_Rows, dtocustomertable.Import_WrongRows, dtocustomertable.Import_Error,
+		dtocustomertable.Import_ErrorDescription))
 }
 
 // options /api/v1.0/tables/export/
@@ -322,6 +375,8 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	file.Export_Ready = false
 	file.Export_Percentage = 0
 	file.Export_Object_ID = dtocustomertable.ID
+	file.Export_Error = false
+	file.Export_ErrorDescription = ""
 
 	err = filerepository.Create(file, nil)
 	if err != nil {
@@ -333,7 +388,7 @@ func ExportDataToFile(request *http.Request, r render.Render, params martini.Par
 	viewexporttable := new(models.ViewExportTable)
 	viewexporttable.Data_Format_ID = dataformat.ID
 	viewexporttable.Type = rowtype
-	go helpers.ExportData(viewexporttable, file, dtocustomertable, tablecolumns, filerepository, customertablerepository)
+	go helpers.ExportData(viewexporttable, file, dtocustomertable, tablecolumns, filerepository, customertablerepository, session.Language)
 
 	r.JSON(http.StatusOK, models.ApiFile{ID: file.ID})
 }
@@ -366,7 +421,7 @@ func GetExportDataStatus(r render.Render, params martini.Params, filerepository 
 	}
 
 	r.JSON(http.StatusOK, models.NewApiExportStatus(file.Export_Ready, file.Export_Percentage,
-		fmt.Sprintf("%v", file.Created.Add(config.Configuration.FileTimeout))))
+		fmt.Sprintf("%v", file.Created.Add(config.Configuration.FileTimeout)), file.Export_Error, file.Export_ErrorDescription))
 }
 
 // get /api/v1.0/tables/export/:token/:fid/

@@ -116,6 +116,22 @@ func (testUserRepository *TestUserRepository) Update(user *models.DtoUser, brief
 	return nil
 }
 
+func (testUserRepository *TestUserRepository) UpdateProfile(user *models.DtoUser) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdatePassword(user *models.DtoUser) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdateEmails(user *models.DtoUser, inTrans bool) (err error) {
+	return nil
+}
+
+func (testUserRepository *TestUserRepository) UpdateMobilePhones(user *models.DtoUser, inTrans bool) (err error) {
+	return nil
+}
+
 func (testUserRepository *TestUserRepository) Delete(userid int64, inTrans bool) (err error) {
 	return testUserRepository.DelErr
 }

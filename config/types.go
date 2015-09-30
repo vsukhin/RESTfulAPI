@@ -23,6 +23,7 @@ type MysqlConfiguration struct {
 
 var Configuration struct {
 	WorkingDirectory string        `yaml:"WorkingDirectory"` // Рабочая директория сервера, сразу после запуска приложение меняет текущую директорию
+	EnablePprof      bool          `yaml:"EnablePprof"`      // Профилирование сервера с помощь go tool pprof
 	TempDirectory    string        `yaml:"TempDirectory"`    // Путь к временной директории сервера
 	FileStorage      string        `yaml:"FileStorage"`      // Путь к хранилищу файлов
 	TemplateStorage  string        `yaml:"TemplateStorage"`  // Путь к хранилищу шаблонов
@@ -115,4 +116,18 @@ var Configuration struct {
 			} `yaml:"Client"`
 		} `yaml:"Keys"`
 	} `yaml:"Performer Communication"`
+
+	Suppliers struct { // Поставщики услуг
+		SvyaznoyZagruzka struct { // Связной загрузка
+			AddressSmsApi string `yaml:"AddressSmsApi"` // Адрес API SMS
+			Username      int64  `yaml:"Username"`      // Идентификатор пользователя
+			Password      string `yaml:"Password"`      // Пароль пользователя
+		} `yaml:"Svyaznoy zagruzka"`
+
+		Dadata struct { // dadata.ru
+			Address string `yaml:"Address"` // Адрес API
+			Key     string `yaml:"Key"`     // API-ключ
+			Secret  string `yaml:"Secret"`  // Секретный ключ для стандартизации
+		} `yaml:"Dadata"`
+	} `yaml:"Suppliers"`
 }

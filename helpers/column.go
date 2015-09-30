@@ -8,6 +8,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -75,13 +76,13 @@ func IsColumnTypeActive(r render.Render, columntyperepository services.ColumnTyp
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return errors.New("Column is not found")
+		return errors.New("Column type not found")
 	}
 	if !dtocolumntype.Active {
 		log.Error("Column type is not active %v", typeid)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return errors.New("Colimn is not active")
+		return errors.New("Column type not active")
 	}
 
 	return nil
@@ -180,6 +181,56 @@ func FindFreeColumn(tableid int64, afterfield byte, r render.Render, tablecolumn
 	}
 
 	return fieldnum, nil
+}
+
+func CheckTableColumnCells(tablecolumn *models.DtoTableColumn, columntyperepository services.ColumnTypeRepository,
+	tablerowrepository services.TableRowRepository) {
+	columntype, err := columntyperepository.Get(tablecolumn.Column_Type_ID)
+	if err != nil {
+		return
+	}
+
+	var re *regexp.Regexp = nil
+	if columntype.Regexp != "" {
+		re, err = regexp.Compile(columntype.Regexp)
+		if err != nil {
+			log.Error("Error during running reg exp %v with value %v", err, columntype.Regexp)
+			return
+		}
+	}
+
+	var offset int64 = 0
+	var count int64 = BLOCK_ROWS_NUMBER
+	log.Info("Start checking rows %v", time.Now())
+	for {
+		log.Info("Getting checking rows %v from %v to %v", time.Now(), offset, offset+count)
+		dtotablerows, err := tablerowrepository.GetValidation(offset, count, tablecolumn.Customer_Table_ID, &[]models.DtoTableColumn{*tablecolumn})
+		if err != nil {
+			return
+		}
+		if len(*dtotablerows) == 0 {
+			break
+		}
+		log.Info("Validating checking rows %v from %v to %v", time.Now(), offset, offset+count)
+		for i, _ := range *dtotablerows {
+			tablecell, err := (&(*dtotablerows)[i]).TableRowToDtoTableCell(tablecolumn)
+			if err != nil {
+				return
+			}
+			tablecell.Valid, _, _ = columntyperepository.Validate(columntype, re, tablecell.Value)
+			err = (&(*dtotablerows)[i]).DtoTableCellToTableRow(tablecell, tablecolumn)
+			if err != nil {
+				return
+			}
+		}
+		log.Info("Saving checking rows %v from %v to %v", time.Now(), offset, offset+count)
+		err = tablerowrepository.SaveValidation(dtotablerows, &[]models.DtoTableColumn{*tablecolumn})
+		if err != nil {
+			return
+		}
+		offset += count
+	}
+	log.Info("Stop checking rows %v", time.Now())
 }
 
 func UpdateProductColumn(products *[]models.ApiProduct, tableid int64, r render.Render,

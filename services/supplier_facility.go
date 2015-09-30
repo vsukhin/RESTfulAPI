@@ -8,7 +8,8 @@ import (
 
 type SupplierFacilityRepository interface {
 	Get(supplier_id int64, service_id int64) (supplierfacility *models.DtoSupplierFacility, err error)
-	GetAll(alias string) (supplierfacilities *[]models.ApiSupplierFacility, err error)
+	GetByAlias(alias string) (supplierfacilities *[]models.ApiShortSupplierFacility, err error)
+	GetByUnit(unit_id int64, filter string) (supplierfacilities *[]models.ApiLongSupplierFacility, err error)
 	SetArrayByUser(user_id int64, facilities *[]int64, inTrans bool) (err error)
 }
 
@@ -33,10 +34,11 @@ func (supplierfacilityservice *SupplierFacilityService) Get(supplier_id int64, s
 	return supplierfacility, nil
 }
 
-func (supplierfacilityservice *SupplierFacilityService) GetAll(alias string) (supplierfacilities *[]models.ApiSupplierFacility, err error) {
-	supplierfacilities = new([]models.ApiSupplierFacility)
+func (supplierfacilityservice *SupplierFacilityService) GetByAlias(alias string) (
+	supplierfacilities *[]models.ApiShortSupplierFacility, err error) {
+	supplierfacilities = new([]models.ApiShortSupplierFacility)
 	_, err = supplierfacilityservice.DbContext.Select(supplierfacilities,
-		"select f.supplier_id, u.name, f.position, f.rating, f.throughput from "+
+		"select f.supplier_id as id, u.name, f.position, f.rating, f.throughput from "+
 			supplierfacilityservice.Table+" f inner join services s on f.service_id = s.id inner join units u on f.supplier_id = u.id"+
 			" where s.active = 1 and u.active = 1 and s.alias = ? and f.service_id in (select service_id from price_properties p"+
 			" where published = 1 and customer_table_id in (select id from customer_tables"+
@@ -50,6 +52,22 @@ func (supplierfacilityservice *SupplierFacilityService) GetAll(alias string) (su
 		log.Error("Error during getting all supplier facility object from database %v", err)
 		return nil, err
 	}
+
+	return supplierfacilities, nil
+}
+
+func (supplierfacilityservice *SupplierFacilityService) GetByUnit(unit_id int64, filter string) (
+	supplierfacilities *[]models.ApiLongSupplierFacility, err error) {
+	supplierfacilities = new([]models.ApiLongSupplierFacility)
+	_, err = supplierfacilityservice.DbContext.Select(supplierfacilities,
+		"select f.supplier_id as id, u.name, f.service_id as serviceId, f.position, f.rating, f.throughput from "+
+			supplierfacilityservice.Table+" f inner join services s on f.service_id = s.id inner join units u on f.supplier_id = u.id"+
+			" where s.active = 1 and u.active = 1 and f.supplier_id in (select supplier_id from orders where unit_id = ?)"+filter, unit_id)
+	if err != nil {
+		log.Error("Error during getting all supplier facility object from database %v", err)
+		return nil, err
+	}
+
 	return supplierfacilities, nil
 }
 

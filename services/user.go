@@ -18,6 +18,7 @@ type UserRepository interface {
 	GetByUnit(unitid int64) (users *[]models.ApiUserTiny, err error)
 	GetMeta() (usermeta *models.ApiUserMeta, err error)
 	GetMetaByUser(user_id int64) (metaunituser *models.ApiMetaUnitUser, err error)
+	GetMetaDashboard(user_id int64) (metadashboard *models.ApiMetaDashboard, err error)
 	InitUnit(trans *gorp.Transaction) (unitid int64, err error)
 	Create(user *models.DtoUser, inTrans bool) (err error)
 	Update(user *models.DtoUser, briefly bool, inTrans bool) (err error)
@@ -94,8 +95,8 @@ func (userservice *UserService) GetUserArrays(user *models.DtoUser) (*models.Dto
 func (userservice *UserService) FindByLogin(login string) (user *models.DtoUser, err error) {
 	user = new(models.DtoUser)
 	err = userservice.DbContext.SelectOne(user,
-		"select * from "+userservice.Table+" where id in (select user_id from emails where `primary` = 1 and email = ?) or"+
-			" id in (select user_id from mobile_phones where `primary` = 1 and phone = ?)", login, login)
+		"select * from "+userservice.Table+" where id in (select user_id from emails where `primary` = 1 and confirmed = 1 and email = ?) or"+
+			" id in (select user_id from mobile_phones where `primary` = 1 and confirmed = 1 and phone = ?)", login, login)
 	if err != nil {
 		log.Error("Error during finding user object in database %v with value %v", err, login)
 		return nil, err
@@ -195,6 +196,24 @@ func (userservice *UserService) GetMetaByUser(user_id int64) (metaunituser *mode
 	}
 
 	return metaunituser, nil
+}
+
+func (userservice *UserService) GetMetaDashboard(user_id int64) (metadashboard *models.ApiMetaDashboard, err error) {
+	metadashboard = new(models.ApiMetaDashboard)
+	count, err := userservice.DbContext.SelectInt("select count(*) from "+userservice.Table+" where id = ? and newsBlocked = 1", user_id)
+	if err != nil {
+		log.Error("Error during getting meta unit user object from database %v", err)
+		return nil, err
+	}
+	metadashboard.NewsBlocked = count != 0
+	metadashboard.InvoiceTotal, err = userservice.DbContext.SelectInt("select count(*) from invoices "+
+		"where company_id in (select id from companies where unit_id = (select unit_id from users where id = ?))", user_id)
+	if err != nil {
+		log.Error("Error during getting meta unit user object from database %v", err)
+		return nil, err
+	}
+
+	return metadashboard, nil
 }
 
 func (userservice *UserService) InitUnit(trans *gorp.Transaction) (unitid int64, err error) {

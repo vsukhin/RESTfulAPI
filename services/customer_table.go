@@ -22,8 +22,9 @@ type CustomerTableRepository interface {
 	CheckUserAccess(user_id int64, id int64) (allowed bool, err error)
 	Get(id int64) (customertable *models.DtoCustomerTable, err error)
 	GetEx(id int64) (customertable *models.ApiLongCustomerTable, err error)
-	GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error)
-	GetByUser(userid int64, filter string, fulllist bool) (customertables *[]models.ApiLongCustomerTable, err error)
+	GetMeta(userid int64, filter string, fulllist bool) (customertable *models.ApiMetaCustomerTable, err error)
+	GetFullMeta(dtocustomertable *models.DtoCustomerTable, filter string) (customertable *models.ApiFullMetaCustomerTable, err error)
+	GetByUser(userid int64, filter string, fulllist bool) (customertables *[]models.ApiSearchCustomerTable, err error)
 	GetByUnit(unitid int64) (customertables *[]models.ApiMiddleCustomerTable, err error)
 	GetExpired(timeout time.Duration) (customertables *[]models.DtoCustomerTable, err error)
 	Create(customertable *models.DtoCustomerTable) (err error)
@@ -51,6 +52,7 @@ func (customertableservice *CustomerTableService) Copy(srccustomertable *models.
 	*destcustomertable = *srccustomertable
 	destcustomertable.ID = 0
 	destcustomertable.Created = time.Now()
+	destcustomertable.Signature = models.CUSTOMER_TABLE_SIGNATURE_DEFAULT
 
 	if inTrans {
 		trans, err = customertableservice.DbContext.Begin()
@@ -100,12 +102,12 @@ func (customertableservice *CustomerTableService) Copy(srccustomertable *models.
 	if inTrans {
 		_, err = trans.Exec(
 			"insert into table_data (customer_table_id, position, created, active, wrong, edition, original_id"+query+
-				" select ?, position, ?, active, wrong, 0, 0"+query+" from table_columns where customer_table_id = ? and active = 1",
+				") select ?, position, ?, active, wrong, 0, 0"+query+" from table_data where customer_table_id = ? and active = 1",
 			destcustomertable.ID, time.Now(), srccustomertable.ID)
 	} else {
 		_, err = customertableservice.DbContext.Exec(
 			"insert into table_data (customer_table_id, position, created, active, wrong, edition, original_id"+query+
-				" select ?, position, ?, active, wrong, 0, 0"+query+" from table_columns where customer_table_id = ? and active = 1",
+				") select ?, position, ?, active, wrong, 0, 0"+query+" from table_data where customer_table_id = ? and active = 1",
 			destcustomertable.ID, time.Now(), srccustomertable.ID)
 	}
 	if err != nil {
@@ -215,7 +217,13 @@ func (customertableservice *CustomerTableService) ImportData(file *models.DtoFil
 		return errors.New("Empty table")
 	}
 
-	query := "load data infile '" + filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)+version) +
+	absfilepath, err := filepath.Abs(config.Configuration.FileStorage)
+	if err != nil {
+		log.Error("Can't make an absolute path for %v, %v", config.Configuration.FileStorage, err)
+		return err
+	}
+
+	query := "load data infile '" + filepath.Join(absfilepath, file.Path, fmt.Sprintf("%08d", file.ID)+version) +
 		"' into table table_data fields terminated by '" +
 		string(models.GetDataSeparator(models.DataFormat(dataformat))) +
 		"'  escaped by '' lines terminated by '\n'"
@@ -288,7 +296,13 @@ func (customertableservice *CustomerTableService) ExportData(viewexporttable *mo
 		}
 		query += ")"
 	}
-	query += " into outfile '" + filepath.Join(config.Configuration.TempDirectory, fmt.Sprintf("%08d", file.ID)+version) + "' fields terminated by '" +
+	abstemppath, err := filepath.Abs(config.Configuration.TempDirectory)
+	if err != nil {
+		log.Error("Can't make an absolute path for %v, %v", config.Configuration.TempDirectory, err)
+		return err
+	}
+
+	query += " into outfile '" + filepath.Join(abstemppath, fmt.Sprintf("%08d", file.ID)+version) + "' fields terminated by '" +
 		string(models.GetDataSeparator(models.DataFormat(viewexporttable.Data_Format_ID))) + "' lines terminated by '\n'"
 	query += ")"
 
@@ -300,18 +314,6 @@ func (customertableservice *CustomerTableService) ExportData(viewexporttable *mo
 	log.Info("Ending downloading table rows %v", time.Now())
 
 	return nil
-}
-
-func (customertableservice *CustomerTableService) ClearExpiredTables() {
-	for {
-		tables, err := customertableservice.GetExpired(config.Configuration.TableTimeout)
-		if err == nil {
-			for _, table := range *tables {
-				err = customertableservice.Deactivate(&table)
-			}
-		}
-		time.Sleep(time.Minute)
-	}
 }
 
 func (customertableservice *CustomerTableService) CheckUserAccess(user_id int64, id int64) (allowed bool, err error) {
@@ -349,16 +351,37 @@ func (customertableservice *CustomerTableService) GetEx(id int64) (customertable
 	return customertable, nil
 }
 
-func (customertableservice *CustomerTableService) GetMeta(id int64) (customertable *models.ApiMetaCustomerTable, err error) {
+func (customertableservice *CustomerTableService) GetMeta(userid int64, filter string, fulllist bool) (customertable *models.ApiMetaCustomerTable, err error) {
 	customertable = new(models.ApiMetaCustomerTable)
-	customertable.NumOfRows, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_data where active = 1 and customer_table_id = ?", id)
+	if !fulllist {
+		filter = " and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN) +
+			" and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN_READONLY) + filter
+	}
+	customertable.Total, err = customertableservice.DbContext.SelectInt("select count(*) from "+customertableservice.Table+
+		" c inner join table_types t on c.type_id = t.id where c.active = 1 and c.permanent = 1 and"+
+		" c.unit_id = (select unit_id from users where id = ?)"+filter, userid)
 	if err != nil {
-		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
+		log.Error("Error during getting unit meta customer table object from database %v with value %v", err, userid)
 		return nil, err
 	}
 
-	tablecolumns, err := customertableservice.TableColumnRepository.GetByTable(id)
+	return customertable, nil
+}
+
+func (customertableservice *CustomerTableService) GetFullMeta(dtocustomertable *models.DtoCustomerTable, filter string) (
+	customertable *models.ApiFullMetaCustomerTable, err error) {
+	customertable = new(models.ApiFullMetaCustomerTable)
+
+	customertable.NumOfRows, err = customertableservice.DbContext.SelectInt(
+		"select count(*) from table_data where"+filter+" active = 1 and customer_table_id = ?", dtocustomertable.ID)
+	if err != nil {
+		log.Error("Error during getting meta customer table object from database %v with value %v", err, dtocustomertable.ID)
+		return nil, err
+	}
+	customertable.Created = dtocustomertable.Created
+	customertable.Signature = dtocustomertable.Signature
+
+	tablecolumns, err := customertableservice.TableColumnRepository.GetByTable(dtocustomertable.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -376,9 +399,9 @@ func (customertableservice *CustomerTableService) GetMeta(id int64) (customertab
 	}
 	var notchecked int64
 	notchecked, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_data where "+query+" active = 1 and customer_table_id = ?", id)
+		"select count(*) from table_data where"+filter+" "+query+" active = 1 and customer_table_id = ?", dtocustomertable.ID)
 	if err != nil {
-		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
+		log.Error("Error during getting meta customer table object from database %v with value %v", err, dtocustomertable.ID)
 		return nil, err
 	}
 	customertable.Checked = notchecked == 0
@@ -393,15 +416,16 @@ func (customertableservice *CustomerTableService) GetMeta(id int64) (customertab
 	if query != "" {
 		query = " sum(" + query + ")"
 	} else {
-		query = "0"
+		query = " sum(0)"
 	}
 	var numofvalid int64
 	numofvalid, err = customertableservice.DbContext.SelectInt(
-		"select "+query+" from table_data where active = 1 and customer_table_id = ?", id)
+		"select coalesce((select cast("+query+" as signed) from table_data where"+filter+" active = 1 and customer_table_id = ?), 0)", dtocustomertable.ID)
 	if err != nil {
-		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
+		log.Error("Error during getting meta customer table object from database %v with value %v", err, dtocustomertable.ID)
 		return nil, err
 	}
+
 	customertable.QaulityPer = 0
 	if customertable.NumOfRows != 0 && customertable.NumOfCols != 0 {
 		customertable.QaulityPer = byte(100 * numofvalid / (customertable.NumOfRows * customertable.NumOfCols))
@@ -418,9 +442,9 @@ func (customertableservice *CustomerTableService) GetMeta(id int64) (customertab
 		query = "(" + query + ") and"
 	}
 	customertable.NumOfWrongRows, err = customertableservice.DbContext.SelectInt(
-		"select count(*) from table_data where "+query+" active = 1 and customer_table_id = ?", id)
+		"select count(*) from table_data where"+filter+" "+query+" active = 1 and customer_table_id = ?", dtocustomertable.ID)
 	if err != nil {
-		log.Error("Error during getting meta customer table object from database %v with value %v", err, id)
+		log.Error("Error during getting meta customer table object from database %v with value %v", err, dtocustomertable.ID)
 		return nil, err
 	}
 
@@ -428,14 +452,15 @@ func (customertableservice *CustomerTableService) GetMeta(id int64) (customertab
 }
 
 func (customertableservice *CustomerTableService) GetByUser(userid int64, filter string,
-	fulllist bool) (customertables *[]models.ApiLongCustomerTable, err error) {
-	customertables = new([]models.ApiLongCustomerTable)
+	fulllist bool) (customertables *[]models.ApiSearchCustomerTable, err error) {
+	customertables = new([]models.ApiSearchCustomerTable)
 	if !fulllist {
 		filter = " and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN) +
 			" and c.type_id != " + fmt.Sprintf("%v", models.TABLE_TYPE_HIDDEN_READONLY) + filter
 	}
 	_, err = customertableservice.DbContext.Select(customertables,
-		"select c.id, c.name, c.type_id as type, c.unit_id from "+customertableservice.Table+
+		"select c.id, c.name, (select count(*) from table_data where customer_table_id = c.id and active = 1) as rows,"+
+			" c.created, c.signature as createdName, c.type_id as type, c.unit_id from "+customertableservice.Table+
 			" c inner join table_types t on c.type_id = t.id where c.active = 1 and c.permanent = 1 and"+
 			" c.unit_id = (select unit_id from users where id = ?)"+filter, userid)
 	if err != nil {

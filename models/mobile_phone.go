@@ -16,14 +16,14 @@ type ViewApiMobilePhone struct {
 	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                // Идентификатор классификатора
 }
 
-type UpdateMobilePhones []ViewApiMobilePhone
-
 type ViewMobilePhone struct {
 	Phone         string `json:"phone" db:"phone" validate:"regexp=^7[0-9]{10}$"` // Уникальный номер
 	Primary       bool   `json:"primary" db:"primary"`                            // Основной
 	Language      string `json:"language" db:"language" validate:"min=1,max=10"`  // Язык рассылки
 	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                 // Идентификатор классификатора
 }
+
+type UpdateMobilePhones []ViewMobilePhone
 
 type DtoMobilePhone struct {
 	Phone         string    `db:"phone"`        // Уникальный номер

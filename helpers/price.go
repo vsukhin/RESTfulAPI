@@ -57,45 +57,57 @@ func CheckColumnMobileOperator(apitablecell *models.ApiLongTableCell, r render.R
 	return mobile_operator_id, nil
 }
 
-func CheckColumnProduct(apitablecell *models.ApiLongTableCell, r render.Render, language string) (product_id int, err error) {
+func CheckColumnProductInternal(apitablecell *models.ApiLongTableCell) (product_id int, err error) {
 	product_id = 0
 	if !apitablecell.Valid {
-		log.Error("Verify product value is not valid")
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		log.Error("Product value is not valid")
 		return 0, errors.New("Not valid verify")
 	}
 	product_id, err = strconv.Atoi(apitablecell.Value)
 	if err != nil {
-		log.Error("Can't convert to number verify product %v with value %v", err, apitablecell.Value)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return 0, errors.New("Verify product value is wrong")
+		log.Error("Can't convert to number product %v with value %v", err, apitablecell.Value)
+		return 0, errors.New("Product value is wrong")
 	}
 
 	return product_id, nil
 }
 
-func CheckColumnDiscount(apitablecell *models.ApiLongTableCell, r render.Render, language string) (discount float64, err error) {
+func CheckColumnProduct(apitablecell *models.ApiLongTableCell, r render.Render, language string) (product_id int, err error) {
+	product_id, err = CheckColumnProductInternal(apitablecell)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[language].Errors.Api.Data_Wrong})
+		return 0, err
+	}
+
+	return product_id, nil
+}
+
+func CheckColumnDiscountInternal(apitablecell *models.ApiLongTableCell) (discount float64, err error) {
 	discount = 0
 	if !apitablecell.Valid {
 		log.Error("Discount column value is not valid")
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
 		return 0, errors.New("Not valid discount")
 	}
 	discount, err = strconv.ParseFloat(strings.Replace(apitablecell.Value, ",", ".", -1), 64)
 	if err != nil {
 		log.Error("Can't convert to number discount %v with value %v", err, apitablecell.Value)
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[language].Errors.Api.Data_Wrong})
 		return 0, errors.New("Discount value is wrong")
 	}
 	if discount < 0 {
 		log.Error("Discount value can't be negative %v", discount)
+		return 0, errors.New("Discount value is negative")
+	}
+
+	return discount, nil
+}
+
+func CheckColumnDiscount(apitablecell *models.ApiLongTableCell, r render.Render, language string) (discount float64, err error) {
+	discount, err = CheckColumnDiscountInternal(apitablecell)
+	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[language].Errors.Api.Data_Wrong})
-		return 0, errors.New("Discount value is negative")
+		return 0, err
 	}
 
 	return discount, nil
@@ -281,250 +293,477 @@ func GetSMSHLRPriceRows(columnmobileoperator, columnrange, columnprice *models.D
 	return nil
 }
 
-func GetSMSHLRPricesInternal(alias string, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
-	tablerowrepository services.TableRowRepository, mobileoperatorrepository services.MobileOperatorRepository) (smshlrprices *[]models.ApiSMSHLRPrice, err error) {
+func GetSMSHLRPrices(alias string, supplier_id int64, r render.Render, pricerepository services.PriceRepository,
+	tablecolumnrepository services.TableColumnRepository, tablerowrepository services.TableRowRepository,
+	mobileoperatorrepository services.MobileOperatorRepository, language string, internal bool) (smshlrprices *[]models.ApiSMSHLRPrice, err error) {
 	smshlrprices = new([]models.ApiSMSHLRPrice)
 	supplierprices, err := pricerepository.GetSupplierPrices(alias)
 	if err != nil {
-		return nil, err
-	}
-	for _, supplierprice := range *supplierprices {
-		columnmobileoperator, columnrange, columnprice, err := GetSMSHLRPriceColumns(&supplierprice, tablecolumnrepository)
-		if err != nil {
-			return nil, err
-		}
-		err = GetSMSHLRPriceRows(columnmobileoperator, columnrange, columnprice, &supplierprice, tablerowrepository, mobileoperatorrepository, smshlrprices)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return smshlrprices, nil
-}
-
-func GetSMSHLRPrices(alias string, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
-	tablerowrepository services.TableRowRepository, mobileoperatorrepository services.MobileOperatorRepository,
-	language string) (smshlrprices *[]models.ApiSMSHLRPrice, err error) {
-	smshlrprices = new([]models.ApiSMSHLRPrice)
-	supplierprices, err := pricerepository.GetSupplierPrices(alias)
-	if err != nil {
-		return nil, err
-	}
-	for _, supplierprice := range *supplierprices {
-		columnmobileoperator, columnrange, columnprice, err := GetSMSHLRPriceColumns(&supplierprice, tablecolumnrepository)
-		if err != nil {
+		if !internal {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, err
 		}
-		err = GetSMSHLRPriceRows(columnmobileoperator, columnrange, columnprice, &supplierprice, tablerowrepository, mobileoperatorrepository, smshlrprices)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-				Message: config.Localization[language].Errors.Api.Data_Wrong})
-			return nil, err
+		return nil, err
+	}
+	for _, supplierprice := range *supplierprices {
+		if supplier_id == 0 || supplier_id == supplierprice.Supplier_ID {
+			columnmobileoperator, columnrange, columnprice, err := GetSMSHLRPriceColumns(&supplierprice, tablecolumnrepository)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, err
+			}
+			err = GetSMSHLRPriceRows(columnmobileoperator, columnrange, columnprice, &supplierprice, tablerowrepository, mobileoperatorrepository, smshlrprices)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+						Message: config.Localization[language].Errors.Api.Data_Wrong})
+				}
+				return nil, err
+			}
 		}
 	}
 
 	return smshlrprices, nil
 }
 
-func GetRecognizePrices(alias string, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
+func GetRecognizePrices(alias string, supplier_id int64, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, recognizeproductrepository services.RecognizeProductRepository,
-	language string) (recognizeprices *[]models.ApiRecognizePrice, err error) {
+	language string, internal bool) (recognizeprices *[]models.ApiRecognizePrice, err error) {
 	recognizeprices = new([]models.ApiRecognizePrice)
 	supplierprices, err := pricerepository.GetSupplierPrices(alias)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		if !internal {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+		}
 		return nil, err
 	}
 	for _, supplierprice := range *supplierprices {
-		dtotablecolumns, err := tablecolumnrepository.GetByTable(supplierprice.Customer_Table_ID)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, err
-		}
-		var columnproduct *models.DtoTableColumn
-		var columnprice *models.DtoTableColumn
-		var columndiscount *models.DtoTableColumn
-		for i, tablecolumn := range *dtotablecolumns {
-			if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_ID {
-				if columnproduct != nil {
-					log.Error("Can't have multiple product id column in price list %v for supplier %v",
-						supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+		if supplier_id == 0 || supplier_id == supplierprice.Supplier_ID {
+			dtotablecolumns, err := tablecolumnrepository.GetByTable(supplierprice.Customer_Table_ID)
+			if err != nil {
+				if !internal {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[language].Errors.Api.Object_NotExist})
-					return nil, errors.New("Multiple product id column")
 				}
-				columnproduct = &(*dtotablecolumns)[i]
+				return nil, err
 			}
-			if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_PRICE {
-				if columnprice != nil {
-					log.Error("Can't have multiple price column in price list %v for supplier %v",
-						supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+			var columnproduct *models.DtoTableColumn
+			var columnprice *models.DtoTableColumn
+			var columndiscount *models.DtoTableColumn
+			for i, tablecolumn := range *dtotablecolumns {
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_ID {
+					if columnproduct != nil {
+						log.Error("Can't have multiple product id column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple product id column")
+					}
+					columnproduct = &(*dtotablecolumns)[i]
+				}
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_PRICE {
+					if columnprice != nil {
+						log.Error("Can't have multiple price column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple price column")
+					}
+					columnprice = &(*dtotablecolumns)[i]
+				}
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_DISCOUNT {
+					if columndiscount != nil {
+						log.Error("Can't have multiple discount column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple discount column")
+					}
+					columndiscount = &(*dtotablecolumns)[i]
+				}
+			}
+			if columnproduct == nil {
+				log.Error("Can't find product id column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[language].Errors.Api.Object_NotExist})
-					return nil, errors.New("Multiple price column")
 				}
-				columnprice = &(*dtotablecolumns)[i]
+				return nil, errors.New("Missed product id column")
 			}
-			if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_DISCOUNT {
-				if columndiscount != nil {
-					log.Error("Can't have multiple discount column in price list %v for supplier %v",
-						supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+			if columnprice == nil {
+				log.Error("Can't find price column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[language].Errors.Api.Object_NotExist})
-					return nil, errors.New("Multiple discount column")
 				}
-				columndiscount = &(*dtotablecolumns)[i]
+				return nil, errors.New("Missed price column")
 			}
-		}
-		if columnproduct == nil {
-			log.Error("Can't find product id column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, errors.New("Missed product id column")
-		}
-		if columnprice == nil {
-			log.Error("Can't find price column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, errors.New("Missed price column")
-		}
-		pricecolumns := &[]models.DtoTableColumn{*columnproduct, *columnprice}
-		if columndiscount != nil {
-			*pricecolumns = append(*pricecolumns, *columndiscount)
-		}
-		apitablerows, err := tablerowrepository.GetAll("", "", supplierprice.Customer_Table_ID, pricecolumns)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, err
-		}
-		for _, apitablerow := range *apitablerows {
-			apirecognizeprice := new(models.ApiRecognizePrice)
-			apirecognizeprice.Supplier_ID = supplierprice.Supplier_ID
-			for _, apitablecell := range apitablerow.Cells {
-				if apitablecell.Table_Column_ID == columnproduct.ID {
-					value, err := CheckColumnProduct(&apitablecell, r, language)
-					if err != nil {
-						return nil, err
-					}
-					dtorecognizeproduct, err := CheckRecognizeProduct(value, r, recognizeproductrepository, language)
-					if err != nil {
-						return nil, err
-					}
-					apirecognizeprice.Product_ID = dtorecognizeproduct.ID
-					apirecognizeprice.Increase = dtorecognizeproduct.Increase
+			pricecolumns := &[]models.DtoTableColumn{*columnproduct, *columnprice}
+			if columndiscount != nil {
+				*pricecolumns = append(*pricecolumns, *columndiscount)
+			}
+			apitablerows, err := tablerowrepository.GetAll("", "", supplierprice.Customer_Table_ID, pricecolumns)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
 				}
-				if apitablecell.Table_Column_ID == columnprice.ID {
-					apirecognizeprice.Price, err = CheckColumnPrice(&apitablecell, r, language)
-					if err != nil {
-						return nil, err
+				return nil, err
+			}
+			for _, apitablerow := range *apitablerows {
+				apirecognizeprice := new(models.ApiRecognizePrice)
+				apirecognizeprice.Supplier_ID = supplierprice.Supplier_ID
+				for _, apitablecell := range apitablerow.Cells {
+					if apitablecell.Table_Column_ID == columnproduct.ID {
+						var value int
+						if !internal {
+							value, err = CheckColumnProduct(&apitablecell, r, language)
+						} else {
+							value, err = CheckColumnProductInternal(&apitablecell)
+						}
+						if err != nil {
+							return nil, err
+						}
+						var dtorecognizeproduct *models.DtoRecognizeProduct
+						if !internal {
+							dtorecognizeproduct, err = CheckRecognizeProduct(value, r, recognizeproductrepository, language)
+						} else {
+							dtorecognizeproduct, err = CheckRecognizeProductInternal(value, recognizeproductrepository)
+						}
+						if err != nil {
+							return nil, err
+						}
+						apirecognizeprice.Product_ID = dtorecognizeproduct.ID
+						apirecognizeprice.Increase = dtorecognizeproduct.Increase
 					}
-				}
-				if columndiscount != nil {
-					if apitablecell.Table_Column_ID == columndiscount.ID {
-						apirecognizeprice.PriceIncrease, err = CheckColumnDiscount(&apitablecell, r, language)
+					if apitablecell.Table_Column_ID == columnprice.ID {
+						if !internal {
+							apirecognizeprice.Price, err = CheckColumnPrice(&apitablecell, r, language)
+						} else {
+							apirecognizeprice.Price, err = CheckColumnPriceInternal(&apitablecell)
+						}
 						if err != nil {
 							return nil, err
 						}
 					}
+					if columndiscount != nil {
+						if apitablecell.Table_Column_ID == columndiscount.ID {
+							if !internal {
+								apirecognizeprice.PriceIncrease, err = CheckColumnDiscount(&apitablecell, r, language)
+							} else {
+								apirecognizeprice.PriceIncrease, err = CheckColumnDiscountInternal(&apitablecell)
+							}
+							if err != nil {
+								return nil, err
+							}
+						}
+					}
 				}
+				*recognizeprices = append(*recognizeprices, *apirecognizeprice)
 			}
-			*recognizeprices = append(*recognizeprices, *apirecognizeprice)
 		}
 	}
 
 	return recognizeprices, nil
 }
 
-func GetVerifyPrices(alias string, r render.Render, pricerepository services.PriceRepository, tablecolumnrepository services.TableColumnRepository,
-	tablerowrepository services.TableRowRepository, verifyproductrepository services.VerifyProductRepository,
-	language string) (verifyprices *[]models.ApiVerifyPrice, err error) {
+func GetVerifyPrices(alias string, supplier_id int64, r render.Render, pricerepository services.PriceRepository,
+	tablecolumnrepository services.TableColumnRepository, tablerowrepository services.TableRowRepository,
+	verifyproductrepository services.VerifyProductRepository, language string, internal bool) (verifyprices *[]models.ApiVerifyPrice, err error) {
 	verifyprices = new([]models.ApiVerifyPrice)
 	supplierprices, err := pricerepository.GetSupplierPrices(alias)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		if !internal {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+		}
 		return nil, err
 	}
 	for _, supplierprice := range *supplierprices {
-		dtotablecolumns, err := tablecolumnrepository.GetByTable(supplierprice.Customer_Table_ID)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, err
-		}
-		var columnproduct *models.DtoTableColumn
-		var columnprice *models.DtoTableColumn
-		for i, tablecolumn := range *dtotablecolumns {
-			if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_ID {
-				if columnproduct != nil {
-					log.Error("Can't have multiple product id column in price list %v for supplier %v",
-						supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+		if supplier_id == 0 || supplier_id == supplierprice.Supplier_ID {
+			dtotablecolumns, err := tablecolumnrepository.GetByTable(supplierprice.Customer_Table_ID)
+			if err != nil {
+				if !internal {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[language].Errors.Api.Object_NotExist})
-					return nil, errors.New("Multiple product id column")
 				}
-				columnproduct = &(*dtotablecolumns)[i]
+				return nil, err
 			}
-			if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_PRICE {
-				if columnprice != nil {
-					log.Error("Can't have multiple price column in price list %v for supplier %v",
-						supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+			var columnproduct *models.DtoTableColumn
+			var columnprice *models.DtoTableColumn
+			for i, tablecolumn := range *dtotablecolumns {
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_ID {
+					if columnproduct != nil {
+						log.Error("Can't have multiple product id column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple product id column")
+					}
+					columnproduct = &(*dtotablecolumns)[i]
+				}
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_PRICE {
+					if columnprice != nil {
+						log.Error("Can't have multiple price column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple price column")
+					}
+					columnprice = &(*dtotablecolumns)[i]
+				}
+			}
+			if columnproduct == nil {
+				log.Error("Can't find product id column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
 					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 						Message: config.Localization[language].Errors.Api.Object_NotExist})
-					return nil, errors.New("Multiple price column")
 				}
-				columnprice = &(*dtotablecolumns)[i]
+				return nil, errors.New("Missed product id column")
 			}
-		}
-		if columnproduct == nil {
-			log.Error("Can't find product id column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, errors.New("Missed product id column")
-		}
-		if columnprice == nil {
-			log.Error("Can't find price column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, errors.New("Missed price column")
-		}
-		pricecolumns := &[]models.DtoTableColumn{*columnproduct, *columnprice}
-		apitablerows, err := tablerowrepository.GetAll("", "", supplierprice.Customer_Table_ID, pricecolumns)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return nil, err
-		}
-		for _, apitablerow := range *apitablerows {
-			apiverifyprice := new(models.ApiVerifyPrice)
-			apiverifyprice.Supplier_ID = supplierprice.Supplier_ID
-			for _, apitablecell := range apitablerow.Cells {
-				if apitablecell.Table_Column_ID == columnproduct.ID {
-					value, err := CheckColumnProduct(&apitablecell, r, language)
-					if err != nil {
-						return nil, err
-					}
-					dtoverifyproduct, err := CheckVerifyProduct(value, r, verifyproductrepository, language)
-					if err != nil {
-						return nil, err
-					}
-					apiverifyprice.Product_ID = dtoverifyproduct.ID
+			if columnprice == nil {
+				log.Error("Can't find price column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
 				}
-				if apitablecell.Table_Column_ID == columnprice.ID {
-					apiverifyprice.Price, err = CheckColumnPrice(&apitablecell, r, language)
-					if err != nil {
-						return nil, err
-					}
-				}
+				return nil, errors.New("Missed price column")
 			}
-			*verifyprices = append(*verifyprices, *apiverifyprice)
+			pricecolumns := &[]models.DtoTableColumn{*columnproduct, *columnprice}
+			apitablerows, err := tablerowrepository.GetAll("", "", supplierprice.Customer_Table_ID, pricecolumns)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, err
+			}
+			for _, apitablerow := range *apitablerows {
+				apiverifyprice := new(models.ApiVerifyPrice)
+				apiverifyprice.Supplier_ID = supplierprice.Supplier_ID
+				for _, apitablecell := range apitablerow.Cells {
+					if apitablecell.Table_Column_ID == columnproduct.ID {
+						var value int
+						if !internal {
+							value, err = CheckColumnProduct(&apitablecell, r, language)
+						} else {
+							value, err = CheckColumnProductInternal(&apitablecell)
+						}
+						if err != nil {
+							return nil, err
+						}
+						var dtoverifyproduct *models.DtoVerifyProduct
+						if !internal {
+							dtoverifyproduct, err = CheckVerifyProduct(value, r, verifyproductrepository, language)
+						} else {
+							dtoverifyproduct, err = CheckVerifyProductInternal(value, verifyproductrepository)
+						}
+						if err != nil {
+							return nil, err
+						}
+						apiverifyprice.Product_ID = dtoverifyproduct.ID
+					}
+					if apitablecell.Table_Column_ID == columnprice.ID {
+						if !internal {
+							apiverifyprice.Price, err = CheckColumnPrice(&apitablecell, r, language)
+						} else {
+							apiverifyprice.Price, err = CheckColumnPriceInternal(&apitablecell)
+						}
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+				*verifyprices = append(*verifyprices, *apiverifyprice)
+			}
 		}
 	}
 
 	return verifyprices, nil
+}
+
+func GetHeaderPrices(alias string, supplier_id int64, r render.Render, pricerepository services.PriceRepository,
+	tablecolumnrepository services.TableColumnRepository, tablerowrepository services.TableRowRepository,
+	headerproductrepository services.HeaderProductRepository, language string, internal bool) (headerprices *[]models.ApiHeaderPrice, err error) {
+	headerprices = new([]models.ApiHeaderPrice)
+	supplierprices, err := pricerepository.GetSupplierPrices(alias)
+	if err != nil {
+		if !internal {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+		}
+		return nil, err
+	}
+	for _, supplierprice := range *supplierprices {
+		if supplier_id == 0 || supplier_id == supplierprice.Supplier_ID {
+			dtotablecolumns, err := tablecolumnrepository.GetByTable(supplierprice.Customer_Table_ID)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, err
+			}
+			var columnproduct *models.DtoTableColumn
+			var columnrange *models.DtoTableColumn
+			var columnprice *models.DtoTableColumn
+			var columndiscount *models.DtoTableColumn
+			for i, tablecolumn := range *dtotablecolumns {
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_ID {
+					if columnproduct != nil {
+						log.Error("Can't have multiple product id column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple product id column")
+					}
+					columnproduct = &(*dtotablecolumns)[i]
+				}
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_RANGE {
+					if columnrange != nil {
+						log.Error("Can't have multiple range column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						return nil, errors.New("Multiple range column")
+					}
+					columnrange = &(*dtotablecolumns)[i]
+				}
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_PRICE {
+					if columnprice != nil {
+						log.Error("Can't have multiple price column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple price column")
+					}
+					columnprice = &(*dtotablecolumns)[i]
+				}
+
+				if tablecolumn.Column_Type_ID == models.COLUMN_TYPE_PRICELIST_DISCOUNT {
+					if columndiscount != nil {
+						log.Error("Can't have multiple discount column in price list %v for supplier %v",
+							supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+						if !internal {
+							r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+								Message: config.Localization[language].Errors.Api.Object_NotExist})
+						}
+						return nil, errors.New("Multiple discount column")
+					}
+					columndiscount = &(*dtotablecolumns)[i]
+				}
+			}
+			if columnproduct == nil {
+				log.Error("Can't find product id column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, errors.New("Missed product id column")
+			}
+			if columnprice == nil {
+				log.Error("Can't find price column in price list %v for supplier %v", supplierprice.Customer_Table_ID, supplierprice.Supplier_ID)
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, errors.New("Missed price column")
+			}
+			pricecolumns := &[]models.DtoTableColumn{*columnproduct, *columnprice}
+			if columnrange != nil {
+				*pricecolumns = append(*pricecolumns, *columnrange)
+			}
+			if columndiscount != nil {
+				*pricecolumns = append(*pricecolumns, *columndiscount)
+			}
+			apitablerows, err := tablerowrepository.GetAll("", "", supplierprice.Customer_Table_ID, pricecolumns)
+			if err != nil {
+				if !internal {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+				}
+				return nil, err
+			}
+			for _, apitablerow := range *apitablerows {
+				apiheaderprice := new(models.ApiHeaderPrice)
+				apiheaderprice.Supplier_ID = supplierprice.Supplier_ID
+				for _, apitablecell := range apitablerow.Cells {
+					if apitablecell.Table_Column_ID == columnproduct.ID {
+						var value int
+						if !internal {
+							value, err = CheckColumnProduct(&apitablecell, r, language)
+						} else {
+							value, err = CheckColumnProductInternal(&apitablecell)
+						}
+						if err != nil {
+							return nil, err
+						}
+						var dtoheaderproduct *models.DtoHeaderProduct
+						if !internal {
+							dtoheaderproduct, err = CheckHeaderProduct(value, r, headerproductrepository, language)
+						} else {
+							dtoheaderproduct, err = CheckHeaderProductInternal(value, headerproductrepository)
+						}
+						if err != nil {
+							return nil, err
+						}
+						apiheaderprice.Product_ID = dtoheaderproduct.ID
+						apiheaderprice.Increase = dtoheaderproduct.Increase
+						apiheaderprice.FeeOnce = dtoheaderproduct.FeeOnce
+						apiheaderprice.FeeMonthly = dtoheaderproduct.FeeMonthly
+					}
+					if columnrange != nil {
+						if apitablecell.Table_Column_ID == columnrange.ID {
+							apirange, err := CheckColumnRangeInternal(&apitablecell)
+							if err != nil {
+								return nil, err
+							}
+							apiheaderprice.AmountRange = *apirange
+						}
+					}
+					if apitablecell.Table_Column_ID == columnprice.ID {
+						if !internal {
+							apiheaderprice.Price, err = CheckColumnPrice(&apitablecell, r, language)
+						} else {
+							apiheaderprice.Price, err = CheckColumnPriceInternal(&apitablecell)
+						}
+						if err != nil {
+							return nil, err
+						}
+					}
+					if columndiscount != nil {
+						if apitablecell.Table_Column_ID == columndiscount.ID {
+							if !internal {
+								apiheaderprice.PriceIncrease, err = CheckColumnDiscount(&apitablecell, r, language)
+							} else {
+								apiheaderprice.PriceIncrease, err = CheckColumnDiscountInternal(&apitablecell)
+							}
+							if err != nil {
+								return nil, err
+							}
+						}
+					}
+				}
+				*headerprices = append(*headerprices, *apiheaderprice)
+			}
+		}
+	}
+
+	return headerprices, nil
 }

@@ -10,8 +10,8 @@ const (
 
 // Структура для организации хранения типов таблиц
 type ApiTableType struct {
-	ID   int    `db:"id"`   // Уникальный идентификатор типа таблицы
-	Name string `db:"name"` // Назавание типа таблицы
+	ID   int    `json:"id" db:"id"`     // Уникальный идентификатор типа таблицы
+	Name string `json:"name" db:"name"` // Назавание типа таблицы
 }
 
 type DtoTableType struct {

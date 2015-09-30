@@ -29,7 +29,7 @@ func GetSupplierFacilities(w http.ResponseWriter, r render.Render, facilityrepos
 // put /api/v1.0/suppliers/services/
 func UpdateSupplierFacilities(errors binding.Errors, viewfacilities models.ViewFacilities, w http.ResponseWriter, r render.Render,
 	facilityrepository services.FacilityRepository, supplierfacilityrepository services.SupplierFacilityRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewfacilities, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -153,11 +153,15 @@ func GetOrder(r render.Render, params martini.Params, orderrepository services.O
 // put /api/v1.0/suppliers/orders/:oid/
 func UpdateOrder(errors binding.Errors, vieworder models.ViewLongOrder, r render.Render, params martini.Params,
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, unitrepository services.UnitRepository,
-	session *models.DtoSession) {
-	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
+	orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	err = helpers.CheckOrderEditability(dtoorder, r, orderstatusrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -174,6 +178,10 @@ func UpdateOrder(errors binding.Errors, vieworder models.ViewLongOrder, r render
 func DeleteOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
 	orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	err = helpers.CheckOrderEditability(dtoorder, r, orderstatusrepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -215,8 +223,11 @@ func UpdateSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMSFacilit
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
 	smssenderrepository services.SMSSenderRepository, mobileoperatorrepository services.MobileOperatorRepository,
 	periodrepository services.PeriodRepository, eventrepository services.EventRepository,
-	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewsmsfacility, errors, r, session.Language) != nil {
+	smsperiodrepository services.SMSPeriodRepository, smseventrepository services.SMSEventRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository,
+	mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
@@ -225,8 +236,8 @@ func UpdateSMSOrder(errors binding.Errors, viewsmsfacility models.ViewSMSFacilit
 	}
 	apismsfacility, err := helpers.UpdateSMSOrder(dtoorder, viewsmsfacility, r, facilityrepository, smsfacilityrepository,
 		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, smssenderrepository,
-		mobileoperatorrepository, periodrepository, eventrepository, resulttablerepository, worktablerepository,
-		false, session.UserID, session.Language)
+		mobileoperatorrepository, periodrepository, eventrepository, smsperiodrepository, smseventrepository, resulttablerepository, worktablerepository,
+		mobileoperatoroperationrepository, false, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
@@ -258,9 +269,9 @@ func UpdateHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLRFacilit
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, hlrfacilityrepository services.HLRFacilityRepository,
 	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
 	columntyperepository services.ColumnTypeRepository, tablecolumnrepository services.TableColumnRepository,
-	mobileoperatorrepository services.MobileOperatorRepository, resulttablerepository services.ResultTableRepository,
-	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewhlrfacility, errors, r, session.Language) != nil {
+	mobileoperatorrepository services.MobileOperatorRepository, mobileoperatoroperationrepository services.MobileOperatorOperationRepository,
+	resulttablerepository services.ResultTableRepository, worktablerepository services.WorkTableRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
@@ -269,7 +280,7 @@ func UpdateHLROrder(errors binding.Errors, viewhlrfacility models.ViewHLRFacilit
 	}
 	apihlrfacility, err := helpers.UpdateHLROrder(dtoorder, viewhlrfacility, r, facilityrepository, hlrfacilityrepository,
 		orderstatusrepository, customertablerepository, columntyperepository, tablecolumnrepository, mobileoperatorrepository,
-		resulttablerepository, worktablerepository, false, session.UserID, session.Language)
+		mobileoperatoroperationrepository, resulttablerepository, worktablerepository, false, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
@@ -303,10 +314,11 @@ func UpdateRecognizeOrder(errors binding.Errors, viewrecognizefacility models.Vi
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
 	recognizefacilityrepository services.RecognizeFacilityRepository, orderstatusrepository services.OrderStatusRepository,
 	columntyperepository services.ColumnTypeRepository, recognizeproductrepository services.RecognizeProductRepository,
-	filerepository services.FileRepository, inputfilerepository services.InputFileRepository, supplierrequestrepository services.SupplierRequestRepository,
+	filerepository services.FileRepository, inputfieldrepository services.InputFieldRepository, inputproductrepository services.InputProductRepository,
+	inputfilerepository services.InputFileRepository, supplierrequestrepository services.SupplierRequestRepository,
 	inputftprepository services.InputFtpRepository, resulttablerepository services.ResultTableRepository,
 	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewrecognizefacility, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
@@ -314,8 +326,8 @@ func UpdateRecognizeOrder(errors binding.Errors, viewrecognizefacility models.Vi
 		return
 	}
 	apirecognizefacility, err := helpers.UpdateRecognizeOrder(dtoorder, viewrecognizefacility, r, facilityrepository, recognizefacilityrepository,
-		orderstatusrepository, columntyperepository, recognizeproductrepository, filerepository, inputfilerepository, supplierrequestrepository,
-		inputftprepository, resulttablerepository, worktablerepository, session.Language)
+		orderstatusrepository, columntyperepository, recognizeproductrepository, filerepository, inputfieldrepository, inputproductrepository,
+		inputfilerepository, supplierrequestrepository, inputftprepository, resulttablerepository, worktablerepository, session.Language)
 	if err != nil {
 		return
 	}
@@ -346,9 +358,10 @@ func UpdateVerifyOrder(errors binding.Errors, viewverifyfacility models.ViewVeri
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, verifyfacilityrepository services.VerifyFacilityRepository,
 	orderstatusrepository services.OrderStatusRepository, customertablerepository services.CustomerTableRepository,
 	columntyperepository services.ColumnTypeRepository, verifyproductrepository services.VerifyProductRepository,
-	tablecolumnrepository services.TableColumnRepository, datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
+	tablecolumnrepository services.TableColumnRepository, dataproductrepository services.DataProductRepository,
+	datacolumnrepository services.DataColumnRepository, resulttablerepository services.ResultTableRepository,
 	worktablerepository services.WorkTableRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&verifyfacilityrepository, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
@@ -356,11 +369,46 @@ func UpdateVerifyOrder(errors binding.Errors, viewverifyfacility models.ViewVeri
 		return
 	}
 	apiverifyfacility, err := helpers.UpdateVerifyOrder(dtoorder, viewverifyfacility, r, facilityrepository, verifyfacilityrepository,
-		orderstatusrepository, customertablerepository, columntyperepository, verifyproductrepository, tablecolumnrepository, datacolumnrepository,
-		resulttablerepository, worktablerepository, false, session.UserID, session.Language)
+		orderstatusrepository, customertablerepository, columntyperepository, verifyproductrepository, tablecolumnrepository,
+		dataproductrepository, datacolumnrepository, resulttablerepository, worktablerepository, false, session.UserID, session.Language)
 	if err != nil {
 		return
 	}
 
 	r.JSON(http.StatusOK, apiverifyfacility)
+}
+
+// get /api/v1.0/suppliers/orders/:oid:/service/header/
+func GetHeaderOrder(r render.Render, params martini.Params, orderrepository services.OrderRepository,
+	facilityrepository services.FacilityRepository, headerfacilityrepository services.HeaderFacilityRepository, session *models.DtoSession) {
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apiheaderfacility, err := helpers.GetHeaderOrder(dtoorder, r, facilityrepository, headerfacilityrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiheaderfacility)
+}
+
+// put /api/v1.0/suppliers/orders/:oid:/service/header/
+func UpdateHeaderOrder(errors binding.Errors, viewheaderfacility models.ViewHeaderFacility, r render.Render, params martini.Params,
+	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository, headerfacilityrepository services.HeaderFacilityRepository,
+	orderstatusrepository services.OrderStatusRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
+		return
+	}
+	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
+	if err != nil {
+		return
+	}
+	apiheaderfacility, err := helpers.UpdateHeaderOrder(dtoorder, viewheaderfacility, r, facilityrepository, headerfacilityrepository,
+		orderstatusrepository, session.Language)
+	if err != nil {
+		return
+	}
+
+	r.JSON(http.StatusOK, apiheaderfacility)
 }

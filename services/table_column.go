@@ -77,8 +77,7 @@ func (tablecolumnservice *TableColumnService) Extract(infield string, invalue st
 	outfield = infield
 
 	if strings.Contains(invalue, "'") {
-		errValue = errors.New("Wrong field value")
-		return "", "", nil, errValue
+		invalue = strings.Replace(invalue, "'", "''", -1)
 	}
 	outvalue = "'" + invalue + "'"
 
@@ -116,7 +115,7 @@ func (tablecolumnservice *TableColumnService) GetByTable(tableid int64) (tableco
 }
 
 func (tablecolumnservice *TableColumnService) GetDefaultPosition(tableid int64) (position int64, err error) {
-	position, err = tablecolumnservice.DbContext.SelectInt("select max(position) from "+tablecolumnservice.Table+
+	position, err = tablecolumnservice.DbContext.SelectInt("select max(t.position) from "+tablecolumnservice.Table+
 		" t left join column_types c on t.column_type_id = c.id where t.active = 1 "+
 		"and (c.active = 1) and t.customer_table_id = ?",
 		tableid)

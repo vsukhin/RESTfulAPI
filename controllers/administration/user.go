@@ -72,8 +72,9 @@ func GetUsers(w http.ResponseWriter, request *http.Request, r render.Render,
 func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *http.Request, r render.Render,
 	userrepository services.UserRepository, emailrepository services.EmailRepository, sessionrepository services.SessionRepository,
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
-	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
+	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository,
+	accesslogrepository services.AccessLogRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -92,6 +93,7 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	dtouser.Password = ""
 	dtouser.ReportAccess = true
 	dtouser.CaptchaRequired = false
+	dtouser.NewsBlocked = false
 
 	if helpers.CheckUserRoles(user.Roles, session.Language, r, grouprepository) != nil {
 		return
@@ -183,7 +185,13 @@ func CreateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 		})
 	}
 
-	err := userrepository.Create(dtouser, true)
+	dtoaccesslog, err := helpers.CreateAccessLog(dtouser.Code, request, r, accesslogrepository, session.Language)
+	if err != nil {
+		return
+	}
+	dtouser.Subscr_AccessLog_ID = dtoaccesslog.ID
+
+	err = userrepository.Create(dtouser, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -203,7 +211,7 @@ func UpdateUser(errors binding.Errors, user models.ViewApiUserFull, request *htt
 	unitrepository services.UnitRepository, templaterepository services.TemplateRepository, grouprepository services.GroupRepository,
 	classifierrepository services.ClassifierRepository, mobilephonerepository services.MobilePhoneRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&user, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	userid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_USER_ID], session.Language)

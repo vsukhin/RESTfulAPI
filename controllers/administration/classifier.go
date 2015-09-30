@@ -70,7 +70,7 @@ func GetClassifiers(w http.ResponseWriter, request *http.Request, r render.Rende
 // post /api/v1.0/administration/classification/contacts/
 func CreateClassifier(errors binding.Errors, veiwclassifier models.ViewClassifier, r render.Render,
 	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&veiwclassifier, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -109,7 +109,7 @@ func GetClassifier(r render.Render, params martini.Params, classifierrepository 
 // put /api/v1.0/administration/classification/contacts/:id/
 func UpdateClassifier(errors binding.Errors, veiwclassifier models.ViewUpdateClassifier, r render.Render, params martini.Params,
 	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&veiwclassifier, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	classifierid, err := helpers.CheckParameterInt(r, params[helpers.PARAM_NAME_CLASSIFIER_ID], session.Language)

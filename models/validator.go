@@ -2,6 +2,7 @@ package models
 
 import (
 	"application/config"
+	"fmt"
 	"github.com/martini-contrib/binding"
 	logging "github.com/op/go-logging"
 	"gopkg.in/validator.v2"
@@ -34,6 +35,7 @@ func Validate(object interface{}, errors binding.Errors, req *http.Request) bind
 		for f, errarray := range errormap {
 			for _, e := range errarray {
 				code := ""
+				value := ""
 				switch e {
 				case validator.ErrZeroValue:
 					code = strconv.Itoa(VALIDATE_FIELD_EMPTY)
@@ -48,10 +50,15 @@ func Validate(object interface{}, errors binding.Errors, req *http.Request) bind
 				if fieldname == "" {
 					fieldname = f
 				}
-				log.Error("Error during validation field %s (%v)", f, e)
+				v, found := GetFieldValue(fieldname, object)
+				if found {
+					value = fmt.Sprintf("%v", v)
+				}
+				log.Error("Error during validation field %s with value %v (%v)", f, v, e)
 				errors = append(errors, binding.Error{
 					FieldNames:     []string{fieldname},
 					Classification: code,
+					Message:        value,
 				})
 			}
 		}
@@ -89,6 +96,7 @@ func ConvertErrors(language string, errors binding.Errors) (fielderrors *[]types
 
 		if len(bindingerror.FieldNames) > 0 {
 			fielderror.Field = strings.Join(bindingerror.FieldNames, ",")
+			fielderror.FieldValue = bindingerror.Message
 			message := ""
 			coderr, errconv := strconv.Atoi(bindingerror.Classification)
 			if errconv == nil {
@@ -110,6 +118,7 @@ func ConvertErrors(language string, errors binding.Errors) (fielderrors *[]types
 			fielderror.Message = message
 		} else {
 			fielderror.Message = bindingerror.Message
+			log.Error("Error during object binding %v", fielderror.Message)
 		}
 		*fielderrors = append(*fielderrors, *fielderror)
 	}

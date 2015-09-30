@@ -23,8 +23,7 @@ type ViewCompany struct {
 	CompanyAddresses []ViewApiCompanyAddress  `json:"addresses"`                                                // Адреса компании
 	CompanyBanks     []ViewApiCompanyBank     `json:"banks"`                                                    // Банки компании
 	CompanyStaff     []ViewApiCompanyEmployee `json:"staff"`                                                    // Сотрудники компании
-	VAT              byte                     `json:"vat" validate:"min=0,max=100"`                             // НДС компании
-	Deleted          bool                     `json:"del"`                                                      // Удален
+	VAT              byte                     `json:"vat" validate:"min=0,max=100"`                             // НДС компании                                                    // Удален
 }
 
 type ApiMetaCompany struct {
@@ -36,6 +35,7 @@ type ApiShortCompany struct {
 	ShortName_Rus string `json:"nameShortRus" db:"nameShortRus"` // Краткое русское название
 	ShortName_Eng string `json:"nameShortEng" db:"nameShortEng"` // Краткое английское название
 	Unit_ID       int64  `json:"unitId" db:"unitId"`             // Идентификатор объединения
+	Locked        bool   `json:"lock" db:"lock"`                 // Неизменяемая
 	IsPrimary     bool   `json:"primary" db:"primary"`           // Юридическое лицо по умолчанию
 }
 
@@ -52,6 +52,7 @@ type ApiMiddleCompany struct {
 	CompanyBanks     []ViewApiCompanyBank     `json:"banks,omitempty" db:"-"`           // Банки компании
 	CompanyStaff     []ViewApiCompanyEmployee `json:"staff,omitempty" db:"-"`           // Сотрудники компании
 	VAT              byte                     `json:"vat" db:"vat"`                     // НДС компании
+	Locked           bool                     `json:"lock" db:"locked"`                 // Неизменяемая
 	Deleted          bool                     `json:"del" db:"del"`                     // Удален
 
 }
@@ -70,15 +71,17 @@ type ApiLongCompany struct {
 	CompanyBanks     []ViewApiCompanyBank     `json:"banks,omitempty" db:"-"`           // Банки компании
 	CompanyStaff     []ViewApiCompanyEmployee `json:"staff,omitempty" db:"-"`           // Сотрудники компании
 	VAT              byte                     `json:"vat" db:"vat"`                     // НДС компании
+	Locked           bool                     `json:"lock" db:"locked"`                 // Неизменяемая
 	Deleted          bool                     `json:"del" db:"del"`                     // Удален
 }
 
 type CompanySearch struct {
-	ID            int64  `query:"id" search:"id"`                      // Уникальный идентификатор компании
-	ShortName_Rus string `query:"nameShortRus" search:"shortname_rus"` // Краткое русское название
-	ShortName_Eng string `query:"nameShortEng" search:"shortname_eng"` // Краткое английское название
-	Unit_ID       int64  `query:"unitId" search:"unit_id"`             // Идентификатор объединения
-	IsPrimary     bool   `query:"primary" search:"primary"`            // Юридическое лицо по умолчанию
+	ID            int64  `query:"id" search:"id"`                                            // Уникальный идентификатор компании
+	ShortName_Rus string `query:"nameShortRus" search:"shortname_rus" group:"shortname_rus"` // Краткое русское название
+	ShortName_Eng string `query:"nameShortEng" search:"shortname_eng" group:"shortname_eng"` // Краткое английское название
+	Unit_ID       int64  `query:"unitId" search:"unit_id"`                                   // Идентификатор объединения
+	Locked        bool   `query:"lock" search:"locked"`                                      // Неизменяемая
+	IsPrimary     bool   `query:"primary" search:"primary"`                                  // Юридическое лицо по умолчанию
 }
 
 type DtoCompany struct {
@@ -98,6 +101,7 @@ type DtoCompany struct {
 	CompanyAddresses []DtoCompanyAddress  `db:"-"`               // Адреса компании
 	CompanyBanks     []DtoCompanyBank     `db:"-"`               // Банки компании
 	CompanyStaff     []DtoCompanyEmployee `db:"-"`               // Сотрудники компании
+	Locked           bool                 `db:"locked"`          // Неизменяемая
 }
 
 // Конструктор создания объекта компании в api
@@ -107,19 +111,20 @@ func NewApiMetaCompany(total int64) *ApiMetaCompany {
 	}
 }
 
-func NewApiShortCompany(id int64, shortname_rus string, shortname_eng string, unitid int64, isprimary bool) *ApiShortCompany {
+func NewApiShortCompany(id int64, shortname_rus string, shortname_eng string, unitid int64, locked bool, isprimary bool) *ApiShortCompany {
 	return &ApiShortCompany{
 		ID:            id,
 		ShortName_Rus: shortname_rus,
 		ShortName_Eng: shortname_eng,
 		Unit_ID:       unitid,
+		Locked:        locked,
 		IsPrimary:     isprimary,
 	}
 }
 
 func NewApiMiddleCompany(primary bool, company_type_id int, fullname_rus string, fullname_eng string, shortname_rus string,
 	shortname_eng string, resident bool, companycodes []ViewApiCompanyCode, companyaddresses []ViewApiCompanyAddress,
-	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, deleted bool) *ApiMiddleCompany {
+	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, locked bool, deleted bool) *ApiMiddleCompany {
 	return &ApiMiddleCompany{
 		Primary:          primary,
 		Company_Type_ID:  company_type_id,
@@ -133,13 +138,14 @@ func NewApiMiddleCompany(primary bool, company_type_id int, fullname_rus string,
 		CompanyBanks:     companybanks,
 		CompanyStaff:     companystaff,
 		VAT:              vat,
+		Locked:           locked,
 		Deleted:          deleted,
 	}
 }
 
 func NewApiLongCompany(id int64, primary bool, company_type_id int, fullname_rus string, fullname_eng string, shortname_rus string,
 	shortname_eng string, resident bool, companycodes []ViewApiCompanyCode, companyaddresses []ViewApiCompanyAddress,
-	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, deleted bool) *ApiLongCompany {
+	companybanks []ViewApiCompanyBank, companystaff []ViewApiCompanyEmployee, vat byte, locked bool, deleted bool) *ApiLongCompany {
 	return &ApiLongCompany{
 		ID:               id,
 		Primary:          primary,
@@ -154,6 +160,7 @@ func NewApiLongCompany(id int64, primary bool, company_type_id int, fullname_rus
 		CompanyBanks:     companybanks,
 		CompanyStaff:     companystaff,
 		VAT:              vat,
+		Locked:           locked,
 		Deleted:          deleted,
 	}
 }
@@ -161,7 +168,7 @@ func NewApiLongCompany(id int64, primary bool, company_type_id int, fullname_rus
 // Конструктор создания объекта компании в бд
 func NewDtoCompany(id int64, unit_id int64, shortname_rus string, shortname_eng string, fullname_rus string, fullname_eng string,
 	created time.Time, primary bool, active bool, company_type_id int, resident bool, vat byte, companycodes []DtoCompanyCode,
-	companyaddresses []DtoCompanyAddress, companybanks []DtoCompanyBank, companystaff []DtoCompanyEmployee) *DtoCompany {
+	companyaddresses []DtoCompanyAddress, companybanks []DtoCompanyBank, companystaff []DtoCompanyEmployee, locked bool) *DtoCompany {
 	return &DtoCompany{
 		ID:               id,
 		Unit_ID:          unit_id,
@@ -179,6 +186,7 @@ func NewDtoCompany(id int64, unit_id int64, shortname_rus string, shortname_eng 
 		CompanyAddresses: companyaddresses,
 		CompanyBanks:     companybanks,
 		CompanyStaff:     companystaff,
+		Locked:           locked,
 	}
 }
 
@@ -206,10 +214,11 @@ func (company *CompanySearch) Extract(infield string, invalue string) (outfield 
 		fallthrough
 	case "nameShortEng":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
+	case "lock":
+		fallthrough
 	case "primary":
 		val, errConv := strconv.ParseBool(invalue)
 		if errConv != nil {
@@ -225,7 +234,7 @@ func (company *CompanySearch) Extract(infield string, invalue string) (outfield 
 }
 
 func (company *CompanySearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(company)
+	return GetAllGroupTags(company)
 }
 
 func (company *ViewCompany) Validate(errors binding.Errors, req *http.Request) binding.Errors {

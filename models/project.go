@@ -44,14 +44,14 @@ type ApiLongProject struct {
 }
 
 type ProjectShortSearch struct {
-	ID   int64  `query:"id" search:"id"`     // Уникальный идентификатор проекта
-	Name string `query:"name" search:"name"` // Название
+	ID   int64  `query:"id" search:"id"`                  // Уникальный идентификатор проекта
+	Name string `query:"name" search:"name" group:"name"` // Название
 }
 
 type ProjectLongSearch struct {
-	ID      int64  `query:"id" search:"id"`                // Уникальный идентификатор проекта
-	Name    string `query:"name" search:"name"`            // Название
-	Archive bool   `query:"archive" search:"(not active)"` // Aрхивирован
+	ID      int64  `query:"id" search:"id"`                  // Уникальный идентификатор проекта
+	Name    string `query:"name" search:"name" group:"name"` // Название
+	Archive bool   `query:"archive" search:"(not active)"`   // Aрхивирован
 }
 
 type DtoProject struct {
@@ -125,8 +125,7 @@ func (project *ProjectShortSearch) Extract(infield string, invalue string) (outf
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	default:
@@ -137,7 +136,7 @@ func (project *ProjectShortSearch) Extract(infield string, invalue string) (outf
 }
 
 func (project *ProjectShortSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(project)
+	return GetAllGroupTags(project)
 }
 
 func (project *ProjectLongSearch) Check(field string) (valid bool, err error) {
@@ -160,8 +159,7 @@ func (project *ProjectLongSearch) Extract(infield string, invalue string) (outfi
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "archive":
@@ -179,7 +177,7 @@ func (project *ProjectLongSearch) Extract(infield string, invalue string) (outfi
 }
 
 func (project *ProjectLongSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(project)
+	return GetAllGroupTags(project)
 }
 
 func (project *ViewProject) Validate(errors binding.Errors, req *http.Request) binding.Errors {

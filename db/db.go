@@ -92,6 +92,16 @@ const (
 	TABLE_TRANSACTION_TYPES          = "transaction_types"
 	TABLE_OPERATION_TYPES            = "operation_types"
 	TABLE_ORDER_INVOICES             = "order_invoices"
+	TABLE_ACCESS_LOG                 = "access_log"
+	TABLE_DOCUMENT_TYPES             = "document_types"
+	TABLE_CONTRACTS                  = "contracts"
+	TABLE_APPENDICES                 = "appendices"
+	TABLE_DOCUMENTS                  = "documents"
+	TABLE_DATA_ENCODINGS             = "data_encodings"
+	TABLE_HEADER_FACILITIES          = "header_services"
+	TABLE_TARIFF_PLANS               = "tariff_plans"
+	TABLE_PAYMENTS                   = "payments"
+	TABLE_HEADER_PRODUCTS            = "header_products"
 )
 
 var (

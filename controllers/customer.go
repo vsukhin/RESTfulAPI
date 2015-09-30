@@ -4,6 +4,7 @@ import (
 	"application/config"
 	"application/helpers"
 	"application/models"
+	"application/server/middlewares"
 	"application/services"
 	"fmt"
 	"github.com/go-martini/martini"
@@ -104,7 +105,7 @@ func GetArchiveProjects(request *http.Request, w http.ResponseWriter, r render.R
 // post /api/v1.0/projects/
 func CreateProject(errors binding.Errors, viewproject models.ViewProject, r render.Render, projectrepository services.ProjectRepository,
 	unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewproject, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -145,7 +146,7 @@ func GetProject(r render.Render, params martini.Params, projectrepository servic
 // put /api/v1.0/projects/:prid/
 func UpdateProject(errors binding.Errors, viewproject models.ViewUpdateProject, r render.Render, params martini.Params,
 	projectrepository services.ProjectRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewproject, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoproject, err := helpers.CheckProject(r, params, projectrepository, session.Language)
@@ -215,7 +216,7 @@ func DeleteProject(r render.Render, params martini.Params, projectrepository ser
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
 }
 
-// options /api/v1.0/smsfrom/
+// options /api/v1.0/unit/header/
 func GetMetaSMSSenders(r render.Render, smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
 	smssender, err := smssenderrepository.GetMeta(session.UserID)
 	if err != nil {
@@ -227,8 +228,9 @@ func GetMetaSMSSenders(r render.Render, smssenderrepository services.SMSSenderRe
 	r.JSON(http.StatusOK, smssender)
 }
 
-// get /api/v1.0/smsfrom/
-func GetSMSSenders(w http.ResponseWriter, request *http.Request, r render.Render, smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
+// get /api/v1.0/unit/header/
+func GetSMSSenders(w http.ResponseWriter, request *http.Request, r render.Render, smssenderrepository services.SMSSenderRepository,
+	session *models.DtoSession) {
 	query := ""
 	var filters *[]models.FilterExp
 	filters, err := helpers.GetFilterArray(new(models.SMSSenderSearch), nil, request, r, session.Language)
@@ -279,66 +281,10 @@ func GetSMSSenders(w http.ResponseWriter, request *http.Request, r render.Render
 	helpers.RenderJSONArray(smssenders, len(*smssenders), w, r)
 }
 
-// get /api/v1.0/smsfrom/:frmid/
-func GetSMSSender(r render.Render, params martini.Params, smssenderrepository services.SMSSenderRepository,
-	session *models.DtoSession) {
-	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
-	if err != nil {
-		return
-	}
-
-	r.JSON(http.StatusOK, models.NewApiMiddleSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered, !dtosmssender.Active))
-}
-
-// post /api/v1.0/smsfrom/
-func CreateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, r render.Render, params martini.Params,
-	smssenderrepository services.SMSSenderRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewsmssender, errors, r, session.Language) != nil {
-		return
-	}
-
-	found, err := smssenderrepository.Exists(viewsmssender.Name)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-	if found {
-		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_SMSSENDER_INUSE,
-			Message: config.Localization[session.Language].Errors.Api.SMSSender_InUse})
-		return
-	}
-
-	unit, err := unitrepository.FindByUser(session.UserID)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-
-	dtosmssender := new(models.DtoSMSSender)
-	dtosmssender.Unit_ID = unit.ID
-	dtosmssender.Name = viewsmssender.Name
-	dtosmssender.Created = time.Now()
-	dtosmssender.Registered = false
-	dtosmssender.Withdraw = false
-	dtosmssender.Withdrawn = false
-	dtosmssender.Active = true
-
-	err = smssenderrepository.Create(dtosmssender)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
-		return
-	}
-
-	r.JSON(http.StatusOK, models.NewApiShortSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered))
-}
-
-// patch /api/v1.0/smsfrom/:frmid/
+// patch /api/v1.0/unit/header/:hdrid/
 func UpdateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, r render.Render, params martini.Params,
 	smssenderrepository services.SMSSenderRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewsmssender, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
@@ -346,19 +292,25 @@ func UpdateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, 
 		return
 	}
 
-	found, err := smssenderrepository.Exists(viewsmssender.Name)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
-		return
-	}
-	if found && dtosmssender.Name != viewsmssender.Name {
-		r.JSON(http.StatusConflict, types.Error{Code: types.TYPE_ERROR_SMSSENDER_INUSE,
-			Message: config.Localization[session.Language].Errors.Api.SMSSender_InUse})
-		return
+	if viewsmssender.Planned_End != "" {
+		dtosmssender.Planned_End, err = models.ParseDate(viewsmssender.Planned_End)
+		if err != nil {
+			log.Error("Can't parse end date %v, %v", err, viewsmssender.Planned_End)
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			return
+		}
+		if dtosmssender.Planned_End.Sub(time.Now()) < 0 {
+			log.Error("End date is in the past %v", dtosmssender.Planned_End)
+			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+				Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+			return
+		}
+	} else {
+		dtosmssender.Planned_End = time.Time{}
 	}
 
-	dtosmssender.Name = viewsmssender.Name
+	dtosmssender.Renew = viewsmssender.Renew
 	err = smssenderrepository.Update(dtosmssender)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -366,23 +318,20 @@ func UpdateSMSSender(errors binding.Errors, viewsmssender models.ViewSMSSender, 
 		return
 	}
 
-	r.JSON(http.StatusOK, models.NewApiShortSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Registered))
+	r.JSON(http.StatusOK, models.NewApiShortSMSSender(dtosmssender.ID, dtosmssender.Name, dtosmssender.Supplier_ID, dtosmssender.Registered,
+		dtosmssender.Planned_Begin.Format(models.FORMAT_DATE), dtosmssender.Planned_End.Format(models.FORMAT_DATE),
+		dtosmssender.Actual_Begin.Format(models.FORMAT_DATE), dtosmssender.Actual_End.Format(models.FORMAT_DATE), dtosmssender.Renew))
 }
 
-// delete //api/v1.0/smsfrom/:frmid/
+// delete /api/v1.0/unit/header/:hdrid/
 func DeleteSMSSender(r render.Render, params martini.Params, smssenderrepository services.SMSSenderRepository,
 	session *models.DtoSession) {
 	dtosmssender, err := helpers.CheckSMSSender(r, params, smssenderrepository, session.Language)
 	if err != nil {
 		return
 	}
-	_, err = helpers.IsSMSSenderActive(dtosmssender.ID, r, smssenderrepository, session.Language)
-	if err != nil {
-		return
-	}
 
-	dtosmssender.Withdraw = true
-	err = smssenderrepository.Update(dtosmssender)
+	err = smssenderrepository.Deactivate(dtosmssender)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
@@ -410,7 +359,7 @@ func CreateReport(errors binding.Errors, viewreport models.ViewReport, r render.
 	orderrepository services.OrderRepository, facilityrepository services.FacilityRepository,
 	complexstatusrepository services.ComplexStatusRepository, reportrepository services.ReportRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&viewreport, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -437,6 +386,8 @@ func CreateReport(errors binding.Errors, viewreport models.ViewReport, r render.
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return
 			}
+		} else {
+			begin = time.Time{}
 		}
 		if apiperiod.End != "" {
 			end, err = models.ParseDate(apiperiod.End)
@@ -446,6 +397,8 @@ func CreateReport(errors binding.Errors, viewreport models.ViewReport, r render.
 					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
 				return
 			}
+		} else {
+			end = time.Time{}
 		}
 		if !begin.IsZero() && !end.IsZero() && begin.Sub(end) > 0 {
 			log.Error("Date begin can't be bigger than date end %v", apiperiod.Begin, apiperiod.End)
@@ -609,4 +562,103 @@ func GetComplexReport(r render.Render, params martini.Params, reportrepository s
 	}
 
 	r.JSON(http.StatusOK, complexreport)
+}
+
+// options /api/v1.0/unit/billing/
+func GetPayment(r render.Render, paymentrepository services.PaymentRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
+	unit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	found, err := paymentrepository.Exists(unit.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	payment := &models.DtoPayment{}
+	if found {
+		payment, err = paymentrepository.Get(unit.ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+	}
+
+	r.JSON(http.StatusOK, models.NewApiPayment(payment.Tariff_Plan_ID, payment.Paid, payment.Payment_Date, payment.Next_Payment_Due, payment.Renew))
+}
+
+// patch /api/v1.0/unit/billing/
+func UpdatePayment(errors binding.Errors, viewpayment models.ViewPayment, r render.Render, paymentrepository services.PaymentRepository,
+	unitrepository services.UnitRepository, tariffplanrepository services.TariffPlanRepository, session *models.DtoSession) {
+	unit, err := unitrepository.FindByUser(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	found, err := paymentrepository.Exists(unit.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+	var payment *models.DtoPayment
+	if !found {
+		payment = new(models.DtoPayment)
+		payment.Unit_ID = unit.ID
+	} else {
+		payment, err = paymentrepository.Get(unit.ID)
+		if err != nil {
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+	}
+	dtotariffplan, err := helpers.CheckTariffPlan(viewpayment.Tariff_Plan_ID, r, tariffplanrepository, session.Language)
+	if err != nil {
+		return
+	}
+	if !dtotariffplan.Public {
+		if !middlewares.IsAdmin(session.Roles) {
+			log.Error("Tariff plan is not public %v", dtotariffplan.ID)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+			return
+		}
+	}
+
+	payment.Tariff_Plan_ID = dtotariffplan.ID
+	payment.Renew = viewpayment.Renew
+
+	if !found {
+		err = paymentrepository.Create(payment)
+	} else {
+		err = paymentrepository.Update(payment)
+	}
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		return
+	}
+
+	r.JSON(http.StatusOK, models.NewApiPayment(payment.Tariff_Plan_ID, payment.Paid, payment.Payment_Date, payment.Next_Payment_Due, payment.Renew))
+}
+
+// options /api/v1.0/news/
+func GetMetaDashboard(r render.Render, userrepository services.UserRepository, session *models.DtoSession) {
+	metadashboard, err := userrepository.GetMetaDashboard(session.UserID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	r.JSON(http.StatusOK, metadashboard)
 }

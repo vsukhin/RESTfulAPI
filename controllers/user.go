@@ -24,8 +24,9 @@ const (
 func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render, params martini.Params,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, emailrepository services.EmailRepository,
 	unitrepository services.UnitRepository, captcharepository services.CaptchaRepository, templaterepository services.TemplateRepository,
-	grouprepository services.GroupRepository, classifierrepository services.ClassifierRepository) {
-	if helpers.CheckValidation(&viewuser, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	grouprepository services.GroupRepository, classifierrepository services.ClassifierRepository,
+	accesslogrepository services.AccessLogRepository) {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	if helpers.Check(viewuser.CaptchaHash, viewuser.CaptchaValue, r, captcharepository) != nil {
@@ -82,6 +83,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtouser.Language = config.Configuration.Server.DefaultLanguage
 	dtouser.ReportAccess = true
 	dtouser.CaptchaRequired = false
+	dtouser.NewsBlocked = false
 	dtouser.Roles = *roles
 
 	session, token, err := sessionrepository.GetAndSaveSession(request, r, params, false, true, true)
@@ -128,6 +130,12 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 	dtouser.Emails = &[]models.DtoEmail{*dtoemail}
 	dtouser.MobilePhones = new([]models.DtoMobilePhone)
 
+	dtoaccesslog, err := helpers.CreateAccessLog(dtouser.Code, request, r, accesslogrepository, config.Configuration.Server.DefaultLanguage)
+	if err != nil {
+		return
+	}
+	dtouser.Subscr_AccessLog_ID = dtoaccesslog.ID
+
 	err = userrepository.Create(dtouser, true)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -146,7 +154,7 @@ func Register(errors binding.Errors, viewuser models.ViewUser, request *http.Req
 func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *http.Request, r render.Render,
 	emailrepository services.EmailRepository, userrepository services.UserRepository, sessionrepository services.SessionRepository,
 	captcharepository services.CaptchaRepository, templaterepository services.TemplateRepository) {
-	if helpers.CheckValidation(&viewuser, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
@@ -206,7 +214,7 @@ func RestorePassword(errors binding.Errors, viewuser models.ViewUser, request *h
 // put /api/v1.0/users/password/:code/
 func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, request *http.Request, r render.Render, params martini.Params,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, emailrepository services.EmailRepository,
-	templaterepository services.TemplateRepository) {
+	templaterepository services.TemplateRepository, accesslogrepository services.AccessLogRepository) {
 	code := params[helpers.PARAMETER_NAME_CODE]
 	if len(code) > helpers.PARAM_LENGTH_MAX {
 		log.Error("Wrong parameter length %v", code)
@@ -277,6 +285,14 @@ func UpdatePassword(errors binding.Errors, password models.PasswordUpdate, reque
 			(*user.Emails)[i].Confirmed = true
 			(*user.Emails)[i].Code = ""
 		}
+	}
+
+	if sendconfirmation {
+		dtoaccesslog, err := helpers.CreateAccessLog(password.Code, request, r, accesslogrepository, user.Language)
+		if err != nil {
+			return
+		}
+		user.Conf_AccessLog_ID = dtoaccesslog.ID
 	}
 
 	err = userrepository.Update(user, false, true)
@@ -402,7 +418,7 @@ func GetUserInfo(r render.Render, userrepository services.UserRepository, sessio
 // patch /api/v1.0/user/
 func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r render.Render,
 	userrepository services.UserRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&changeuser, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	user, err := userrepository.Get(session.UserID)
@@ -414,6 +430,12 @@ func UpdateUserInfo(errors binding.Errors, changeuser models.ChangeUser, r rende
 
 	user.Surname = changeuser.Surname
 	user.Name = changeuser.Name
+	if user.Surname == "" {
+		user.Surname = models.USER_SURNAME_DEFAULT
+	}
+	if user.Name == "" {
+		user.Name = models.USER_NAME_DEFAULT
+	}
 	user.MiddleName = changeuser.MiddleName
 	user.WorkPhone = changeuser.WorkPhone
 	user.JobTitle = changeuser.JobTitle
@@ -456,7 +478,7 @@ func GetUserEmails(w http.ResponseWriter, r render.Render, userrepository servic
 func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails models.UpdateEmails, request *http.Request, r render.Render,
 	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, userrepository services.UserRepository,
 	templaterepository services.TemplateRepository, classifierrepository services.ClassifierRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&updateemails, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	count := 0
@@ -465,10 +487,10 @@ func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails
 			count++
 		}
 	}
-	if count != 1 {
+	if count > 1 {
 		log.Error("Only one primary email is allowed")
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_EMAIL_NOTSINGLE,
+			Message: config.Localization[session.Language].Errors.Api.PrimaryEmail_NotSingle})
 		return
 	}
 
@@ -479,9 +501,22 @@ func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails
 		return
 	}
 
+	count_old := 0
+	for _, checkEmail := range *user.Emails {
+		if checkEmail.Primary {
+			count_old++
+		}
+	}
+	if count_old > count {
+		log.Error("Can't delete primary email")
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_EMAIL_NOTSINGLE,
+			Message: config.Localization[session.Language].Errors.Api.PrimaryEmail_NotSingle})
+		return
+	}
+
 	arrEmails := new([]models.DtoEmail)
 
-	var updEmail models.UpdateEmail
+	var updEmail models.ViewEmail
 	var curEmail models.DtoEmail
 
 	for _, updEmail = range updateemails {
@@ -541,8 +576,8 @@ func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails
 		if updEmail.Primary {
 			if !found || !curEmail.Confirmed {
 				log.Error("Primary email is not confirmed %v", updEmail.Email)
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_EMAIL_NOTCONFIRMED,
+					Message: config.Localization[session.Language].Errors.Api.PrimaryEmail_NotConfirmed})
 				return
 			}
 		}
@@ -572,7 +607,7 @@ func UpdateUserEmails(w http.ResponseWriter, errors binding.Errors, updateemails
 // patch /api/v1.0/user/password/
 func ChangePassword(errors binding.Errors, changepassword models.ChangePassword, r render.Render,
 	userrepository services.UserRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&changepassword, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	if changepassword.NewPassword != changepassword.ConfirmPassword {
@@ -643,7 +678,7 @@ func GetUserMobilePhones(w http.ResponseWriter, r render.Render, userrepository 
 func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, updatephones models.UpdateMobilePhones, request *http.Request, r render.Render,
 	mobilephonerepository services.MobilePhoneRepository, userrepository services.UserRepository,
 	classifierrepository services.ClassifierRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&updatephones, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	count := 0
@@ -652,10 +687,10 @@ func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, update
 			count++
 		}
 	}
-	if count != 1 {
+	if count > 1 {
 		log.Error("Only one primary mobile phone is allowed")
-		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-			Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_MOBILEPHONE_NOTSINGLE,
+			Message: config.Localization[session.Language].Errors.Api.PrimaryMobilePhone_NotSingle})
 		return
 	}
 
@@ -666,9 +701,22 @@ func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, update
 		return
 	}
 
+	count_old := 0
+	for _, checkMobilePhone := range *user.MobilePhones {
+		if checkMobilePhone.Primary {
+			count_old++
+		}
+	}
+	if count_old > count {
+		log.Error("Can't delete primary mobile phone")
+		r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_MOBILEPHONE_NOTSINGLE,
+			Message: config.Localization[session.Language].Errors.Api.PrimaryMobilePhone_NotSingle})
+		return
+	}
+
 	arrMobilePhones := new([]models.DtoMobilePhone)
 
-	var updMobilePhone models.ViewApiMobilePhone
+	var updMobilePhone models.ViewMobilePhone
 	var curMobilePhone models.DtoMobilePhone
 
 	for _, updMobilePhone = range updatephones {
@@ -697,7 +745,7 @@ func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, update
 				Classifier_ID: classifier.ID,
 				Created:       time.Now(),
 				Primary:       updMobilePhone.Primary,
-				Confirmed:     updMobilePhone.Confirmed,
+				Confirmed:     false,
 				//				Subscription:  updMobilePhone.Subscription,
 				Code:     "",
 				Language: strings.ToLower(updMobilePhone.Language),
@@ -705,7 +753,6 @@ func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, update
 			})
 		} else {
 			curMobilePhone.Primary = updMobilePhone.Primary
-			curMobilePhone.Confirmed = updMobilePhone.Confirmed
 			//			curMobilePhone.Subscription = updMobilePhone.Subscription
 			curMobilePhone.Language = strings.ToLower(updMobilePhone.Language)
 			curMobilePhone.Classifier_ID = classifier.ID
@@ -713,11 +760,11 @@ func UpdateUserMobilePhones(w http.ResponseWriter, errors binding.Errors, update
 			*arrMobilePhones = append(*arrMobilePhones, curMobilePhone)
 		}
 
-		if !updMobilePhone.Confirmed {
-			if updMobilePhone.Primary {
+		if updMobilePhone.Primary {
+			if !found || !curMobilePhone.Confirmed {
 				log.Error("Primary mobile phone is not confirmed %v", updMobilePhone.Phone)
-				r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
-					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_PRIMARY_MOBILEPHONE_NOTCONFIRMED,
+					Message: config.Localization[session.Language].Errors.Api.PrimaryMobilePhone_NotConfirmed})
 				return
 			}
 		}
@@ -762,7 +809,7 @@ func GetUserUnit(r render.Render, userrepository services.UserRepository, unitre
 // patch /api/v1.0/unit/
 func UpdateUserUnit(r render.Render, errors binding.Errors, viewunit models.ViewShortUnit, userrepository services.UserRepository,
 	unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewunit, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	user, err := userrepository.Get(session.UserID)

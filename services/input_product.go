@@ -8,6 +8,7 @@ import (
 type InputProductRepository interface {
 	Get(order_id int64, product_id int) (inputproduct *models.DtoInputProduct, err error)
 	GetByOrder(order_id int64) (inputproducts *[]models.ViewApiInputProduct, err error)
+	GetAll(order_id int64) (inputproducts *[]models.DtoInputProduct, err error)
 	Create(dtoinputproduct *models.DtoInputProduct, trans *gorp.Transaction) (err error)
 	DeleteByOrder(order_id int64, trans *gorp.Transaction) (err error)
 }
@@ -37,6 +38,18 @@ func (inputproductservice *InputProductService) GetByOrder(order_id int64) (inpu
 	inputproducts = new([]models.ViewApiInputProduct)
 	_, err = inputproductservice.DbContext.Select(inputproducts,
 		"select product_id from "+inputproductservice.Table+" where order_id = ?", order_id)
+	if err != nil {
+		log.Error("Error during getting all input product object from database %v with value %v", err, order_id)
+		return nil, err
+	}
+
+	return inputproducts, nil
+}
+
+func (inputproductservice *InputProductService) GetAll(order_id int64) (inputproducts *[]models.DtoInputProduct, err error) {
+	inputproducts = new([]models.DtoInputProduct)
+	_, err = inputproductservice.DbContext.Select(inputproducts,
+		"select * from "+inputproductservice.Table+" where order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all input product object from database %v with value %v", err, order_id)
 		return nil, err

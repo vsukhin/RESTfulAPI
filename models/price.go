@@ -32,6 +32,17 @@ type ApiVerifyPrice struct {
 	Price       float64 `json:"price" db:"price"`                      // Стоимость позиции
 }
 
+type ApiHeaderPrice struct {
+	Supplier_ID   int64    `json:"supplierId" db:"supplier_id"`        // Идентификатор поставщика
+	Product_ID    int      `json:"productId" db:"product_id"`          // Идентификатор позиции
+	AmountRange   ApiRange `json:"range" db:"range"`                   // Диапазон количества
+	Price         float64  `json:"price" db:"price"`                   // Стоимость позиции
+	Increase      bool     `json:"orderIncrease" db:"increase"`        // Использование наценки
+	PriceIncrease float64  `json:"priceIncrease" db:"price_increase"`  // Наценка
+	FeeOnce       bool     `json:"subscription" db:"fee_once"`         // Разовая оплата
+	FeeMonthly    bool     `json:"subscriptionMonth" db:"fee_monthly"` // Ежемесячная оплата
+}
+
 // Конструктор создания объекта цены услуги в api
 func NewApiRange(begin int, end int) *ApiRange {
 	return &ApiRange{
@@ -71,5 +82,19 @@ func NewApiVerifyPrice(supplier_id int64, product_id int, price float64) *ApiVer
 		Supplier_ID: supplier_id,
 		Product_ID:  product_id,
 		Price:       price,
+	}
+}
+
+func NewApiHeaderPrice(supplier_id int64, product_id int, amountrange ApiRange, price float64, increase bool, priceincrease float64,
+	feeonce bool, feemonthly bool) *ApiHeaderPrice {
+	return &ApiHeaderPrice{
+		Supplier_ID:   supplier_id,
+		Product_ID:    product_id,
+		AmountRange:   amountrange,
+		Price:         price,
+		Increase:      increase,
+		PriceIncrease: priceincrease,
+		FeeOnce:       feeonce,
+		FeeMonthly:    feemonthly,
 	}
 }

@@ -50,3 +50,7 @@ func NewDtoInvoiceItem(id int64, invoice_id int64, name string, measure string, 
 		Total:      total,
 	}
 }
+
+func (item *ApiInvoiceItem) GetNumber(index int) (number int) {
+	return index + 1
+}

@@ -45,7 +45,7 @@ func Ping(request *http.Request, r render.Render, params martini.Params, session
 // post /api/v1.0/session/user/
 func CreateSession(errors binding.Errors, viewsession models.ViewSession, r render.Render,
 	userrepository services.UserRepository, sessionrepository services.SessionRepository, captcharepository services.CaptchaRepository) {
-	if helpers.CheckValidation(&viewsession, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 

@@ -6,12 +6,22 @@ import (
 )
 
 type DataFormat int
+type DataEncoding int
 
 const (
-	DATA_FORMAT_UKNOWN DataFormat = iota
+	DATA_FORMAT_UNKNOWN DataFormat = iota
 	DATA_FORMAT_TXT
 	DATA_FORMAT_CSV
 	DATA_FORMAT_SSV
+)
+
+const (
+	DATA_ENCODING_UNKNOWN DataEncoding = iota
+	DATA_ENCODING_UTF8
+	DATA_ENCODING_WINDOWS1251
+	DATA_ENCODING_KOI8R
+	DATA_ENCODING_MACINTOSH
+	DATA_ENCODING_UTF16
 )
 
 const (
@@ -22,8 +32,10 @@ const (
 
 // Структура для организации хранения импорта-экспорта
 type ViewImportTable struct {
-	File_ID   string `json:"fileId" validate:"min=1,max=255"` // Уникальный идентификатор файла
-	HasHeader bool   `json:"names"`                           // Есть строка заголовка
+	File_ID      string       `json:"fileId" validate:"min=1,max=255"` // Уникальный идентификатор файла
+	DataFormat   DataFormat   `json:"format"`                          // Идентификатор формата
+	DataEncoding DataEncoding `json:"codepage"`                        // Идентификатор кодировки
+	HasHeader    bool         `json:"names"`                           // Есть строка заголовка
 }
 
 type ViewImportColumn struct {
@@ -41,17 +53,24 @@ type ViewExportTable struct {
 	Type           string `json:"rows" validate:"min=1,max=255"` // Тип экспортируемых данных
 }
 
+type ApiMetaImportTable struct {
+	Formats   []ApiDataFormat   `json:"formats,omitempty" `   // Список форматов для загрузки данных
+	Encodings []ApiDataEncoding `json:"codepages,omitempty" ` // Список кодировок для загрузки данных
+}
+
 type ApiImportTable struct {
 	ID int64 `json:"id"` // Уникальный идентификатор временной таблицы
 }
 
 type ApiImportStatus struct {
-	Ready          bool            `json:"ready" `             // Готова
-	Percentage     byte            `json:"percent"`            // Процент готовности
-	Percentages    []ApiImportStep `json:"percents,omitempty"` // Процент готовности по шагам
-	NumOfCols      int64           `json:"columns"`            // Число колонок
-	NumOfRows      int64           `json:"rows"`               // Число строк
-	NumOfWrongRows int64           `json:"errorRows"`          // Количество строк с неверным числом столбцов
+	Ready            bool            `json:"ready" `             // Готова
+	Percentage       byte            `json:"percent"`            // Процент готовности
+	Percentages      []ApiImportStep `json:"percents,omitempty"` // Процент готовности по шагам
+	NumOfCols        int64           `json:"columns"`            // Число колонок
+	NumOfRows        int64           `json:"rows"`               // Число строк
+	NumOfWrongRows   int64           `json:"errorRows"`          // Количество строк с неверным числом столбцов
+	Error            bool            `json:"error"`              // Ошибка
+	ErrorDescription string          `json:"errorDescription"`   // Описание ошибки
 }
 
 type ApiImportColumn struct {
@@ -66,12 +85,21 @@ type ApiMetaExportTable struct {
 }
 
 type ApiExportStatus struct {
-	Ready      bool   `json:"ready" `  // Готова
-	Percentage byte   `json:"percent"` // Процент готовности
-	ExpiredAt  string `json:"timeout"` // Срок валидности
+	Ready            bool   `json:"ready" `           // Готова
+	Percentage       byte   `json:"percent"`          // Процент готовности
+	ExpiredAt        string `json:"timeout"`          // Срок валидности
+	Error            bool   `json:"error"`            // Ошибка
+	ErrorDescription string `json:"errorDescription"` // Описание ошибки
 }
 
 // Конструктор создания объекта импорта-экспорта
+func NewApiMetaImportTable(formats []ApiDataFormat, encodings []ApiDataEncoding) *ApiMetaImportTable {
+	return &ApiMetaImportTable{
+		Formats:   formats,
+		Encodings: encodings,
+	}
+}
+
 func NewApiImportTable(id int64) *ApiImportTable {
 	return &ApiImportTable{
 		ID: id,
@@ -79,14 +107,16 @@ func NewApiImportTable(id int64) *ApiImportTable {
 }
 
 func NewApiImportStatus(ready bool, percentage byte, percentages []ApiImportStep,
-	numofcols int64, numofrows int64, numofwrongrows int64) *ApiImportStatus {
+	numofcols int64, numofrows int64, numofwrongrows int64, errorflag bool, errordescription string) *ApiImportStatus {
 	return &ApiImportStatus{
-		Ready:          ready,
-		Percentage:     percentage,
-		Percentages:    percentages,
-		NumOfCols:      numofcols,
-		NumOfRows:      numofrows,
-		NumOfWrongRows: numofwrongrows,
+		Ready:            ready,
+		Percentage:       percentage,
+		Percentages:      percentages,
+		NumOfCols:        numofcols,
+		NumOfRows:        numofrows,
+		NumOfWrongRows:   numofwrongrows,
+		Error:            errorflag,
+		ErrorDescription: errordescription,
 	}
 }
 
@@ -105,11 +135,13 @@ func NewApiMetaExportTable(formats []ApiDataFormat, url string) *ApiMetaExportTa
 	}
 }
 
-func NewApiExportStatus(ready bool, percentage byte, expiredat string) *ApiExportStatus {
+func NewApiExportStatus(ready bool, percentage byte, expiredat string, errorflag bool, errordescription string) *ApiExportStatus {
 	return &ApiExportStatus{
-		Ready:      ready,
-		Percentage: percentage,
-		ExpiredAt:  expiredat,
+		Ready:            ready,
+		Percentage:       percentage,
+		ExpiredAt:        expiredat,
+		Error:            errorflag,
+		ErrorDescription: errordescription,
 	}
 }
 

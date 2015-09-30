@@ -32,12 +32,12 @@ type ViewUser struct {
 }
 
 type ChangeUser struct {
-	Surname    string `json:"surname" validate:"min=1,max=255"` // Фамилия пользователя
-	Name       string `json:"name" validate:"min=1,max=255"`    // Логин пользователя
-	MiddleName string `json:"middleName"  validate:"max=255"`   // Отчество пользователя
-	WorkPhone  string `json:"workPhone" validate:"max=25"`      // Рабочий телефон
-	JobTitle   string `json:"jobTitle" validate:"max=255"`      // Должность
-	Language   string `json:"language" validate:"max=10"`       // Язык пользователя по умолчанию
+	Surname    string `json:"surname" validate:"max=255"`     // Фамилия пользователя
+	Name       string `json:"name" validate:"max=255"`        // Логин пользователя
+	MiddleName string `json:"middleName"  validate:"max=255"` // Отчество пользователя
+	WorkPhone  string `json:"workPhone" validate:"max=25"`    // Рабочий телефон
+	JobTitle   string `json:"jobTitle" validate:"max=255"`    // Должность
+	Language   string `json:"language" validate:"max=10"`     // Язык пользователя по умолчанию
 }
 
 type ViewApiUserFull struct {
@@ -46,8 +46,8 @@ type ViewApiUserFull struct {
 	UnitAdmin    bool                 `json:"unitAdmin" db:"unitAdmin"`                       // Администратор объединения
 	Active       bool                 `json:"active" db:"active"`                             // Пользователь активен
 	Confirmed    bool                 `json:"confirmed" db:"confirmed"`                       // Пользователь подтвержден
-	Surname      string               `json:"surname" db:"surname" validate:"min=1,max=255"`  // Фамилия пользователя
-	Name         string               `json:"name" db:"name" validate:"min=1,max=255"`        // Имя пользователя
+	Surname      string               `json:"surname" db:"surname" validate:"max=255"`        // Фамилия пользователя
+	Name         string               `json:"name" db:"name" validate:"max=255"`              // Имя пользователя
 	MiddleName   string               `json:"middleName" db:"middleName" validate:"max=255"`  // Отчество пользователя
 	WorkPhone    string               `json:"workPhone" db:"workPhone" validate:"max=25"`     // Рабочий телефон
 	JobTitle     string               `json:"jobTitle" db:"jobTitle" validate:"max=255"`      // Должность
@@ -55,6 +55,11 @@ type ViewApiUserFull struct {
 	Roles        []UserRole           `json:"groups,omitempty" db:"-"`                        // Массив значений уровней доступа пользователя
 	Emails       []ViewApiEmail       `json:"emails,omitempty" db:"-"`                        // Массив email
 	MobilePhones []ViewApiMobilePhone `json:"mobilePhones,omitempty" db:"-"`                  // Массив мобильных телефонов
+}
+
+type ApiMetaDashboard struct {
+	NewsBlocked  bool  `json:"disable"` // Блок новостей отключен
+	InvoiceTotal int64 `json:"count"`   // Общее количество выставленных счетов
 }
 
 type ApiUserTiny struct {
@@ -90,40 +95,50 @@ type ApiUserMeta struct {
 }
 
 type UserSearch struct {
-	ID         int64  `query:"id" search:"id"`                 // id пользователя
-	Blocked    bool   `query:"blocked" search:"(not active)"`  // Пользователь заблокирован
-	Confirmed  bool   `query:"confirmed" search:"confirmed"`   // Пользователь подтвержден
-	LastLogin  string `query:"lastLoginAt" search:"lastLogin"` // Последний заход
-	Surname    string `query:"surname" search:"surname"`       // Фамилия пользователя
-	Name       string `query:"name" search:"name"`             // Имя пользователя
-	MiddleName string `query:"middleName" search:"middleName"` // Отчество пользователя
+	ID         int64  `query:"id" search:"id"`                                                       // id пользователя
+	Blocked    bool   `query:"blocked" search:"(not active)"`                                        // Пользователь заблокирован
+	Confirmed  bool   `query:"confirmed" search:"confirmed"`                                         // Пользователь подтвержден
+	LastLogin  string `query:"lastLoginAt" search:"lastLogin" group:"convert(lastLogin using utf8)"` // Последний заход
+	Surname    string `query:"surname" search:"surname" group:"surname"`                             // Фамилия пользователя
+	Name       string `query:"name" search:"name" group:"name"`                                      // Имя пользователя
+	MiddleName string `query:"middleName" search:"middleName" group:"middleName"`                    // Отчество пользователя
 }
 
 type DtoUser struct {
-	ID              int64             `db:"id"`              // Уникальный id пользователя
-	Creator_ID      int64             `db:"user_id"`         // Уникальный id создателя
-	UnitID          int64             `db:"unit_id"`         // Уникальный id объединения
-	Roles           []UserRole        `db:"-"`               // Массив значений уровней доступа пользователя
-	UnitAdmin       bool              `db:"unitAdmin"`       // Администратор объединения
-	Active          bool              `db:"active"`          // Пользователь активен
-	Confirmed       bool              `db:"confirmed"`       // Пользователь подтвержден
-	Created         time.Time         `db:"created"`         // Время создания пользователя
-	LastLogin       time.Time         `db:"lastLogin"`       // Время последнего логина
-	Password        string            `db:"password"`        // Хэш пароля
-	Surname         string            `db:"surname"`         // Фамилия пользователя
-	Name            string            `db:"name"`            // Имя пользователя
-	MiddleName      string            `db:"middleName"`      // Отчество пользователя
-	WorkPhone       string            `db:"workPhone"`       // Рабочий телефон
-	JobTitle        string            `db:"jobTitle"`        // Должность
-	Code            string            `db:"code"`            // Koд подтверждения пользователя
-	Language        string            `db:"language"`        // Язык пользователя по умолчанию
-	ReportAccess    bool              `db:"reportAccess"`    // Доступность отчетов
-	CaptchaRequired bool              `db:"captchaRequired"` // Требуется captcha
-	Emails          *[]DtoEmail       `db:"-"`               // Массив email
-	MobilePhones    *[]DtoMobilePhone `db:"-"`               // Массив мобильных телефонов
+	ID                  int64             `db:"id"`                  // Уникальный id пользователя
+	Creator_ID          int64             `db:"user_id"`             // Уникальный id создателя
+	UnitID              int64             `db:"unit_id"`             // Уникальный id объединения
+	Roles               []UserRole        `db:"-"`                   // Массив значений уровней доступа пользователя
+	UnitAdmin           bool              `db:"unitAdmin"`           // Администратор объединения
+	Active              bool              `db:"active"`              // Пользователь активен
+	Confirmed           bool              `db:"confirmed"`           // Пользователь подтвержден
+	Created             time.Time         `db:"created"`             // Время создания пользователя
+	LastLogin           time.Time         `db:"lastLogin"`           // Время последнего логина
+	Password            string            `db:"password"`            // Хэш пароля
+	Surname             string            `db:"surname"`             // Фамилия пользователя
+	Name                string            `db:"name"`                // Имя пользователя
+	MiddleName          string            `db:"middleName"`          // Отчество пользователя
+	WorkPhone           string            `db:"workPhone"`           // Рабочий телефон
+	JobTitle            string            `db:"jobTitle"`            // Должность
+	Code                string            `db:"code"`                // Koд подтверждения пользователя
+	Language            string            `db:"language"`            // Язык пользователя по умолчанию
+	ReportAccess        bool              `db:"reportAccess"`        // Доступность отчетов
+	CaptchaRequired     bool              `db:"captchaRequired"`     // Требуется captcha
+	Subscr_AccessLog_ID int64             `db:"subscr_accesslog_id"` // Идентификатор лога подписки
+	Conf_AccessLog_ID   int64             `db:"conf_accesslog_id"`   // Идентификатор лога подтверждения
+	NewsBlocked         bool              `db:"newsBlocked"`         // Блок новостей отключен
+	Emails              *[]DtoEmail       `db:"-"`                   // Массив email
+	MobilePhones        *[]DtoMobilePhone `db:"-"`                   // Массив мобильных телефонов
 }
 
 // Конструктор создания объекта пользователя в api
+func NewApiMetaDashboard(newsblocked bool, invoicetotal int64) *ApiMetaDashboard {
+	return &ApiMetaDashboard{
+		NewsBlocked:  newsblocked,
+		InvoiceTotal: invoicetotal,
+	}
+}
+
 func NewApiUserTiny(id int64) *ApiUserTiny {
 	return &ApiUserTiny{
 		ID: id,
@@ -191,29 +206,34 @@ func NewApiUserMeta(numofrows int64) *ApiUserMeta {
 func NewDtoUser(id int64, creator_id int64, unitid int64, roles []UserRole,
 	unitadmin bool, active bool, confirmed bool, created time.Time, lastlogin time.Time,
 	password string, surname string, name string, middlename string, workphone string, jobtitle string,
-	code string, language string, reportaccess bool, captcharequired bool, emails *[]DtoEmail, mobilephones *[]DtoMobilePhone) *DtoUser {
+	code string, language string, reportaccess bool, captcharequired bool,
+	subscr_accesslog_id int64, conf_accesslog_id int64, newsblocked bool,
+	emails *[]DtoEmail, mobilephones *[]DtoMobilePhone) *DtoUser {
 	return &DtoUser{
-		ID:              id,
-		Creator_ID:      creator_id,
-		UnitID:          unitid,
-		Roles:           roles,
-		UnitAdmin:       unitadmin,
-		Active:          active,
-		Confirmed:       confirmed,
-		Created:         created,
-		LastLogin:       lastlogin,
-		Password:        password,
-		Surname:         surname,
-		Name:            name,
-		MiddleName:      middlename,
-		WorkPhone:       workphone,
-		JobTitle:        jobtitle,
-		Code:            code,
-		Language:        language,
-		ReportAccess:    reportaccess,
-		CaptchaRequired: captcharequired,
-		Emails:          emails,
-		MobilePhones:    mobilephones,
+		ID:                  id,
+		Creator_ID:          creator_id,
+		UnitID:              unitid,
+		Roles:               roles,
+		UnitAdmin:           unitadmin,
+		Active:              active,
+		Confirmed:           confirmed,
+		Created:             created,
+		LastLogin:           lastlogin,
+		Password:            password,
+		Surname:             surname,
+		Name:                name,
+		MiddleName:          middlename,
+		WorkPhone:           workphone,
+		JobTitle:            jobtitle,
+		Code:                code,
+		Language:            language,
+		ReportAccess:        reportaccess,
+		CaptchaRequired:     captcharequired,
+		Subscr_AccessLog_ID: subscr_accesslog_id,
+		Conf_AccessLog_ID:   conf_accesslog_id,
+		NewsBlocked:         newsblocked,
+		Emails:              emails,
+		MobilePhones:        mobilephones,
 	}
 }
 
@@ -261,8 +281,7 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 		fallthrough
 	case "lastLoginAt":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "blocked":
@@ -282,5 +301,5 @@ func (user *UserSearch) Extract(infield string, invalue string) (outfield string
 }
 
 func (user *UserSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(user)
+	return GetAllGroupTags(user)
 }

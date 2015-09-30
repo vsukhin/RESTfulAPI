@@ -1,9 +1,10 @@
 package services
 
 import (
-	"application/models"
 	"regexp"
 	"strings"
+
+	"application/models"
 )
 
 var (
@@ -13,7 +14,7 @@ var (
 type ColumnTypeRepository interface {
 	Validate(dtocolumntype *models.DtoColumnType, columnRegExp *regexp.Regexp, value string) (valid bool, corrected string, err error)
 	Get(id int) (columntype *models.DtoColumnType, err error)
-	GetAll() (columntypes *[]models.ApiColumnType, err error)
+	GetAll(filter string) (columntypes *[]models.ApiColumnType, err error)
 	GetByTable(tableid int64) (columntypes map[int]models.DtoColumnType, err error)
 	FindByName(name string) (id int, err error)
 }
@@ -84,18 +85,17 @@ func (columntypeservice *ColumnTypeService) Get(id int) (columntype *models.DtoC
 	return columntype, nil
 }
 
-func (columntypeservice *ColumnTypeService) GetAll() (columntypes *[]models.ApiColumnType, err error) {
+func (columntypeservice *ColumnTypeService) GetAll(filter string) (columntypes *[]models.ApiColumnType, err error) {
 	columntypes = new([]models.ApiColumnType)
 	_, err = columntypeservice.DbContext.Select(columntypes,
-		"select id, name, description, required, `regexp`, "+
+		"select id, name, position, description, required as notNull, `regexp`, "+
 			"case horAlignmentHead when 1 then 'left' when 2 then 'center' when 3 then 'right' end as alignmentHead, "+
-			"case horAlignmentBody when 1 then 'left' when 2 then 'center' when 3 then 'right' end as alignmentBody from "+
-			columntypeservice.Table+" where active = 1")
+			"case horAlignmentBody when 1 then 'left' when 2 then 'center' when 3 then 'right' end as alignmentBody "+
+			"from "+columntypeservice.Table+" where active = 1"+filter)
 	if err != nil {
 		log.Error("Error during getting all column type object from database %v", err)
 		return nil, err
 	}
-
 	return columntypes, nil
 }
 

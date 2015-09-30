@@ -22,15 +22,15 @@ type ApiCompanyClass struct {
 }
 
 type CompanyClassSearch struct {
-	ID        int    `query:"id" search:"id"`                 // Уникальный идентификатор классификатора компании
-	FullName  string `query:"nameFull" search:"fullname"`     // Полное название
-	ShortName string `query:"nameShort" search:"shortname"`   // Короткое название
-	Format    string `query:"format" search:"format"`         // Регулярное выражение для проверки
-	Required  bool   `query:"required" search:"required"`     // Обязательность к заполнению
-	Visible   bool   `query:"outward" search:"visible"`       // Всегда видимый
-	Multiple  bool   `query:"multiplicity" search:"multiple"` // Множественный
-	Position  int    `query:"position" search:"position"`     // Позиция
-	Deleted   bool   `query:"del" search:"(not active)"`      // Удален
+	ID        int    `query:"id" search:"id"`                                 // Уникальный идентификатор классификатора компании
+	FullName  string `query:"nameFull" search:"fullname" group:"fullname"`    // Полное название
+	ShortName string `query:"nameShort" search:"shortname" group:"shortname"` // Короткое название
+	Format    string `query:"format" search:"format"`                         // Регулярное выражение для проверки
+	Required  bool   `query:"required" search:"required"`                     // Обязательность к заполнению
+	Visible   bool   `query:"outward" search:"visible"`                       // Всегда видимый
+	Multiple  bool   `query:"multiplicity" search:"multiple"`                 // Множественный
+	Position  int    `query:"position" search:"position"`                     // Позиция
+	Deleted   bool   `query:"del" search:"(not active)"`                      // Удален
 }
 
 type DtoCompanyClass struct {
@@ -105,8 +105,7 @@ func (companyclass *CompanyClassSearch) Extract(infield string, invalue string) 
 		fallthrough
 	case "format":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "required":
@@ -130,5 +129,5 @@ func (companyclass *CompanyClassSearch) Extract(infield string, invalue string) 
 }
 
 func (companyclass *CompanyClassSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(companyclass)
+	return GetAllGroupTags(companyclass)
 }

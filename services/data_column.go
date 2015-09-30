@@ -8,6 +8,7 @@ import (
 type DataColumnRepository interface {
 	Get(order_id int64, table_column_id int64) (datacolumn *models.DtoDataColumn, err error)
 	GetByOrder(order_id int64) (datacolumns *[]models.ApiDataColumn, err error)
+	GetAll(order_id int64) (datacolumns *[]models.DtoDataColumn, err error)
 	Create(dtodatacolumn *models.DtoDataColumn, trans *gorp.Transaction) (err error)
 	DeleteByOrder(order_id int64, trans *gorp.Transaction) (err error)
 }
@@ -37,7 +38,20 @@ func (datacolumnservice *DataColumnService) GetByOrder(order_id int64) (datacolu
 	datacolumns = new([]models.ApiDataColumn)
 	_, err = datacolumnservice.DbContext.Select(datacolumns,
 		"select d.table_column_id, c.name, c.column_type_id, c.position from "+datacolumnservice.Table+
-			" d inner join table_columns c on d.table_column_id = c.id where d.order_id = ?", order_id)
+			" d inner join table_columns c on d.table_column_id = c.id where c.active = 1 and d.order_id = ?"+
+			" and c.column_type_id in (select id from column_types where active = 1)", order_id)
+	if err != nil {
+		log.Error("Error during getting all data column object from database %v with value %v", err, order_id)
+		return nil, err
+	}
+
+	return datacolumns, nil
+}
+
+func (datacolumnservice *DataColumnService) GetAll(order_id int64) (datacolumns *[]models.DtoDataColumn, err error) {
+	datacolumns = new([]models.DtoDataColumn)
+	_, err = datacolumnservice.DbContext.Select(datacolumns,
+		"select * from "+datacolumnservice.Table+" where order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all data column object from database %v with value %v", err, order_id)
 		return nil, err

@@ -7,17 +7,6 @@ import (
 )
 
 // Структура для организации хранения email
-type UpdateEmail struct {
-	Email     string `json:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
-	Primary   bool   `json:"primary"`                                 // Основной
-	Confirmed bool   `json:"-"`                                       // Подтвержден
-	//	Subscription  bool   `json:"subscription"`                                          // Используется для рассылки
-	Language      string `json:"language" validate:"min=1,max=10"` // Язык рассылки
-	Classifier_ID int    `json:"contactClass"`                     // Идентификатор классификатора
-}
-
-type UpdateEmails []UpdateEmail
-
 type ViewApiEmail struct {
 	Email     string `json:"email" db:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
 	Primary   bool   `json:"primary" db:"primary"`                               // Основной
@@ -30,9 +19,11 @@ type ViewApiEmail struct {
 type ViewEmail struct {
 	Email         string `json:"email" db:"email" validate:"max=255,regexp=^.+@.+$"` // Уникальный email
 	Primary       bool   `json:"primary" db:"primary"`                               // Основной
-	Language      string `json:"language" db:"language" validate:"min=1,max=10"`     // Язык рассылки
+	Language      string `json:"language" db:"language" validate:"min=1,max=10"`     // Язык рассылки                                        // Используется для рассылки
 	Classifier_ID int    `json:"contactClass" db:"classifier_id"`                    // Идентификатор классификатора
 }
+
+type UpdateEmails []ViewEmail
 
 type DtoEmail struct {
 	Email         string    `db:"email"`        // Уникальный email
@@ -76,14 +67,10 @@ func NewDtoEmail(email string, userid int64, classifier_id int, created time.Tim
 	}
 }
 
-func (email UpdateEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
-	return ValidateWithLanguage(&email, errors, req, email.Language)
-}
-
 func (email *ViewApiEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	return ValidateWithLanguage(email, errors, req, email.Language)
 }
 
-func (email *ViewEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
-	return ValidateWithLanguage(email, errors, req, email.Language)
+func (email ViewEmail) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+	return ValidateWithLanguage(&email, errors, req, email.Language)
 }

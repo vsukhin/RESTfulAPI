@@ -9,7 +9,7 @@ import (
 type ViewHLRFacility struct {
 	EstimatedNumbersShipments int                              `json:"estimatedNumbersShipments" validate:"min=0"` // Предполагаемое количество отправок HLR запросов
 	EstimatedOperators        []ViewApiMobileOperatorOperation `json:"estimatedOperators"`                         // Прогноз распределения отправлений
-	DeliveryDataId            int64                            `json:"deliveryDataId" validate:"nonzero"`          // Уникальный идентификатор таблицы
+	DeliveryDataId            int64                            `json:"deliveryDataId"`                             // Уникальный идентификатор таблицы
 	DeliveryDataDelete        bool                             `json:"deliveryDataDelete"`                         // Удалить указанную таблицу
 	MessageToInColumnId       int64                            `json:"messageToInColumnId"`                        // Идентификатор колонки в таблице
 }

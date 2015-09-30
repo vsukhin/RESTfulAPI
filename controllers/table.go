@@ -1,25 +1,29 @@
 package controllers
 
 import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+	"types"
+
 	"application/config"
 	"application/helpers"
 	"application/models"
 	"application/server/middlewares"
 	"application/services"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"net/http"
-	"strings"
-	"time"
-	"types"
 )
 
 const (
 	TIME_ONE_MONTH = 720
 )
 
-// options /api/v1.0/tables/
+// get /api/v1.0/tables/types/
 func GetTableTypes(w http.ResponseWriter, r render.Render, tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
 	tabletypes, err := tabletyperepository.GetAll()
 	if err != nil {
@@ -29,6 +33,41 @@ func GetTableTypes(w http.ResponseWriter, r render.Render, tabletyperepository s
 	}
 
 	helpers.RenderJSONArray(tabletypes, len(*tabletypes), w, r)
+}
+
+// options	/api/v1.0/tables/
+func GetMetaUnitTables(request *http.Request, r render.Render, customertablerepository services.CustomerTableRepository,
+	session *models.DtoSession) {
+	var err error
+	query := ""
+
+	var filters *[]models.FilterExp
+	filters, err = helpers.GetFilterArray(new(models.TableSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, field+" "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	customertable, err := customertablerepository.GetMeta(session.UserID, query, middlewares.IsAdmin(session.Roles))
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	r.JSON(http.StatusOK, customertable)
 }
 
 // get /api/v1.0/tables/
@@ -108,11 +147,11 @@ func GetTable(r render.Render, params martini.Params, customertablerepository se
 func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustomerTable, r render.Render,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository,
 	tabletyperepository services.TableTypeRepository, unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewcustomertable, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
-	unitid, typeid, err := helpers.CheckCustomerTableParameters(r, viewcustomertable.UnitID, models.TABLE_TYPE_DEFAULT, session.UserID, session.Language,
+	unitid, typeid, author, err := helpers.CheckCustomerTableParameters(r, viewcustomertable.UnitID, models.TABLE_TYPE_DEFAULT, session.UserID, session.Language,
 		userrepository, unitrepository, tabletyperepository)
 	if err != nil {
 		return
@@ -125,6 +164,7 @@ func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustom
 	dtocustomertable.UnitID = unitid
 	dtocustomertable.Active = true
 	dtocustomertable.Permanent = true
+	dtocustomertable.Signature = author
 
 	err = customertablerepository.Create(dtocustomertable)
 	if err != nil {
@@ -140,7 +180,7 @@ func CreateTable(errors binding.Errors, viewcustomertable models.ViewShortCustom
 func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustomerTable, r render.Render, params martini.Params,
 	userrepository services.UserRepository, customertablerepository services.CustomerTableRepository, unitrepository services.UnitRepository,
 	tabletyperepository services.TableTypeRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewcustomertable, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
@@ -148,7 +188,7 @@ func UpdateTable(errors binding.Errors, viewcustomertable models.ViewLongCustome
 		return
 	}
 
-	unitid, typeid, err := helpers.CheckCustomerTableParameters(r, viewcustomertable.UnitID, viewcustomertable.Type, session.UserID, session.Language,
+	unitid, typeid, _, err := helpers.CheckCustomerTableParameters(r, viewcustomertable.UnitID, viewcustomertable.Type, session.UserID, session.Language,
 		userrepository, unitrepository, tabletyperepository)
 	if err != nil {
 		return
@@ -195,13 +235,58 @@ func DeleteTable(r render.Render, params martini.Params, customertablerepository
 }
 
 // options /api/v1.0/tables/:tid/data/
-func GetTableMetaData(r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository, session *models.DtoSession) {
+func GetTableMetaData(request *http.Request, r render.Render, params martini.Params, customertablerepository services.CustomerTableRepository,
+	tablecolumnrepository services.TableColumnRepository, session *models.DtoSession) {
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
 	if err != nil {
 		return
 	}
 
-	customertablemeta, err := customertablerepository.GetMeta(dtocustomertable.ID)
+	filters, err := helpers.GetFilterArray(tablecolumnrepository, dtocustomertable.ID, request, r, session.Language)
+	if err != nil {
+		return
+	}
+
+	query := ""
+
+	tablecolumns, err := tablecolumnrepository.GetByTable(dtocustomertable.ID)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	for _, filter := range *filters {
+		var exps []string
+		for _, field := range filter.Fields {
+			found := false
+			for _, tablecolumn := range *tablecolumns {
+				value, err := strconv.ParseInt(field, 0, 64)
+				if err != nil {
+					log.Error("Can't convert to number %v filter column with value %v", err, field)
+					r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+						Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+					return
+				}
+				if tablecolumn.ID == value {
+					found = true
+					exps = append(exps, fmt.Sprintf(" field%v ", tablecolumn.FieldNum)+filter.Op+" "+filter.Value)
+					break
+				}
+			}
+			if !found {
+				log.Error("Filter column %v doesn't belong table %v", field, dtocustomertable.ID)
+				r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+					Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+				return
+			}
+		}
+		if len(exps) != 0 {
+			query += " (" + strings.Join(exps, " or ") + ")" + " and"
+		}
+	}
+
+	customertablemeta, err := customertablerepository.GetFullMeta(dtocustomertable, query)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
@@ -217,8 +302,8 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 	facilityrepository services.FacilityRepository, tablecolumnrepository services.TableColumnRepository,
 	columntyperepository services.ColumnTypeRepository, tablerowrepository services.TableRowRepository,
 	recognizeproductrepository services.RecognizeProductRepository, verifyproductrepository services.VerifyProductRepository,
-	session *models.DtoSession) {
-	if helpers.CheckValidation(&viewpriceproperties, errors, r, session.Language) != nil {
+	headerproductrepository services.HeaderProductRepository, session *models.DtoSession) {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtocustomertable, err := helpers.CheckTable(r, params, customertablerepository, session.Language)
@@ -351,9 +436,10 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 			}
 		}
 
-		if viewpriceproperties.Published && (facility.Alias == models.SERVICE_TYPE_RECOGNIZE || facility.Alias == models.SERVICE_TYPE_VERIFY) {
+		if viewpriceproperties.Published &&
+			(facility.Alias == models.SERVICE_TYPE_RECOGNIZE || facility.Alias == models.SERVICE_TYPE_VERIFY || facility.Alias == models.SERVICE_TYPE_HEADER) {
 			products, err := helpers.CheckProductColumns(dtocustomertable.ID, facility.Alias, r, tablecolumnrepository, tablerowrepository,
-				recognizeproductrepository, verifyproductrepository, session.Language)
+				recognizeproductrepository, verifyproductrepository, headerproductrepository, session.Language)
 			if err != nil {
 				return
 			}
@@ -403,6 +489,27 @@ func UpdatePriceTable(errors binding.Errors, viewpriceproperties models.ViewApiP
 				}
 				for _, verifyproduct := range *verifyproducts {
 					uniqueproducts[verifyproduct.Name] = verifyproduct.ID
+				}
+			}
+			if facility.Alias == models.SERVICE_TYPE_HEADER {
+				headerproducts := new([]models.DtoHeaderProduct)
+				for productname, _ := range uniqueproducts {
+					headerproduct := new(models.DtoHeaderProduct)
+					headerproduct.Name = productname
+					headerproduct.Created = time.Now()
+					headerproduct.Active = true
+					*headerproducts = append(*headerproducts, *headerproduct)
+				}
+				if len(*headerproducts) != 0 {
+					err = headerproductrepository.CreateAll(headerproducts)
+					if err != nil {
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
+							Message: config.Localization[session.Language].Errors.Api.Data_Wrong})
+						return
+					}
+				}
+				for _, headerproduct := range *headerproducts {
+					uniqueproducts[headerproduct.Name] = headerproduct.ID
 				}
 			}
 			for i, product := range *products {

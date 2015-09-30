@@ -8,6 +8,7 @@ import (
 type SMSEventRepository interface {
 	Get(order_id int64, event_id int) (smsevent *models.DtoSMSEvent, err error)
 	GetByOrder(order_id int64) (smsevents *[]models.ViewApiSMSEvent, err error)
+	GetAll(order_id int64) (smsevents *[]models.DtoSMSEvent, err error)
 	Create(dtosmsevent *models.DtoSMSEvent, trans *gorp.Transaction) (err error)
 	DeleteByOrder(order_id int64, trans *gorp.Transaction) (err error)
 }
@@ -37,6 +38,18 @@ func (smseventservice *SMSEventService) GetByOrder(order_id int64) (smsevents *[
 	smsevents = new([]models.ViewApiSMSEvent)
 	_, err = smseventservice.DbContext.Select(smsevents,
 		"select event_id from "+smseventservice.Table+" where order_id = ?", order_id)
+	if err != nil {
+		log.Error("Error during getting all sms event object from database %v with value %v", err, order_id)
+		return nil, err
+	}
+
+	return smsevents, nil
+}
+
+func (smseventservice *SMSEventService) GetAll(order_id int64) (smsevents *[]models.DtoSMSEvent, err error) {
+	smsevents = new([]models.DtoSMSEvent)
+	_, err = smseventservice.DbContext.Select(smsevents,
+		"select * from "+smseventservice.Table+" where order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all sms event object from database %v with value %v", err, order_id)
 		return nil, err

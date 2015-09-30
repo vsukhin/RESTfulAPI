@@ -34,10 +34,13 @@ func TestNewDtoFile(t *testing.T) {
 	var export_ready = true
 	var export_percentage byte = 50
 	var export_object_id int64 = 1
+	var export_error = true
+	var export_errordescription = "description"
 	var filedata = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
 	var dtoFile *DtoFile
 
-	dtoFile = NewDtoFile(id, name, path, created, permanent, export_ready, export_percentage, export_object_id, filedata)
+	dtoFile = NewDtoFile(id, name, path, created, permanent, export_ready, export_percentage, export_object_id,
+		export_error, export_errordescription, filedata)
 	if dtoFile.ID != id {
 		t.Error("ID field is not properly initialized")
 	}
@@ -61,6 +64,12 @@ func TestNewDtoFile(t *testing.T) {
 	}
 	if dtoFile.Export_Object_ID != export_object_id {
 		t.Error("Object_ID field is not properly initialized")
+	}
+	if dtoFile.Export_Error != export_error {
+		t.Error("Error field is not properly initialized")
+	}
+	if dtoFile.Export_ErrorDescription != export_errordescription {
+		t.Error("Error description field is not properly initialized")
 	}
 	if len(dtoFile.FileData) != len(filedata) {
 		t.Error("FileData field is not properly initialized")

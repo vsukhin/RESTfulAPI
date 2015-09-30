@@ -37,7 +37,7 @@ func (worktableservice *WorkTableService) GetByOrder(order_id int64) (worktables
 	worktables = new([]models.ApiWorkTable)
 	_, err = worktableservice.DbContext.Select(worktables,
 		"select r.customer_table_id, t.created, t.type_id from "+worktableservice.Table+
-			" r inner join customer_tables t on r.customer_table_id = t.id where r.order_id = ?", order_id)
+			" r inner join customer_tables t on r.customer_table_id = t.id where t.active = 1 and t.permanent = 1 and r.order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all work table object from database %v with value %v", err, order_id)
 		return nil, err

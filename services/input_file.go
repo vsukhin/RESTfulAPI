@@ -8,6 +8,7 @@ import (
 type InputFileRepository interface {
 	Get(order_id int64, file_id int64) (inputfile *models.DtoInputFile, err error)
 	GetByOrder(order_id int64) (inputfiles *[]models.ApiInputFile, err error)
+	GetAll(order_id int64) (inputfiles *[]models.DtoInputFile, err error)
 	Create(dtoinputfile *models.DtoInputFile, trans *gorp.Transaction) (err error)
 	DeleteByOrder(order_id int64, trans *gorp.Transaction) (err error)
 }
@@ -37,6 +38,18 @@ func (inputfileservice *InputFileService) GetByOrder(order_id int64) (inputfiles
 	inputfiles = new([]models.ApiInputFile)
 	_, err = inputfileservice.DbContext.Select(inputfiles,
 		"select i.file_id, f.name from "+inputfileservice.Table+" i inner join files f on i.file_id = f.id where order_id = ?", order_id)
+	if err != nil {
+		log.Error("Error during getting all input file object from database %v with value %v", err, order_id)
+		return nil, err
+	}
+
+	return inputfiles, nil
+}
+
+func (inputfileservice *InputFileService) GetAll(order_id int64) (inputfiles *[]models.DtoInputFile, err error) {
+	inputfiles = new([]models.DtoInputFile)
+	_, err = inputfileservice.DbContext.Select(inputfiles,
+		"select * from "+inputfileservice.Table+" where order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all input file object from database %v with value %v", err, order_id)
 		return nil, err

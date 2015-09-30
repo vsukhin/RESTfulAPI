@@ -6,7 +6,6 @@ import (
 	"application/config"
 	"application/models"
 	"errors"
-	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	logging "github.com/op/go-logging"
@@ -28,7 +27,7 @@ func InitLogger(logger config.Logger) {
 	log = logger
 }
 
-func CheckValidation(object interface{}, binerrs binding.Errors, r render.Render, language string) error {
+func CheckValidation(binerrs binding.Errors, r render.Render, language string) error {
 	fielderrors, errcode := models.ConvertErrors(language, binerrs)
 	switch errcode {
 	case types.TYPE_ERROR_LANGUAGE_NOTSUPPORTED:
@@ -37,12 +36,6 @@ func CheckValidation(object interface{}, binerrs binding.Errors, r render.Render
 		return errors.New("Wrong language")
 	case types.TYPE_ERROR_NONE:
 		if len(*fielderrors) > 0 {
-			for i, _ := range *fielderrors {
-				value, found := models.GetFieldValue((*fielderrors)[i].Field, object)
-				if found {
-					(*fielderrors)[i].FieldValue = fmt.Sprintf("%v", value)
-				}
-			}
 			r.JSON(http.StatusBadRequest, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
 				Message: config.Localization[language].Errors.Api.Data_Wrong, Errors: *fielderrors})
 			return errors.New("Wrong fields")

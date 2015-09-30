@@ -13,7 +13,6 @@ import (
 )
 
 type FileRepository interface {
-	ClearExpiredFiles()
 	Get(fileid int64) (file *models.DtoFile, err error)
 	GetBriefly(fileid int64) (file *models.DtoFile, err error)
 	GetExpired(timeout time.Duration) (files *[]models.DtoFile, err error)
@@ -31,20 +30,6 @@ func NewFileService(repository *Repository) *FileService {
 	repository.DbContext.AddTableWithName(models.DtoFile{}, repository.Table).SetKeys(true, "id")
 	return &FileService{
 		repository,
-	}
-}
-
-func (fileservice *FileService) ClearExpiredFiles() {
-	for {
-		files, err := fileservice.GetExpired(config.Configuration.FileTimeout)
-		if err == nil {
-			for _, file := range *files {
-				if !file.Permanent {
-					err = fileservice.Delete(&file)
-				}
-			}
-		}
-		time.Sleep(time.Minute)
 	}
 }
 
@@ -78,7 +63,10 @@ func (fileservice *FileService) GetBriefly(fileid int64) (file *models.DtoFile, 
 
 func (fileservice *FileService) GetExpired(timeout time.Duration) (files *[]models.DtoFile, err error) {
 	files = new([]models.DtoFile)
-	_, err = fileservice.DbContext.Select(files, "select * from "+fileservice.Table+" where created < ?", time.Now().Add(-timeout))
+	_, err = fileservice.DbContext.Select(files, "select * from "+fileservice.Table+" where created < ?"+
+		" and id not in (select file_id from input_files union select file_id from appendices union select file_id from contracts"+
+		" union select file_id from documents union select picDisable_id from services union select picNormal_id from services"+
+		" union select picOver_id from services union select picSoon_id from services)", time.Now().Add(-timeout))
 	if err != nil {
 		log.Error("Error during getting file object from database %v with value %v", err, timeout)
 		return nil, err

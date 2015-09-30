@@ -74,6 +74,19 @@ func GetAllSearchTags(object interface{}) (tags *[]string) {
 	return tags
 }
 
+func GetAllGroupTags(object interface{}) (tags *[]string) {
+	tags = new([]string)
+	structAddr := reflect.ValueOf(object).Elem()
+	for i := 0; i < structAddr.NumField(); i++ {
+		fieldTag := structAddr.Type().Field(i).Tag.Get("group")
+		if fieldTag != "" && fieldTag != "-" {
+			*tags = append(*tags, fieldTag)
+		}
+	}
+
+	return tags
+}
+
 func GetDbTagValue(param string, object interface{}) (value interface{}, found bool) {
 	found = false
 	value = nil

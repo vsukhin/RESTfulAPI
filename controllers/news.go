@@ -20,7 +20,7 @@ import (
 const (
 	NEWS_NUMBER                 = 10
 	NEWS_VERSION                = "2.0"
-	METHOD_NAME_SUBSCRIPTION    = "/api/v1.0/feedbacks/news/:email/"
+	METHOD_NAME_SUBSCRIPTION    = "/api/v1.0/subscriptions/news/:email/"
 	METHOD_TIMEOUT_SUBSCRIPTION = time.Second
 )
 
@@ -111,8 +111,9 @@ func GetNewsSubscription(request *http.Request, r render.Render, params martini.
 // post /api/v1.0/subscriptions/news/
 func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubscription, request *http.Request, r render.Render,
 	subscriptionrepository services.SubscriptionRepository, captcharepository services.CaptchaRepository,
-	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, templaterepository services.TemplateRepository) {
-	if helpers.CheckValidation(&viewsubscription, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	sessionrepository services.SessionRepository, emailrepository services.EmailRepository, templaterepository services.TemplateRepository,
+	accesslogrepository services.AccessLogRepository) {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	if helpers.Check(viewsubscription.CaptchaHash, viewsubscription.CaptchaValue, r, captcharepository) != nil {
@@ -164,23 +165,13 @@ func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubsc
 	dtosubscription.Email = strings.ToLower(viewsubscription.Email)
 	dtosubscription.Language = language
 	dtosubscription.Confirmed = false
-	dtosubscription.Subscr_Created = time.Now()
-	host, _, err := net.SplitHostPort(request.RemoteAddr)
+
+	dtoaccesslog, err := helpers.CreateAccessLog(request.RequestURI, request, r, accesslogrepository, config.Configuration.Server.DefaultLanguage)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
-	dtosubscription.Subscr_IP_Address = host
-	dnses, err := net.LookupAddr(dtosubscription.Subscr_IP_Address)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
-		return
-	}
-	dtosubscription.Subscr_Reverse_DNS = strings.Join(dnses, ",")
-	dtosubscription.Subscr_User_Agent = request.UserAgent()
-	dtosubscription.Conf_Created = time.Now()
+	dtosubscription.Subscr_AccessLog_ID = dtoaccesslog.ID
+
 	if !found {
 		err = subscriptionrepository.Create(dtosubscription)
 	} else {
@@ -191,10 +182,20 @@ func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubsc
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Data_Wrong})
 		return
 	}
-
+	host := request.Header.Get(helpers.REQUEST_HEADER_X_FORWARDED_FOR)
+	if host == "" {
+		host, _, err = net.SplitHostPort(request.RemoteAddr)
+		if err != nil {
+			log.Error("Can't detect ip address %v from %v", err, request.RemoteAddr)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
+			return
+		}
+	}
 	subject := config.Localization[dtosubscription.Language].Messages.SubscriptionSubject
 	buf, err := templaterepository.GenerateText(models.NewDtoDualCodeTemplate(models.NewDtoTemplate(dtosubscription.Email, dtosubscription.Language,
-		request.Host), dtosubscription.Subscr_Code, dtosubscription.Unsubscr_Code), services.TEMPLATE_SUBSCRIPTION, "")
+		request.Host, time.Now(), host), dtosubscription.Subscr_Code, dtosubscription.Unsubscr_Code), services.TEMPLATE_SUBSCRIPTION,
+		services.TEMPLATE_DIRECTORY_EMAILS, "")
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
@@ -214,8 +215,8 @@ func CreateSubscription(errors binding.Errors, viewsubscription models.ViewSubsc
 
 // patch /api/v1.0/subscriptions/news/
 func ConfirmSubscription(errors binding.Errors, confirm models.SubscriptionConfirm, request *http.Request, r render.Render,
-	subscriptionrepository services.SubscriptionRepository) {
-	if helpers.CheckValidation(&confirm, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	subscriptionrepository services.SubscriptionRepository, accesslogrepository services.AccessLogRepository) {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 
@@ -233,22 +234,13 @@ func ConfirmSubscription(errors binding.Errors, confirm models.SubscriptionConfi
 	}
 
 	dtosubscription.Confirmed = true
-	dtosubscription.Conf_Created = time.Now()
-	host, _, err := net.SplitHostPort(request.RemoteAddr)
+
+	dtoaccesslog, err := helpers.CreateAccessLog(request.RequestURI, request, r, accesslogrepository, config.Configuration.Server.DefaultLanguage)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
 		return
 	}
-	dtosubscription.Conf_IP_Address = host
-	dnses, err := net.LookupAddr(dtosubscription.Conf_IP_Address)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[config.Configuration.Server.DefaultLanguage].Errors.Api.Object_NotExist})
-		return
-	}
-	dtosubscription.Conf_Reverse_DNS = strings.Join(dnses, ",")
-	dtosubscription.Conf_User_Agent = request.UserAgent()
+	dtosubscription.Conf_AccessLog_ID = dtoaccesslog.ID
+
 	err = subscriptionrepository.Update(dtosubscription)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_DATA_WRONG,
@@ -337,4 +329,56 @@ func DeleteSubscription(r render.Render, params martini.Params, subscriptionrepo
 	}
 
 	r.JSON(http.StatusOK, types.ResponseOK{Message: config.Localization[session.Language].Messages.OK})
+}
+
+// get /api/v1.0/news/
+func GetNews(w http.ResponseWriter, request *http.Request, r render.Render, newsrepository services.NewsRepository, session *models.DtoSession) {
+	query := ""
+	var filters *[]models.FilterExp
+	filters, err := helpers.GetFilterArray(new(models.NewsSearch), nil, request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*filters) != 0 {
+		var masks []string
+		for _, filter := range *filters {
+			var exps []string
+			for _, field := range filter.Fields {
+				exps = append(exps, "`"+field+"` "+filter.Op+" "+filter.Value)
+			}
+			masks = append(masks, "("+strings.Join(exps, " or ")+")")
+		}
+		query += " and "
+		query += strings.Join(masks, " and ")
+	}
+
+	var sorts *[]models.OrderExp
+	sorts, err = helpers.GetOrderArray(new(models.NewsSearch), request, r, session.Language)
+	if err != nil {
+		return
+	}
+	if len(*sorts) != 0 {
+		var orders []string
+		for _, sort := range *sorts {
+			orders = append(orders, " `"+sort.Field+"` "+sort.Order)
+		}
+		query += " order by"
+		query += strings.Join(orders, ",")
+	}
+
+	var limit string
+	limit, err = helpers.GetLimitQuery(request, r, session.Language)
+	if err != nil {
+		return
+	}
+	query += limit
+
+	news, err := newsrepository.GetAny(query)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[session.Language].Errors.Api.Object_NotExist})
+		return
+	}
+
+	helpers.RenderJSONArray(news, len(*news), w, r)
 }

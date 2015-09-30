@@ -81,7 +81,7 @@ func GetUnits(w http.ResponseWriter, request *http.Request, r render.Render, uni
 // post /api/v1.0/administration/units/
 func CreateUnit(errors binding.Errors, viewunit models.ViewShortUnit, r render.Render, unitrepository services.UnitRepository,
 	session *models.DtoSession) {
-	if helpers.CheckValidation(&viewunit, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 
@@ -116,7 +116,7 @@ func GetUnit(r render.Render, params martini.Params, unitrepository services.Uni
 // put /api/v1.0/administration/units/:unitId/
 func UpdateUnit(errors binding.Errors, viewunit models.ViewLongUnit, r render.Render, params martini.Params,
 	unitrepository services.UnitRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewunit, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtounit, err := helpers.CheckUnit(r, params, unitrepository, session.Language)
@@ -477,7 +477,7 @@ func UpdateOrder(errors binding.Errors, vieworder models.ViewFullOrder, r render
 	orderrepository services.OrderRepository, unitrepository services.UnitRepository,
 	userrepository services.UserRepository, facilityrepository services.FacilityRepository,
 	projectrepository services.ProjectRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&vieworder, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)

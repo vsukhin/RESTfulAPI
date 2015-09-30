@@ -40,7 +40,7 @@ func CreateDevice(errors binding.Errors, viewdevice models.ViewLongDevice, reque
 		config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if helpers.CheckValidation(&viewdevice, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	found, err := devicerepository.Exists(viewdevice.Serial)
@@ -99,7 +99,7 @@ func UpdateDevice(errors binding.Errors, viewdevice models.ViewHashDevice, reque
 		config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if helpers.CheckValidation(&viewdevice, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	dtodevice, err := devicerepository.FindByHash(viewdevice.Hash)
@@ -137,7 +137,7 @@ func LinkDevice(errors binding.Errors, viewdevice models.ViewCodeDevice, request
 		session.Language) != nil {
 		return
 	}
-	if helpers.CheckValidation(&viewdevice, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtodevice, err := devicerepository.FindByCode(viewdevice.Code)
@@ -176,7 +176,7 @@ func CreateSessionDevice(errors binding.Errors, viewdevice models.ViewTokenDevic
 		config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
-	if helpers.CheckValidation(&viewdevice, errors, r, config.Configuration.Server.DefaultLanguage) != nil {
+	if helpers.CheckValidation(errors, r, config.Configuration.Server.DefaultLanguage) != nil {
 		return
 	}
 	encryptedtoken, err := hex.DecodeString(viewdevice.Token)

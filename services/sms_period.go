@@ -8,6 +8,7 @@ import (
 type SMSPeriodRepository interface {
 	Get(order_id int64, period_id int) (smsperiod *models.DtoSMSPeriod, err error)
 	GetByOrder(order_id int64) (smsperiods *[]models.ViewApiSMSPeriod, err error)
+	GetAll(order_id int64) (smsperiods *[]models.DtoSMSPeriod, err error)
 	Create(dtosmsperiod *models.DtoSMSPeriod, trans *gorp.Transaction) (err error)
 	DeleteByOrder(order_id int64, trans *gorp.Transaction) (err error)
 }
@@ -37,6 +38,18 @@ func (smsperiodservice *SMSPeriodService) GetByOrder(order_id int64) (smsperiods
 	smsperiods = new([]models.ViewApiSMSPeriod)
 	_, err = smsperiodservice.DbContext.Select(smsperiods,
 		"select period_id from "+smsperiodservice.Table+" where order_id = ?", order_id)
+	if err != nil {
+		log.Error("Error during getting all sms period object from database %v with value %v", err, order_id)
+		return nil, err
+	}
+
+	return smsperiods, nil
+}
+
+func (smsperiodservice *SMSPeriodService) GetAll(order_id int64) (smsperiods *[]models.DtoSMSPeriod, err error) {
+	smsperiods = new([]models.DtoSMSPeriod)
+	_, err = smsperiodservice.DbContext.Select(smsperiods,
+		"select * from "+smsperiodservice.Table+" where order_id = ?", order_id)
 	if err != nil {
 		log.Error("Error during getting all sms period object from database %v with value %v", err, order_id)
 		return nil, err

@@ -19,11 +19,15 @@ const (
 
 func CheckFrequence(method string, timeout time.Duration, request *http.Request, r render.Render, requestrepository services.RequestRepository,
 	language string) (err error) {
-	host, _, err := net.SplitHostPort(request.RemoteAddr)
-	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return err
+	host := request.Header.Get(REQUEST_HEADER_X_FORWARDED_FOR)
+	if host == "" {
+		host, _, err = net.SplitHostPort(request.RemoteAddr)
+		if err != nil {
+			log.Error("Can't detect ip address %v from %v", err, request.RemoteAddr)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			return err
+		}
 	}
 	exists, err := requestrepository.Exists(host, method)
 	if err != nil {

@@ -18,21 +18,22 @@ const (
 
 func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam int, userid int64,
 	language string, userrepository services.UserRepository, unitrepository services.UnitRepository,
-	tabletyperepository services.TableTypeRepository) (unitid int64, typeid int, err error) {
+	tabletyperepository services.TableTypeRepository) (unitid int64, typeid int, author string, err error) {
+	user, err := userrepository.Get(userid)
+	if err != nil {
+		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+			Message: config.Localization[language].Errors.Api.Object_NotExist})
+		return 0, 0, "", err
+	}
+	author = user.Name + " " + user.MiddleName + " " + user.Surname
 	if unitparam == 0 {
-		user, err := userrepository.Get(userid)
-		if err != nil {
-			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return 0, 0, err
-		}
 		unitid = user.UnitID
 	} else {
 		unit, err := unitrepository.Get(unitparam)
 		if err != nil {
 			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 				Message: config.Localization[language].Errors.Api.Object_NotExist})
-			return 0, 0, err
+			return 0, 0, "", err
 		}
 		unitid = unit.ID
 	}
@@ -41,11 +42,11 @@ func CheckCustomerTableParameters(r render.Render, unitparam int64, typeparam in
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return 0, 0, err
+		return 0, 0, "", err
 	}
 	typeid = dtotype.ID
 
-	return unitid, typeid, nil
+	return unitid, typeid, author, nil
 }
 
 func IsTableActive(r render.Render, customertablerepository services.CustomerTableRepository, tableid int64,
@@ -238,9 +239,10 @@ func CheckPriceColumns(customer_table_id int64, alias string, r render.Render, t
 
 func CheckProductColumns(customer_table_id int64, alias string, r render.Render, tablecolumnrepository services.TableColumnRepository,
 	tablerowrepository services.TableRowRepository, recognizeproductrepository services.RecognizeProductRepository,
-	verifyproductrepository services.VerifyProductRepository, language string) (products *[]models.ApiProduct, err error) {
+	verifyproductrepository services.VerifyProductRepository, headerproductrepository services.HeaderProductRepository,
+	language string) (products *[]models.ApiProduct, err error) {
 	products = new([]models.ApiProduct)
-	if alias != models.SERVICE_TYPE_RECOGNIZE && alias != models.SERVICE_TYPE_VERIFY {
+	if alias != models.SERVICE_TYPE_RECOGNIZE && alias != models.SERVICE_TYPE_VERIFY && alias != models.SERVICE_TYPE_HEADER {
 		return products, nil
 	}
 	dtotablecolumns, err := tablecolumnrepository.GetByTable(customer_table_id)
@@ -355,6 +357,28 @@ func CheckProductColumns(customer_table_id int64, alias string, r render.Render,
 					apiproduct.Product_ID = verifyproduct.ID
 				}
 			}
+			if alias == models.SERVICE_TYPE_HEADER {
+				found, err := headerproductrepository.Exists(apiproduct.Name)
+				if err != nil {
+					r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+						Message: config.Localization[language].Errors.Api.Object_NotExist})
+					return nil, err
+				}
+				if !found {
+					apiproduct.Product_ID = 0
+				} else {
+					headerproduct, err := headerproductrepository.FindByName(apiproduct.Name)
+					if err != nil {
+						r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+							Message: config.Localization[language].Errors.Api.Object_NotExist})
+						return nil, err
+					}
+					if apiproduct.Product_ID == headerproduct.ID {
+						continue
+					}
+					apiproduct.Product_ID = headerproduct.ID
+				}
+			}
 		} else {
 			if alias == models.SERVICE_TYPE_RECOGNIZE {
 				_, err = CheckRecognizeProduct(apiproduct.Product_ID, r, recognizeproductrepository, language)
@@ -364,6 +388,12 @@ func CheckProductColumns(customer_table_id int64, alias string, r render.Render,
 			}
 			if alias == models.SERVICE_TYPE_VERIFY {
 				_, err = CheckVerifyProduct(apiproduct.Product_ID, r, verifyproductrepository, language)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if alias == models.SERVICE_TYPE_HEADER {
+				_, err = CheckHeaderProduct(apiproduct.Product_ID, r, headerproductrepository, language)
 				if err != nil {
 					return nil, err
 				}

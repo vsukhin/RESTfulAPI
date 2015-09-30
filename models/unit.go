@@ -60,6 +60,11 @@ type ApiFullUnit struct {
 	End_Paid   time.Time `json:"paidEnd" db:"end_paid"`        // Окончание оплаченного периода
 }
 
+type UnitSearch struct {
+	ID   int64  `query:"id" search:"id"`                  // Уникальный идентификатор объединения
+	Name string `query:"name" search:"name" group:"name"` // Название
+}
+
 type DtoUnit struct {
 	ID         int64     `db:"id"`         // Уникальный идентификатор объединения
 	Created    time.Time `db:"created"`    // Время создания объединения
@@ -69,6 +74,7 @@ type DtoUnit struct {
 	Paid       bool      `db:paid`         // Оплачен
 	Begin_Paid time.Time `db:"begin_paid"` // Начало оплаченного периода
 	End_Paid   time.Time `db:"end_paid"`   // Окончание оплаченного периода
+	UUID       string    `db:"uuid"`       // UUID объединения
 }
 
 // Конструктор создания объекта объединения в api
@@ -108,7 +114,8 @@ func NewApiLongUnit(id int64, created time.Time, name string, deleted bool) *Api
 	}
 }
 
-func NewApiFullUnit(id int64, name string, created time.Time, subscribed bool, paid bool, begin_paid time.Time, end_paid time.Time) *ApiFullUnit {
+func NewApiFullUnit(id int64, name string, created time.Time, subscribed bool, paid bool,
+	begin_paid time.Time, end_paid time.Time) *ApiFullUnit {
 	return &ApiFullUnit{
 		ID:         id,
 		Name:       name,
@@ -120,13 +127,9 @@ func NewApiFullUnit(id int64, name string, created time.Time, subscribed bool, p
 	}
 }
 
-type UnitSearch struct {
-	ID   int64  `query:"id" search:"id"`     // Уникальный идентификатор объединения
-	Name string `query:"name" search:"name"` // Название
-}
-
 // Конструктор создания объекта объединения в бд
-func NewDtoUnit(id int64, created time.Time, name string, active bool, subscribed bool, paid bool, begin_paid time.Time, end_paid time.Time) *DtoUnit {
+func NewDtoUnit(id int64, created time.Time, name string, active bool, subscribed bool, paid bool,
+	begin_paid time.Time, end_paid time.Time, uuid string) *DtoUnit {
 	return &DtoUnit{
 		ID:         id,
 		Created:    created,
@@ -136,6 +139,7 @@ func NewDtoUnit(id int64, created time.Time, name string, active bool, subscribe
 		Paid:       paid,
 		Begin_Paid: begin_paid,
 		End_Paid:   end_paid,
+		UUID:       uuid,
 	}
 }
 
@@ -159,8 +163,7 @@ func (unit *UnitSearch) Extract(infield string, invalue string) (outfield string
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	default:
@@ -171,7 +174,7 @@ func (unit *UnitSearch) Extract(infield string, invalue string) (outfield string
 }
 
 func (unit *UnitSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(unit)
+	return GetAllGroupTags(unit)
 }
 
 func (unit *ViewShortUnit) Validate(errors binding.Errors, req *http.Request) binding.Errors {

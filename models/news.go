@@ -1,6 +1,9 @@
 package models
 
 import (
+	"errors"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,6 +20,20 @@ type ApiChannel struct {
 	URL         string     `xml:"link"`        // Прямая ссылка
 	Language    string     `xml:"language"`    // Язык
 	News        *[]DtoNews `xml:"item"`        // Новости
+}
+
+type ApiNews struct {
+	ID          int64     `json:"id" db:"id"`                     // Уникальный идентификатор новости
+	Created     time.Time `json:"date" db:"date"`                 // Время создания
+	Title       string    `json:"title" db:"title"`               // Заголовок
+	Description string    `json:"messageShort" db:"messageShort"` // Содержание
+}
+
+type NewsSearch struct {
+	ID          int64     `query:"id" search:"id"`                                            // Уникальный идентификатор компании
+	Created     time.Time `query:"date" search:"created" group:"convert(created using utf8)"` // Время создания
+	Title       string    `query:"title" search:"title" group:"title"`                        // Заголовок
+	Description string    `query:"messageShort" search:"description" group:"description"`     // Содержание
 }
 
 type DtoNews struct {
@@ -47,6 +64,15 @@ func NewApiChannel(title string, description string, url string, language string
 	}
 }
 
+func NewApiNews(id int64, created time.Time, title string, description string) *ApiNews {
+	return &ApiNews{
+		ID:          id,
+		Created:     created,
+		Title:       title,
+		Description: description,
+	}
+}
+
 // Конструктор создания объекта новости в бд
 func NewDtoNews(id int64, title string, description string, created time.Time, language string, active bool, url string) *DtoNews {
 	return &DtoNews{
@@ -58,4 +84,42 @@ func NewDtoNews(id int64, title string, description string, created time.Time, l
 		Active:      active,
 		URL:         url,
 	}
+}
+
+func (news *NewsSearch) Check(field string) (valid bool, err error) {
+	return CheckQueryTag(field, news), nil
+}
+
+func (news *NewsSearch) Extract(infield string, invalue string) (outfield string, outvalue string, errField error, errValue error) {
+	outvalue = ""
+	outfield = GetSearchTag(infield, news)
+	errField = nil
+	errValue = nil
+
+	switch infield {
+	case "id":
+		_, errConv := strconv.ParseInt(invalue, 0, 64)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "date":
+		fallthrough
+	case "title":
+		fallthrough
+	case "messageShort":
+		if strings.Contains(invalue, "'") {
+			invalue = strings.Replace(invalue, "'", "''", -1)
+		}
+		outvalue = "'" + invalue + "'"
+	default:
+		errField = errors.New("Unknown field")
+	}
+
+	return outfield, outvalue, errField, errValue
+}
+
+func (news *NewsSearch) GetAllFields(parameter interface{}) (fields *[]string) {
+	return GetAllGroupTags(news)
 }

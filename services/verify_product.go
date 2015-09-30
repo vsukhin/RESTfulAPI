@@ -50,7 +50,7 @@ func (verifyproductservice *VerifyProductService) FindByName(name string) (verif
 func (verifyproductservice *VerifyProductService) Get(id int) (verifyproduct *models.DtoVerifyProduct, err error) {
 	verifyproduct = new(models.DtoVerifyProduct)
 	err = verifyproductservice.DbContext.SelectOne(verifyproduct,
-		"select * from "+verifyproductservice.Table+" where id = ? order by position asc", id)
+		"select * from "+verifyproductservice.Table+" where id = ?", id)
 	if err != nil {
 		log.Error("Error during getting verify product object from database %v with value %v", err, id)
 		return nil, err
@@ -62,7 +62,7 @@ func (verifyproductservice *VerifyProductService) Get(id int) (verifyproduct *mo
 func (verifyproductservice *VerifyProductService) GetAll() (verifyproducts *[]models.ApiVerifyProduct, err error) {
 	verifyproducts = new([]models.ApiVerifyProduct)
 	_, err = verifyproductservice.DbContext.Select(verifyproducts,
-		"select id, position, name, description from "+verifyproductservice.Table+" where active = 1")
+		"select id, position, name, description from "+verifyproductservice.Table+" where active = 1 order by position asc")
 	if err != nil {
 		log.Error("Error during getting all verify product object from database %v", err)
 		return nil, err

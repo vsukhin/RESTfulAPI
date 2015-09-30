@@ -70,7 +70,7 @@ func (companyservice *CompanyService) GetMeta(user_id int64) (company *models.Ap
 func (companyservice *CompanyService) GetByUser(userid int64, filter string) (companies *[]models.ApiShortCompany, err error) {
 	companies = new([]models.ApiShortCompany)
 	_, err = companyservice.DbContext.Select(companies,
-		"select id, shortname_rus as nameShortRus, shortname_eng as nameShortEng, unit_id as unitId, `primary` from "+
+		"select id, shortname_rus as nameShortRus, shortname_eng as nameShortEng, unit_id as unitId, locked as `lock`, `primary` from "+
 			companyservice.Table+" where unit_id = (select unit_id from users where id = ?) and active = 1"+filter, userid)
 	if err != nil {
 		log.Error("Error during getting unit company object from database %v with value %v", err, userid)
@@ -83,7 +83,7 @@ func (companyservice *CompanyService) GetByUser(userid int64, filter string) (co
 func (companyservice *CompanyService) GetByUnit(unitid int64) (companies *[]models.ApiShortCompany, err error) {
 	companies = new([]models.ApiShortCompany)
 	_, err = companyservice.DbContext.Select(companies,
-		"select id, shortname_rus as nameShortRus, shortname_eng as nameShortEng, unit_id as unitId, `primary` from "+companyservice.Table+
+		"select id, shortname_rus as nameShortRus, shortname_eng as nameShortEng, unit_id as unitId, locked as `lock`, `primary` from "+companyservice.Table+
 			" where unit_id = ? and active = 1", unitid)
 	if err != nil {
 		log.Error("Error during getting unit company object from database %v with value %v", err, unitid)
@@ -184,6 +184,7 @@ func (companyservice *CompanyService) SetArrays(company *models.DtoCompany, tran
 			return err
 		}
 	}
+
 	return nil
 }
 

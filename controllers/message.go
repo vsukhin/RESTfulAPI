@@ -101,7 +101,7 @@ func GetMessages(w http.ResponseWriter, request *http.Request, r render.Render, 
 // post /api/v1.0/messages/order/:oid/
 func CreateMessage(errors binding.Errors, viewmessage models.ViewLongMessage, r render.Render, params martini.Params,
 	orderrepository services.OrderRepository, messagerepository services.MessageRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewmessage, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtoorder, err := helpers.CheckOrder(r, params, orderrepository, session.Language)
@@ -195,7 +195,7 @@ func MarkMessages(r render.Render, params martini.Params, orderrepository servic
 // put /api/v1.0/messages/orders/:oid/message/:mid/
 func UpdateMessage(errors binding.Errors, viewmessage models.ViewShortMessage, r render.Render, params martini.Params,
 	orderrepository services.OrderRepository, messagerepository services.MessageRepository, session *models.DtoSession) {
-	if helpers.CheckValidation(&viewmessage, errors, r, session.Language) != nil {
+	if helpers.CheckValidation(errors, r, session.Language) != nil {
 		return
 	}
 	dtomessage, err := helpers.CheckChangeableMessage(r, params, orderrepository, messagerepository, session.UserID, session.Language, true)

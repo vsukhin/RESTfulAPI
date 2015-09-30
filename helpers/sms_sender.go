@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	PARAM_NAME_SMSSENDER_ID = "frmid"
+	PARAM_NAME_SMSSENDER_ID = "hdrid"
 )
 
 func CheckSMSSender(r render.Render, params martini.Params, smssenderrepository services.SMSSenderRepository,
@@ -22,10 +22,8 @@ func CheckSMSSender(r render.Render, params martini.Params, smssenderrepository 
 		return nil, err
 	}
 
-	dtosmssender, err = smssenderrepository.Get(smssender_id)
+	dtosmssender, err = IsSMSSenderActive(smssender_id, r, smssenderrepository, language)
 	if err != nil {
-		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
-			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
 
@@ -40,11 +38,11 @@ func IsSMSSenderActive(smssender_id int64, r render.Render, smssenderrepository 
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return nil, err
 	}
-	if dtosmssender.Withdraw || !dtosmssender.Active {
-		log.Error("SMSFrom is not active or withdraw %v", dtosmssender.ID)
+	if !dtosmssender.Active {
+		log.Error("SMS sender is not active %v", dtosmssender.ID)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
-		return nil, errors.New("Wrong SMSFrom")
+		return nil, errors.New("Wrong SMS sender")
 	}
 
 	return dtosmssender, nil
@@ -59,7 +57,7 @@ func IsSMSSenderAccessible(smssender_id int64, user_id int64, r render.Render, s
 		return err
 	}
 	if !allowed {
-		log.Error("SMSFrom %v is not accessible for customer  %v", smssender_id, user_id)
+		log.Error("SMS sender %v is not accessible for customer %v", smssender_id, user_id)
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
 		return errors.New("Not accessible SMS sender")

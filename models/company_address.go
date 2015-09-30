@@ -10,6 +10,7 @@ type ViewApiCompanyAddress struct {
 	Primary         bool   `json:"primary" db:"primary"`                         // Основной
 	Ditto           int    `json:"ditto" db:"ditto"`                             // Идентификатор повторного типа адреса
 	Address_Type_ID int    `json:"type" db:"address_type_id" validate:"nonzero"` // Идентификатор типа адреса
+	Full            string `json:"allInOne" db:"full"`                           // Полный адрес
 	Zip             string `json:"zipCode" db:"zip" validate:"max=50"`           // Индекс
 	Country         string `json:"country" db:"country" validate:"max=100"`      // Страна
 	Region          string `json:"region" db:"region" validate:"max=255"`        // Регион
@@ -36,15 +37,17 @@ type DtoCompanyAddress struct {
 	Postbox         string `db:"postbox"`         // Номер почтового ящика
 	Company         string `db:"company"`         // Компания
 	Comments        string `db:"comments"`        // Комментарии
+	Full            string `db:"full"`            //  Полный адрес
 }
 
 // Конструктор создания объекта адреса компании в api
-func NewViewApiCompanyAddress(address_type_id int, ditto int, primary bool, zip string, country string, region string,
+func NewViewApiCompanyAddress(primary bool, ditto int, address_type_id int, full string, zip string, country string, region string,
 	city string, street string, building string, postbox string, company string, comments string) *ViewApiCompanyAddress {
 	return &ViewApiCompanyAddress{
-		Address_Type_ID: address_type_id,
-		Ditto:           ditto,
 		Primary:         primary,
+		Ditto:           ditto,
+		Address_Type_ID: address_type_id,
+		Full:            full,
 		Zip:             zip,
 		Country:         country,
 		Region:          region,
@@ -59,7 +62,7 @@ func NewViewApiCompanyAddress(address_type_id int, ditto int, primary bool, zip 
 
 // Конструктор создания объекта адреса компании в бд
 func NewDtoCompanyAddress(id int64, company_id int64, address_type_id int, ditto int, primary bool, zip string, country string, region string,
-	city string, street string, building string, postbox string, company string, comments string) *DtoCompanyAddress {
+	city string, street string, building string, postbox string, company string, comments string, full string) *DtoCompanyAddress {
 	return &DtoCompanyAddress{
 		ID:              id,
 		Company_ID:      company_id,
@@ -75,6 +78,7 @@ func NewDtoCompanyAddress(id int64, company_id int64, address_type_id int, ditto
 		Postbox:         postbox,
 		Company:         company,
 		Comments:        comments,
+		Full:            full,
 	}
 }
 

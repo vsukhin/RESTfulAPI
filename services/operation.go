@@ -46,7 +46,7 @@ func (operationservice *OperationService) GetByUnit(unit_id int64) (operations *
 
 func (operationservice *OperationService) CalculateBalance(unit_id int64) (money float64, err error) {
 	money, err = operationservice.DbContext.SelectFloat(
-		"select d.money - c.money from debet d inner join credit c on d.unit_id = c.unit_id where d.unit_id = ?", unit_id)
+		"select coalesce(sum(d.money), 0) - coalesce(sum(c.money), 0) from debet d inner join credit c on d.unit_id = c.unit_id where d.unit_id = ?", unit_id)
 	if err != nil {
 		log.Error("Error during getting operation object from database %v with value %v", err, unit_id)
 		return 0, err

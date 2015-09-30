@@ -7,6 +7,7 @@ import (
 type NewsRepository interface {
 	Get(id int64) (news *models.DtoNews, err error)
 	GetAll(language string, count int64) (news *[]models.DtoNews, err error)
+	GetAny(filter string) (news *[]models.ApiNews, err error)
 }
 
 type NewsService struct {
@@ -35,6 +36,18 @@ func (newsservice *NewsService) GetAll(language string, count int64) (news *[]mo
 	news = new([]models.DtoNews)
 	_, err = newsservice.DbContext.Select(news, "select title, description from "+newsservice.Table+
 		" where active = 1 and language = ? order by created desc limit ?", language, count)
+	if err != nil {
+		log.Error("Error during getting all news object from database %v", err)
+		return nil, err
+	}
+
+	return news, nil
+}
+
+func (newsservice *NewsService) GetAny(filter string) (news *[]models.ApiNews, err error) {
+	news = new([]models.ApiNews)
+	_, err = newsservice.DbContext.Select(news, "select id, created as date, title, description as messageShort from "+newsservice.Table+
+		" where active = 1"+filter)
 	if err != nil {
 		log.Error("Error during getting all news object from database %v", err)
 		return nil, err

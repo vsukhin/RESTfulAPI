@@ -9,9 +9,9 @@ type VerifyFacilityRepository interface {
 	Exists(orderid int64) (found bool, err error)
 	Get(order_id int64) (verifyfacility *models.DtoVerifyFacility, err error)
 	SetArrays(verifyfacility *models.DtoVerifyFacility, trans *gorp.Transaction) (err error)
-	Create(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error)
-	Update(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error)
-	Save(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error)
+	Create(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error)
+	Update(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error)
+	Save(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error)
 }
 
 type VerifyFacilityService struct {
@@ -103,7 +103,7 @@ func (verifyfacilityservice *VerifyFacilityService) SetArrays(verifyfacility *mo
 	return nil
 }
 
-func (verifyfacilityservice *VerifyFacilityService) Create(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error) {
+func (verifyfacilityservice *VerifyFacilityService) Create(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -127,12 +127,14 @@ func (verifyfacilityservice *VerifyFacilityService) Create(verifyfacility *model
 		return err
 	}
 
-	err = verifyfacilityservice.SetArrays(verifyfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = verifyfacilityservice.SetArrays(verifyfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -146,7 +148,7 @@ func (verifyfacilityservice *VerifyFacilityService) Create(verifyfacility *model
 	return nil
 }
 
-func (verifyfacilityservice *VerifyFacilityService) Update(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error) {
+func (verifyfacilityservice *VerifyFacilityService) Update(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -170,12 +172,14 @@ func (verifyfacilityservice *VerifyFacilityService) Update(verifyfacility *model
 		return err
 	}
 
-	err = verifyfacilityservice.SetArrays(verifyfacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = verifyfacilityservice.SetArrays(verifyfacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -189,7 +193,7 @@ func (verifyfacilityservice *VerifyFacilityService) Update(verifyfacility *model
 	return nil
 }
 
-func (verifyfacilityservice *VerifyFacilityService) Save(verifyfacility *models.DtoVerifyFacility, inTrans bool) (err error) {
+func (verifyfacilityservice *VerifyFacilityService) Save(verifyfacility *models.DtoVerifyFacility, briefly bool, inTrans bool) (err error) {
 	count, err := verifyfacilityservice.DbContext.SelectInt("select count(*) from "+verifyfacilityservice.Table+
 		" where order_id = ?", verifyfacility.Order_ID)
 	if err != nil {
@@ -197,9 +201,9 @@ func (verifyfacilityservice *VerifyFacilityService) Save(verifyfacility *models.
 		return err
 	}
 	if count == 0 {
-		err = verifyfacilityservice.Create(verifyfacility, inTrans)
+		err = verifyfacilityservice.Create(verifyfacility, briefly, inTrans)
 	} else {
-		err = verifyfacilityservice.Update(verifyfacility, inTrans)
+		err = verifyfacilityservice.Update(verifyfacility, briefly, inTrans)
 	}
 
 	return err

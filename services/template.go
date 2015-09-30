@@ -13,10 +13,13 @@ const (
 	TEMPLATE_SUBSCRIPTION          = "subscription.tpl.html"             // Письмо подписки на новости
 	TEMPLATE_FEEDBACK              = "sayhello.tpl.html"                 // Письмо обратной связи
 	TEMPLATE_CONFIRMATION          = "confirmation.tpl.html"             // Подтверждение успешности регистрации
+	TEMPLATE_MATCHING              = "matching.tpl.html"                 // Письмо запроса акта сверки
+	TEMPLATE_INVOICE               = "invoice.tpl.html"                  // Счет-фактура
+	TEMPLATE_DIRECTORY_EMAILS      = "/mailers"
 )
 
 type TemplateRepository interface {
-	GenerateText(object interface{}, name string, layout string) (buf *bytes.Buffer, err error)
+	GenerateText(object interface{}, name string, directory string, layout string) (buf *bytes.Buffer, err error)
 	GenerateHTML(name string, w http.ResponseWriter, object interface{}) (err error)
 }
 

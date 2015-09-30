@@ -102,8 +102,6 @@ func (complexreportservice *ComplexReportService) Get(user_id int64, apireport *
 	}
 	if apireport.Settings.Count > 0 {
 		query += " limit " + fmt.Sprintf("%v", (apireport.Settings.Page-1)*apireport.Settings.Count) + ", " + fmt.Sprintf("%v", apireport.Settings.Count)
-	} else if apireport.Settings.Count == 0 && apireport.Settings.Page == 0 {
-		query += " limit 0, 100"
 	}
 	complexreport = new(models.ApiComplexReport)
 	complexreport.Orders = *new([]models.ApiOrderReport)
@@ -165,7 +163,7 @@ func (complexreportservice *ComplexReportService) Get(user_id int64, apireport *
 				percentage = (float64(value.Sum) / float64(budget)) * 100
 			}
 			complexreport.Budgets = append(complexreport.Budgets, *models.NewApiBudgetedReport(models.TYPE_BUDGETEDBY_FACILITY_VALUE,
-				*models.NewApiDoughnutReport(id, 0, percentage, float64(value.Sum))))
+				*models.NewApiDoughnutReport(id, 0, percentage, models.Round(float64(value.Sum), 0.5, 2))))
 		}
 
 	}
@@ -180,7 +178,7 @@ func (complexreportservice *ComplexReportService) Get(user_id int64, apireport *
 				percentage = (float64(value.Sum) / float64(budget)) * 100
 			}
 			complexreport.Budgets = append(complexreport.Budgets, *models.NewApiBudgetedReport(models.TYPE_BUDGETEDBY_COMPLEX_STATUS_VALUE,
-				*models.NewApiDoughnutReport(id, 0, percentage, float64(value.Sum))))
+				*models.NewApiDoughnutReport(id, 0, percentage, models.Round(float64(value.Sum), 0.5, 2))))
 		}
 	}
 
@@ -194,7 +192,7 @@ func (complexreportservice *ComplexReportService) Get(user_id int64, apireport *
 				percentage = (float64(value.Sum) / float64(budget)) * 100
 			}
 			complexreport.Budgets = append(complexreport.Budgets, *models.NewApiBudgetedReport(models.TYPE_BUDGETEDBY_SUPPLIER_VALUE,
-				*models.NewApiDoughnutReport(id, 0, percentage, float64(value.Sum))))
+				*models.NewApiDoughnutReport(id, 0, percentage, models.Round(float64(value.Sum), 0.5, 2))))
 		}
 	}
 

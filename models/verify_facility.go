@@ -9,7 +9,7 @@ import (
 type ViewVerifyFacility struct {
 	EstimatedNumbersRecords int                  `json:"estimatedNumbersRecords" validate:"min=0"` // Предполагаемое количество проверяемых записей
 	DataProducts            []ViewApiDataProduct `json:"estimatedProductIds"`                      // Позиции прайс листа
-	TablesDataId            int64                `json:"tablesDataId" validate:"nonzero"`          // Уникальный идентификатор таблицы
+	TablesDataId            int64                `json:"tablesDataId"`                             // Уникальный идентификатор таблицы
 	TablesDataDelete        bool                 `json:"tablesDataDelete"`                         // Удалить указанную таблицу
 	DataColumns             []ViewDataColumn     `json:"tablesDataColumns"`                        // Массив проверяемых колонок
 }

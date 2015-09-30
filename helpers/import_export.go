@@ -5,15 +5,21 @@ import (
 	"application/models"
 	"application/services"
 	"bufio"
+	"encoding/binary"
 	"encoding/csv"
+	"errors"
 	"fmt"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 const (
@@ -27,11 +33,90 @@ const (
 	BLOCK_ROWS_NUMBER = 1000
 )
 
+func ConvertFileToDefault(dataencoding models.DataEncoding, fullpath string) (err error) {
+	data, err := ioutil.ReadFile(fullpath)
+	if err != nil {
+		return err
+	}
+
+	var array []byte
+	var result string
+
+	switch dataencoding {
+	case models.DATA_ENCODING_WINDOWS1251:
+		array, _, err = transform.Bytes(charmap.Windows1251.NewDecoder(), data)
+		result = string(array)
+	case models.DATA_ENCODING_KOI8R:
+		array, _, err = transform.Bytes(charmap.KOI8R.NewDecoder(), data)
+		result = string(array)
+	case models.DATA_ENCODING_MACINTOSH:
+		array, _, err = transform.Bytes(charmap.MacintoshCyrillic.NewDecoder(), data)
+		result = string(array)
+	case models.DATA_ENCODING_UTF16:
+		if len(data)%2 != 0 {
+			err = errors.New("Not Unicode 16")
+			break
+		}
+		var unicode []uint16
+		found := false
+		defaultendian := true
+		if len(data) > 1 {
+			if data[0] == 0xfe && data[1] == 0xff {
+				found = true
+				defaultendian = false
+			}
+			if data[0] == 0xff && data[1] == 0xfe {
+				found = true
+				defaultendian = true
+			}
+		}
+		pos := 0
+		if found {
+			pos = 2
+		}
+		for {
+			if pos+2 > len(data) {
+				break
+			}
+			var symbol uint16
+			if defaultendian {
+				symbol = binary.LittleEndian.Uint16(data[pos : pos+2])
+			} else {
+				symbol = binary.BigEndian.Uint16(data[pos : pos+2])
+			}
+			unicode = append(unicode, symbol)
+			pos = pos + 2
+		}
+		result = string(utf16.Decode(unicode))
+		err = nil
+	case models.DATA_ENCODING_UNKNOWN:
+		fallthrough
+	case models.DATA_ENCODING_UTF8:
+		result = string(data)
+		err = nil
+	default:
+		err = errors.New("Unknown encoding")
+	}
+	if err != nil {
+		return err
+	}
+
+	result = strings.Replace(result, "\r\n", "\n", -1)
+	result = strings.Replace(result, "\r", "\n", -1)
+
+	err = ioutil.WriteFile(fullpath, []byte(result), 0666)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func DetectDataFormat(fullpath string) (dataformat models.DataFormat, err error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
 		log.Error("Can't read from file %v with value %v", err, fullpath)
-		return models.DATA_FORMAT_UKNOWN, err
+		return models.DATA_FORMAT_UNKNOWN, err
 	}
 	defer file.Close()
 
@@ -39,7 +124,8 @@ func DetectDataFormat(fullpath string) (dataformat models.DataFormat, err error)
 	firstline, err := reader.ReadString('\n')
 	if err != nil {
 		if err != io.EOF {
-			return models.DATA_FORMAT_UKNOWN, err
+			log.Error("Can't detect data format for file %v with value %v", err, fullpath)
+			return models.DATA_FORMAT_UNKNOWN, err
 		}
 	}
 	if len(strings.Split(firstline, "\t")) > 1 {
@@ -50,12 +136,32 @@ func DetectDataFormat(fullpath string) (dataformat models.DataFormat, err error)
 		return models.DATA_FORMAT_SSV, nil
 	}
 
-	return models.DATA_FORMAT_UKNOWN, nil
+	return models.DATA_FORMAT_UNKNOWN, nil
+}
+
+func SaveImportError(description string, dtocustomertable *models.DtoCustomerTable, customertablerepository services.CustomerTableRepository) {
+	dtocustomertable.Import_Error = true
+	dtocustomertable.Import_ErrorDescription = description
+	err := customertablerepository.Update(dtocustomertable)
+	if err != nil {
+		log.Error("Can't save error information %v for table %v", err, dtocustomertable.ID)
+		return
+	}
+}
+
+func SaveExportError(description string, dtofile *models.DtoFile, filerepository services.FileRepository) {
+	dtofile.Export_Error = true
+	dtofile.Export_ErrorDescription = description
+	err := filerepository.Update(dtofile)
+	if err != nil {
+		log.Error("Can't save error information %v for file %v", err, dtofile.ID)
+		return
+	}
 }
 
 func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dtocustomertable *models.DtoCustomerTable,
 	customertablerepository services.CustomerTableRepository, importsteprepository services.ImportStepRepository,
-	columntyperepository services.ColumnTypeRepository) {
+	columntyperepository services.ColumnTypeRepository, language string) {
 	dtoimportstep := models.NewDtoImportStep(dtocustomertable.ID, 2, false, 0, time.Now(), time.Now())
 	err := importsteprepository.Save(dtoimportstep)
 	if err != nil {
@@ -63,15 +169,35 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	}
 
 	fullpath := filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID))
-	dataformat, err := DetectDataFormat(fullpath)
+	var dataformat models.DataFormat
+	if viewimporttable.DataFormat == models.DATA_FORMAT_UNKNOWN {
+		dataformat, err = DetectDataFormat(fullpath)
+		if err != nil {
+			SaveImportError(config.Localization[language].Errors.Internal.Data_Format, dtocustomertable, customertablerepository)
+			return
+		}
+	} else {
+		dataformat = viewimporttable.DataFormat
+	}
+
+	var dataencoding models.DataEncoding
+	if viewimporttable.DataEncoding == models.DATA_ENCODING_UNKNOWN {
+		dataencoding = models.DATA_ENCODING_UTF8
+	} else {
+		dataencoding = viewimporttable.DataEncoding
+	}
+
+	err = ConvertFileToDefault(dataencoding, fullpath)
 	if err != nil {
-		log.Error("Can't detect data format for file %v with value %v", err, fullpath)
+		log.Error("Can't convert file %v to encoding %v with value %v", err, dataencoding, fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Format, dtocustomertable, customertablerepository)
 		return
 	}
 
 	csvfile, err := os.Open(fullpath)
 	if err != nil {
 		log.Error("Can't read from file %v with value %v", err, fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Reading, dtocustomertable, customertablerepository)
 		return
 	}
 	defer csvfile.Close()
@@ -79,7 +205,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	reader := csv.NewReader(csvfile)
 	reader.FieldsPerRecord = -1
 	reader.Comma = models.GetDataSeparator(dataformat)
-	reader.LazyQuotes = false
+	reader.LazyQuotes = true
 	reader.TrimLeadingSpace = true
 
 	log.Info("Detected data format %v", dataformat)
@@ -87,6 +213,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	rawCSVdata, err := reader.ReadAll()
 	if err != nil {
 		log.Error("Can't read from file %v with value %v", err, fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Reading, dtocustomertable, customertablerepository)
 		return
 	}
 	rowcount := len(rawCSVdata)
@@ -98,10 +225,12 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 
 	if columncount == 0 {
 		log.Error("Can't find any data in file %v", fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Columns, dtocustomertable, customertablerepository)
 		return
 	}
 	if columncount > models.MAX_COLUMN_NUMBER {
 		log.Error("So many columns are not supported %v", columncount)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Columns, dtocustomertable, customertablerepository)
 		return
 	}
 	dtocolumntype, err := columntyperepository.Get(models.COLUMN_TYPE_DEFAULT)
@@ -137,6 +266,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 
 	err = customertablerepository.ImportDataStructure(dtotablecolumns, true)
 	if err != nil {
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Writing, dtocustomertable, customertablerepository)
 		return
 	}
 
@@ -204,6 +334,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	newcsvfile, err := os.Create(fullpath)
 	if err != nil {
 		log.Error("Can't write to file %v with value %v", err, fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Writing, dtocustomertable, customertablerepository)
 		return
 	}
 
@@ -214,8 +345,9 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	log.Info("Start writing file %v", time.Now())
 	err = writer.WriteAll(rawCSVdata)
 	if err != nil {
-		log.Error("Can't write to file %v with value %v", err, fullpath)
 		newcsvfile.Close()
+		log.Error("Can't write to file %v with value %v", err, fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Writing, dtocustomertable, customertablerepository)
 		return
 	}
 	log.Info("Stop writing file %v", time.Now())
@@ -224,6 +356,7 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 	err = customertablerepository.ImportData(file, dtocustomertable, dataformat, viewimporttable.HasHeader, dtotablecolumns, version)
 	if err != nil {
 		os.Remove(fullpath)
+		SaveImportError(config.Localization[language].Errors.Internal.Data_Writing, dtocustomertable, customertablerepository)
 		return
 	}
 	os.Remove(fullpath)
@@ -244,19 +377,33 @@ func ImportData(viewimporttable models.ViewImportTable, file *models.DtoFile, dt
 }
 
 func ExportData(viewexporttable *models.ViewExportTable, file *models.DtoFile, dtocustomertable *models.DtoCustomerTable,
-	tablecolumns *[]models.DtoTableColumn, filerepository services.FileRepository,
-	customertablerepository services.CustomerTableRepository) {
+	tablecolumns *[]models.DtoTableColumn, filerepository services.FileRepository, customertablerepository services.CustomerTableRepository, language string) {
 	version := fmt.Sprintf(".%v", time.Now().UTC().UnixNano())
 	err := customertablerepository.ExportData(viewexporttable, file, dtocustomertable, tablecolumns, true, version)
 	if err != nil {
+		SaveExportError(config.Localization[language].Errors.Internal.Data_Writing, file, filerepository)
 		return
 	}
 
-	mvCmd := exec.Command("mv", "-f", filepath.Join(config.Configuration.TempDirectory, fmt.Sprintf("%08d", file.ID)+version),
-		filepath.Join(config.Configuration.FileStorage, file.Path, fmt.Sprintf("%08d", file.ID)))
+	abstemppath, err := filepath.Abs(config.Configuration.TempDirectory)
+	if err != nil {
+		log.Error("Can't make an absolute path for %v, %v", config.Configuration.TempDirectory, err)
+		SaveExportError(config.Localization[language].Errors.Internal.Data_Reading, file, filerepository)
+		return
+	}
+	absfilepath, err := filepath.Abs(config.Configuration.FileStorage)
+	if err != nil {
+		log.Error("Can't make an absolute path for %v, %v", config.Configuration.FileStorage, err)
+		SaveExportError(config.Localization[language].Errors.Internal.Data_Reading, file, filerepository)
+		return
+	}
+
+	mvCmd := exec.Command("mv", "-f", filepath.Join(abstemppath, fmt.Sprintf("%08d", file.ID)+version),
+		filepath.Join(absfilepath, file.Path, fmt.Sprintf("%08d", file.ID)))
 	err = mvCmd.Run()
 	if err != nil {
 		log.Error("Can't move temporable file %v with value %v%v", err, file.ID, version)
+		SaveExportError(config.Localization[language].Errors.Internal.Data_Writing, file, filerepository)
 		return
 	}
 

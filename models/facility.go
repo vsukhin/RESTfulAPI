@@ -11,6 +11,7 @@ const (
 	SERVICE_TYPE_HLR       = "hlr"
 	SERVICE_TYPE_RECOGNIZE = "recognize"
 	SERVICE_TYPE_VERIFY    = "verification"
+	SERVICE_TYPE_HEADER    = "header"
 )
 
 // Структура для организации хранения сервисов

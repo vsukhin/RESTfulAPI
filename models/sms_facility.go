@@ -27,14 +27,14 @@ type ViewSMSFacility struct {
 	EstimatedNumberCharacters   int                              `json:"estimatedNumberCharacters" validate:"min=0"`   // Количество символов в одном сообщении
 	EstimatedNumberSmsInMessage int                              `json:"estimatedNumberSmsInMessage" validate:"min=0"` // Количество SMS используемых для отправки одного сообщения
 	EstimatedOperators          []ViewApiMobileOperatorOperation `json:"estimatedOperators"`                           // Прогноз распределения отправлений
-	DeliveryType                string                           `json:"deliveryType" validate:"nonzero"`              // Константа периодичности оказания услуги
+	DeliveryType                string                           `json:"deliveryType"`                                 // Константа периодичности оказания услуги
 	DeliveryTime                bool                             `json:"deliveryTime"`                                 // Рассылка в период времени
 	Periods                     []ViewApiSMSPeriod               `json:"deliveryTimePeriods"`                          // Периоды
 	Events                      []ViewApiSMSEvent                `json:"deliveryTimeEvents"`                           // События
 	DeliveryTimeStart           time.Time                        `json:"deliveryTimeStart"`                            // Дата и время начала рассылки
 	DeliveryTimeEnd             time.Time                        `json:"deliveryTimeEnd"`                              // Дата и время прекращения рассылки
 	DeliveryBaseTime            time.Time                        `json:"deliveryBaseTime"`                             // Время для рассылок
-	DeliveryDataId              int64                            `json:"deliveryDataId" validate:"nonzero"`            // Уникальный идентификатор таблицы
+	DeliveryDataId              int64                            `json:"deliveryDataId"`                               // Уникальный идентификатор таблицы
 	DeliveryDataDelete          bool                             `json:"deliveryDataDelete"`                           // Удалить указанную таблицу
 	MessageFromId               int64                            `json:"messageFromId"`                                // Идентификатор отправителя
 	MessageFromInColumnId       int64                            `json:"messageFromInColumnId"`                        // Идентификатор отправителя сообщений

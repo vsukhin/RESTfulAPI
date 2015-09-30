@@ -9,9 +9,9 @@ type RecognizeFacilityRepository interface {
 	Exists(orderid int64) (found bool, err error)
 	Get(order_id int64) (recognizefacility *models.DtoRecognizeFacility, err error)
 	SetArrays(recognizefacility *models.DtoRecognizeFacility, trans *gorp.Transaction) (err error)
-	Create(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error)
-	Update(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error)
-	Save(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error)
+	Create(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error)
+	Update(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error)
+	Save(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error)
 }
 
 type RecognizeFacilityService struct {
@@ -83,7 +83,7 @@ func (recognizefacilityservice *RecognizeFacilityService) SetArrays(recognizefac
 		log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
 		return err
 	}
-	for _, dtoinputfile := range recognizefacility.EstimatedFromFiles {
+	for _, dtoinputfile := range recognizefacility.EstimatedFormFiles {
 		err = recognizefacilityservice.InputFileRepository.Create(&dtoinputfile, trans)
 		if err != nil {
 			log.Error("Error during setting recognize facility object in database %v with value %v", err, recognizefacility.Order_ID)
@@ -140,7 +140,7 @@ func (recognizefacilityservice *RecognizeFacilityService) SetArrays(recognizefac
 	return nil
 }
 
-func (recognizefacilityservice *RecognizeFacilityService) Create(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error) {
+func (recognizefacilityservice *RecognizeFacilityService) Create(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -164,12 +164,14 @@ func (recognizefacilityservice *RecognizeFacilityService) Create(recognizefacili
 		return err
 	}
 
-	err = recognizefacilityservice.SetArrays(recognizefacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = recognizefacilityservice.SetArrays(recognizefacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -183,7 +185,7 @@ func (recognizefacilityservice *RecognizeFacilityService) Create(recognizefacili
 	return nil
 }
 
-func (recognizefacilityservice *RecognizeFacilityService) Update(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error) {
+func (recognizefacilityservice *RecognizeFacilityService) Update(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error) {
 	var trans *gorp.Transaction
 
 	if inTrans {
@@ -207,12 +209,14 @@ func (recognizefacilityservice *RecognizeFacilityService) Update(recognizefacili
 		return err
 	}
 
-	err = recognizefacilityservice.SetArrays(recognizefacility, trans)
-	if err != nil {
-		if inTrans {
-			_ = trans.Rollback()
+	if !briefly {
+		err = recognizefacilityservice.SetArrays(recognizefacility, trans)
+		if err != nil {
+			if inTrans {
+				_ = trans.Rollback()
+			}
+			return err
 		}
-		return err
 	}
 
 	if inTrans {
@@ -226,7 +230,7 @@ func (recognizefacilityservice *RecognizeFacilityService) Update(recognizefacili
 	return nil
 }
 
-func (recognizefacilityservice *RecognizeFacilityService) Save(recognizefacility *models.DtoRecognizeFacility, inTrans bool) (err error) {
+func (recognizefacilityservice *RecognizeFacilityService) Save(recognizefacility *models.DtoRecognizeFacility, briefly bool, inTrans bool) (err error) {
 	count, err := recognizefacilityservice.DbContext.SelectInt("select count(*) from "+recognizefacilityservice.Table+
 		" where order_id = ?", recognizefacility.Order_ID)
 	if err != nil {
@@ -234,9 +238,9 @@ func (recognizefacilityservice *RecognizeFacilityService) Save(recognizefacility
 		return err
 	}
 	if count == 0 {
-		err = recognizefacilityservice.Create(recognizefacility, inTrans)
+		err = recognizefacilityservice.Create(recognizefacility, briefly, inTrans)
 	} else {
-		err = recognizefacilityservice.Update(recognizefacility, inTrans)
+		err = recognizefacilityservice.Update(recognizefacility, briefly, inTrans)
 	}
 
 	return err

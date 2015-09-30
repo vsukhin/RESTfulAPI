@@ -6,7 +6,9 @@ import (
 	"application/services"
 	"errors"
 	"github.com/martini-contrib/render"
+	"net"
 	"net/http"
+	"time"
 	"types"
 )
 
@@ -85,8 +87,19 @@ func SendPasswordRecovery(language string,
 
 func sendPassword(language string, email *models.DtoEmail, user *models.DtoUser, request *http.Request, r render.Render,
 	emailrepository services.EmailRepository, templaterepository services.TemplateRepository, tpl string, subject string) (err error) {
-	buf, err := templaterepository.GenerateText(models.NewDtoCodeTemplate(models.NewDtoTemplate(email.Email, email.Language, request.Host), user.Code),
-		tpl, services.TEMPLATE_LAYOUT)
+	host := request.Header.Get(REQUEST_HEADER_X_FORWARDED_FOR)
+	if host == "" {
+		host, _, err = net.SplitHostPort(request.RemoteAddr)
+		if err != nil {
+			log.Error("Can't detect ip address %v from %v", err, request.RemoteAddr)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			return err
+		}
+	}
+	buf, err := templaterepository.GenerateText(models.NewDtoCodeTemplate(
+		models.NewDtoTemplate(email.Email, email.Language, request.Host, time.Now(), host), user.Code), tpl, services.TEMPLATE_DIRECTORY_EMAILS,
+		services.TEMPLATE_LAYOUT)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})
@@ -105,9 +118,20 @@ func sendPassword(language string, email *models.DtoEmail, user *models.DtoUser,
 
 func SendConfirmation(language string, email *models.DtoEmail, request *http.Request, r render.Render,
 	emailrepository services.EmailRepository, templaterepository services.TemplateRepository) (err error) {
+	host := request.Header.Get(REQUEST_HEADER_X_FORWARDED_FOR)
+	if host == "" {
+		host, _, err = net.SplitHostPort(request.RemoteAddr)
+		if err != nil {
+			log.Error("Can't detect ip address %v from %v", err, request.RemoteAddr)
+			r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
+				Message: config.Localization[language].Errors.Api.Object_NotExist})
+			return err
+		}
+	}
 	subject := config.Localization[email.Language].Messages.ConfirmationSubject
-	buf, err := templaterepository.GenerateText(models.NewDtoTemplate(email.Email, email.Language,
-		request.Host), services.TEMPLATE_CONFIRMATION, services.TEMPLATE_LAYOUT)
+	buf, err := templaterepository.GenerateText(models.NewDtoTemplate(
+		email.Email, email.Language, request.Host, time.Now(), host), services.TEMPLATE_CONFIRMATION, services.TEMPLATE_DIRECTORY_EMAILS,
+		services.TEMPLATE_LAYOUT)
 	if err != nil {
 		r.JSON(http.StatusNotFound, types.Error{Code: types.TYPE_ERROR_OBJECT_NOTEXIST,
 			Message: config.Localization[language].Errors.Api.Object_NotExist})

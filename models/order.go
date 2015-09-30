@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MAX_STEP_NUMBER = 3
+	MAX_STEP_NUMBER = 4
 )
 
 // Структура для организации хранения заказа
@@ -88,6 +88,11 @@ type ApiMetaOrderByProject struct {
 	NumOfAlert int64 `json:"alert"` // Число заказов с уведомлениями
 }
 
+type ApiTinyOrder struct {
+	ID          int64 `json:"id" db:"id"`           // Уникальный идентификатор
+	Facility_ID int64 `json:"type" db:"service_id"` // Идентификатор услуги
+}
+
 type ApiShortOrder struct {
 	ID          int64  `json:"id" db:"id"`                 // Уникальный идентификатор
 	IsAssembled bool   `json:"completed" db:"completed"`   // Собран
@@ -99,15 +104,29 @@ type ApiShortOrder struct {
 }
 
 type ApiMiddleOrder struct {
-	ID          int64  `json:"id" db:"id"`                 // Уникальный идентификатор
-	IsAssembled bool   `json:"completed" db:"completed"`   // Собран
-	Facility_ID int64  `json:"type" db:"type"`             // Идентификатор услуги
-	Supplier_ID int64  `json:"supplierId" db:"supplierId"` // Идентификатор поставщика
-	IsNew       bool   `json:"new" db:"new"`               // Новый
-	IsOpen      bool   `json:"open" db:"open"`             // Открыт
-	IsCancelled bool   `json:"cancel" db:"cancel"`         // Отказ
-	IsPaid      bool   `json:"paid" db:"paid"`             // Оплачен
-	Name        string `json:"name" db:"name"`             // Название
+	ID                 int64   `json:"id" db:"id"`                                             // Уникальный идентификатор
+	Name               string  `json:"name" db:"name"`                                         // Название
+	Step               byte    `json:"step" db:"step"`                                         // Шаг
+	IsAssembled        bool    `json:"completed" db:"completed"`                               // Собран
+	IsConfirmed        bool    `json:"moderatorConfirmed" db:"moderatorConfirmed"`             // Утвержден
+	Facility_ID        int64   `json:"type" db:"type"`                                         // Идентификатор услуги
+	Supplier_ID        int64   `json:"supplierId" db:"supplierId"`                             // Идентификатор поставщика
+	IsNew              bool    `json:"new" db:"new"`                                           // Новый
+	IsOpen             bool    `json:"open" db:"open"`                                         // Открыт
+	IsCancelled        bool    `json:"cancel" db:"cancel"`                                     // Отказ
+	Reason             string  `json:"cancelDescription" db:"cancelDescription"`               // Причина отказа
+	Execution_Forecast int     `json:"supplierForecastWorkDays" db:"supplierForecastWorkDays"` // Прогноз исполнения
+	Proposed_Price     float64 `json:"supplierCost" db:"supplierCost"`                         // Предложенная цена
+	IsNewCost          bool    `json:"supplierCostNew" db:"supplierCostNew"`                   // Новая цена
+	IsNewCostConfirmed bool    `json:"customerNewCostConfirmed" db:"customerNewCostConfirmed"` // Новая цена утверждена
+	IsPaid             bool    `json:"paid" db:"paid"`                                         // Оплачен
+	IsStarted          bool    `json:"moderatorBegin" db:"moderatorBegin"`                     // Запущен
+	IsNewCharge        bool    `json:"supplierFactualCostNew" db:"supplierFactualCostNew"`     // Предложена фактическая цена
+	Charged_Fee        float64 `json:"supplierFactualCost" db:"supplierFactualCost"`           // Фактическая цена
+	IsExecuted         bool    `json:"supplierClose" db:"supplierClose"`                       // Выполнен
+	IsDocumented       bool    `json:"moderatorDocumentsGotten" db:"moderatorDocumentsGotten"` // Документы имеются
+	IsClosed           bool    `json:"moderatorClose" db:"moderatorClose"`                     // Закрыт
+	IsArchived         bool    `json:"archive" db:"archive"`                                   // Архивирован
 }
 
 type ApiBriefOrder struct {
@@ -170,6 +189,36 @@ type ApiFullOrder struct {
 	ApiLongOrder
 }
 
+type ApiFinanceOrder struct {
+	ID               int64     `json:"orderId" db:"orderId"`             // Уникальный идентификатор
+	Project_ID       int64     `json:"projectId" db:"projectId"`         // Идентификатор проекта
+	Begin_Date       time.Time `json:"beginDate" db:"beginDate"`         // Дата начала работ
+	Charged_Fee      float64   `json:"cost" db:"cost"`                   // Фактическая цена
+	Facility_ID      int64     `json:"type" db:"type"`                   // Идентификатор услуги
+	Supplier_ID      int64     `json:"supplierId" db:"supplierId"`       // Идентификатор поставщика
+	Status_ID        int       `json:"statusId" db:"statusId"`           // Статус заказа
+	Act_File_ID      int64     `json:"actFileId" db:"actFileId"`         // Идентификатор файла акта
+	EInvoice_File_ID int64     `json:"invoiceFileId" db:"invoiceFileId"` // Идентификатор файла акта
+}
+
+type ApiResultOrder struct {
+	Total       int64   `json:"count" db:"count"`             // Всего заказов
+	Processing  int64   `json:"countInWork" db:"countInWork"` // Заказов в работе
+	Charged_Fee float64 `json:"cost" db:"cost"`               // Фактическая цена
+}
+
+type OrderFinanceSearch struct {
+	ID               int64     `query:"orderId" search:"o.id"`                                                    // Уникальный идентификатор
+	Project_ID       int64     `query:"projectId" search:"o.project_id"`                                          // Идентификатор проекта
+	Begin_Date       time.Time `query:"beginDate" search:"o.begin_date" group:"convert(o.begin_date using utf8)"` // Дата начала работ
+	Charged_Fee      float64   `query:"cost" search:"o.charged_fee" group:"o.charged_fee"`                        // Фактическая цена
+	Facility_ID      int64     `query:"type" search:"o.service_id"`                                               // Идентификатор услуги
+	Supplier_ID      int64     `query:"supplierId" search:"o.supplier_id"`                                        // Идентификатор поставщика
+	Status_ID        int       `query:"statusId" search:"coalesce(s.complex_status_id, 0)"`                       // Статус заказа
+	Act_File_ID      int64     `query:"actFileId" search:"coalesce(a.file_id, 0)"`                                // Идентификатор файла акта
+	EInvoice_File_ID int64     `query:"invoiceFileId" search:"coalesce(i.file_id, 0)"`                            // Идентификатор файла акта
+}
+
 type OrderSearch struct {
 	ID          int64  `query:"id" search:"o.id"`                        // Уникальный идентификатор
 	IsAssembled bool   `query:"completed" search:"coalesce(c.value, 0)"` // Собран
@@ -177,25 +226,51 @@ type OrderSearch struct {
 	Supplier_ID int64  `query:"supplierId" search:"o.supplier_id"`       // Идентификатор поставщика
 	IsNew       bool   `query:"new" search:"coalesce(n.value, 0)"`       // Новый
 	IsOpen      bool   `query:"open" search:"coalesce(p.value, 0)"`      // Открыт
-	Name        string `query:"name" search:"o.name"`                    // Название
+	Name        string `query:"name" search:"o.name" group:"o.name"`     // Название
+}
+
+type OrderProjectSearch struct {
+	ID                 int64   `query:"id" search:"o.id"`                                                                     // Уникальный идентификатор
+	Name               string  `query:"name" search:"o.name" group:"o.name"`                                                  // Название
+	Step               byte    `query:"step" search:"o.step"`                                                                 // Шаг
+	IsAssembled        bool    `query:"completed" search:"coalesce(c.value, 0)"`                                              // Собран
+	IsConfirmed        bool    `query:"moderatorConfirmed" search:"coalesce(m.value, 0)"`                                     // Утвержден
+	Facility_ID        int64   `query:"type" search:"o.service_id"`                                                           // Идентификатор услуги
+	Supplier_ID        int64   `query:"supplierId" search:"o.supplier_id"`                                                    // Идентификатор поставщика
+	IsNew              bool    `query:"new" search:"coalesce(n.value, 0)"`                                                    // Новый
+	IsOpen             bool    `query:"open" search:"coalesce(v.value, 0)"`                                                   // Открыт
+	IsCancelled        bool    `query:"cancel" search:"coalesce(a.value, 0)"`                                                 // Отказ
+	Reason             string  `query:"cancelDescription" search:"coalesce(a.comments, '')" group:"coalesce(a.comments, '')"` // Причина отказа
+	Execution_Forecast int     `query:"supplierForecastWorkDays" search:"o.execution_forecast" group:"o.execution_forecast"`  // Прогноз исполнения
+	Proposed_Price     float64 `query:"supplierCost" search:"o.proposed_price" group:"o.proposed_price"`                      // Предложенная цена
+	IsNewCost          bool    `query:"supplierCostNew" search:"coalesce(s.value, 0)"`                                        // Новая цена
+	IsNewCostConfirmed bool    `query:"customerNewCostConfirmed" search:"coalesce(u.value, 0)"`                               // Новая цена утверждена
+	IsPaid             bool    `query:"paid" search:"coalesce(p.value, 0)"`                                                   // Оплачен
+	IsStarted          bool    `query:"moderatorBegin" search:"coalesce(d.value, 0)"`                                         // Запущен
+	IsNewCharge        bool    `query:"supplierFactualCostNew" search:"coalesce(l.value, 0)"`                                 // Предложена фактическая цена
+	Charged_Fee        float64 `query:"supplierFactualCost" search:"o.charged_fee" group:"o.charged_fee"`                     // Фактическая цена
+	IsExecuted         bool    `query:"supplierClose" search:"coalesce(i.value, 0)"`                                          // Выполнен
+	IsDocumented       bool    `query:"moderatorDocumentsGotten" search:"coalesce(e.value, 0)"`                               // Документы имеются
+	IsClosed           bool    `query:"moderatorClose" search:"coalesce(r.value, 0)"`                                         // Закрыт
+	IsArchived         bool    `query:"archive" search:"coalesce(h.value, 0)"`                                                // Архивирован
 }
 
 type OrderAdminSearch struct {
-	ID          int64   `query:"id" search:"o.id"`                        // Уникальный идентификатор
-	Step        byte    `query:"step" search:"o.step"`                    // Шаг
-	IsAssembled bool    `query:"completed" search:"coalesce(c.value, 0)"` // Собран
-	Facility_ID int64   `query:"type" search:"o.service_id"`              // Идентификатор услуги
-	Unit_ID     int64   `query:"unitId" search:"o.unit_id"`               // Идентификатор объединения
-	Creator_ID  int64   `query:"customerId" search:"o.user_id"`           // Идентификатор создателя
-	Supplier_ID int64   `query:"supplierId" search:"o.supplier_id"`       // Идентификатор поставщика
-	IsNew       bool    `query:"new" search:"coalesce(n.value, 0)"`       // Новый
-	IsOpen      bool    `query:"open" search:"coalesce(p.value, 0)"`      // Открыт
-	IsCancelled bool    `query:"cancel" search:"coalesce(a.value, 0)"`    // Отказ
-	Charged_Fee float64 `query:"cost" search:"o.charged_fee"`             // Фактическая цена
-	IsPaid      bool    `query:"paid" search:"coalesce(i.value, 0)"`      // Оплачен
-	Name        string  `query:"name" search:"o.name"`                    // Название
-	IsArchived  bool    `query:"archive" search:"coalesce(r.value, 0)"`   // Архивирован
-	IsDeleted   bool    `query:"del" search:"coalesce(e.value, 0)"`       // Удален
+	ID          int64   `query:"id" search:"o.id"`                                  // Уникальный идентификатор
+	Step        byte    `query:"step" search:"o.step"`                              // Шаг
+	IsAssembled bool    `query:"completed" search:"coalesce(c.value, 0)"`           // Собран
+	Facility_ID int64   `query:"type" search:"o.service_id"`                        // Идентификатор услуги
+	Unit_ID     int64   `query:"unitId" search:"o.unit_id"`                         // Идентификатор объединения
+	Creator_ID  int64   `query:"customerId" search:"o.user_id"`                     // Идентификатор создателя
+	Supplier_ID int64   `query:"supplierId" search:"o.supplier_id"`                 // Идентификатор поставщика
+	IsNew       bool    `query:"new" search:"coalesce(n.value, 0)"`                 // Новый
+	IsOpen      bool    `query:"open" search:"coalesce(p.value, 0)"`                // Открыт
+	IsCancelled bool    `query:"cancel" search:"coalesce(a.value, 0)"`              // Отказ
+	Charged_Fee float64 `query:"cost" search:"o.charged_fee" group:"o.charged_fee"` // Фактическая цена
+	IsPaid      bool    `query:"paid" search:"coalesce(i.value, 0)"`                // Оплачен
+	Name        string  `query:"name" search:"o.name" group:"o.name"`               // Название
+	IsArchived  bool    `query:"archive" search:"coalesce(r.value, 0)"`             // Архивирован
+	IsDeleted   bool    `query:"del" search:"coalesce(e.value, 0)"`                 // Удален
 }
 
 type DtoOrder struct {
@@ -213,6 +288,8 @@ type DtoOrder struct {
 	Execution_Forecast int       `db:"execution_forecast"` // Прогноз исполнения
 	Begin_Date         time.Time `db:"begin_date"`         // Дата начала работ
 	End_Date           time.Time `db:"end_date"`           // Дата окончания работ
+	Act_ID             int64     `db:"act_id"`             // Идентификатор акта
+	EInvoice_ID        int64     `db:"eInvoice_id"`        // Идентификатор счета-фактуры
 }
 
 // Конструктор создания объекта заказа в api
@@ -249,6 +326,13 @@ func NewApiMetaOrderByProject(total int64, numofalert int64) *ApiMetaOrderByProj
 	return &ApiMetaOrderByProject{
 		Total:      total,
 		NumOfAlert: numofalert,
+	}
+}
+
+func NewApiTinyOrder(id int64, facility_id int64) *ApiTinyOrder {
+	return &ApiTinyOrder{
+		ID:          id,
+		Facility_ID: facility_id,
 	}
 }
 
@@ -352,10 +436,33 @@ func NewApiFullOrder(user_id int64, unit_id int64, created time.Time, apilongord
 	}
 }
 
+func NewApiFinanceOrder(id int64, project_id int64, begin_date time.Time, charged_fee float64, facility_id int64, supplier_id int64,
+	status_id int, act_file_id int64, einvoice_file_id int64) *ApiFinanceOrder {
+	return &ApiFinanceOrder{
+		ID:               id,
+		Project_ID:       project_id,
+		Begin_Date:       begin_date,
+		Charged_Fee:      charged_fee,
+		Facility_ID:      facility_id,
+		Supplier_ID:      supplier_id,
+		Status_ID:        status_id,
+		Act_File_ID:      act_file_id,
+		EInvoice_File_ID: einvoice_file_id,
+	}
+}
+
+func NewApiResultOrder(total int64, processing int64, charged_fee float64) *ApiResultOrder {
+	return &ApiResultOrder{
+		Total:       total,
+		Processing:  processing,
+		Charged_Fee: charged_fee,
+	}
+}
+
 // Конструктор создания объекта заказа в бд
 func NewDtoOrder(id int64, project_id int64, creator_id int64, unit_id int64, supplier_id int64, facility_id int64,
 	name string, step byte, created time.Time, proposed_price float64, charged_fee float64, execution_forecast int,
-	begin_date time.Time, end_date time.Time) *DtoOrder {
+	begin_date time.Time, end_date time.Time, act_id int64, einvoice_id int64) *DtoOrder {
 	return &DtoOrder{
 		ID:                 id,
 		Project_ID:         project_id,
@@ -371,6 +478,8 @@ func NewDtoOrder(id int64, project_id int64, creator_id int64, unit_id int64, su
 		Execution_Forecast: execution_forecast,
 		Begin_Date:         begin_date,
 		End_Date:           end_date,
+		Act_ID:             act_id,
+		EInvoice_ID:        einvoice_id,
 	}
 }
 
@@ -397,8 +506,7 @@ func (order *OrderSearch) Extract(infield string, invalue string) (outfield stri
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "completed":
@@ -420,7 +528,102 @@ func (order *OrderSearch) Extract(infield string, invalue string) (outfield stri
 }
 
 func (order *OrderSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(order)
+	return GetAllGroupTags(order)
+}
+
+func (order *OrderProjectSearch) Check(field string) (valid bool, err error) {
+	return CheckQueryTag(field, order), nil
+}
+
+func (order *OrderProjectSearch) Extract(infield string, invalue string) (outfield string, outvalue string, errField error, errValue error) {
+	outvalue = ""
+	outfield = GetSearchTag(infield, order)
+	errField = nil
+	errValue = nil
+	switch infield {
+	case "id":
+		fallthrough
+	case "type":
+		fallthrough
+	case "supplierId":
+		_, errConv := strconv.ParseInt(invalue, 0, 64)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "supplierForecastWorkDays":
+		_, errConv := strconv.ParseInt(invalue, 0, 32)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "step":
+		_, errConv := strconv.ParseInt(invalue, 0, 8)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "supplierCost":
+		fallthrough
+	case "supplierFactualCost":
+		_, errConv := strconv.ParseFloat(invalue, 64)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "name":
+		fallthrough
+	case "cancelDescription":
+		if strings.Contains(invalue, "'") {
+			invalue = strings.Replace(invalue, "'", "''", -1)
+		}
+		outvalue = "'" + invalue + "'"
+	case "completed":
+		fallthrough
+	case "moderatorConfirmed":
+		fallthrough
+	case "new":
+		fallthrough
+	case "open":
+		fallthrough
+	case "cancel":
+		fallthrough
+	case "supplierCostNew":
+		fallthrough
+	case "customerNewCostConfirmed":
+		fallthrough
+	case "paid":
+		fallthrough
+	case "moderatorBegin":
+		fallthrough
+	case "supplierFactualCostNew":
+		fallthrough
+	case "supplierClose":
+		fallthrough
+	case "moderatorDocumentsGotten":
+		fallthrough
+	case "moderatorClose":
+		fallthrough
+	case "archive":
+		val, errConv := strconv.ParseBool(invalue)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = fmt.Sprintf("%v", val)
+	default:
+		errField = errors.New("Unknown field")
+	}
+
+	return outfield, outvalue, errField, errValue
+}
+
+func (order *OrderProjectSearch) GetAllFields(parameter interface{}) (fields *[]string) {
+	return GetAllGroupTags(order)
 }
 
 func (order *ViewMiddleOrder) Validate(errors binding.Errors, req *http.Request) binding.Errors {
@@ -550,8 +753,7 @@ func (order *OrderAdminSearch) Extract(infield string, invalue string) (outfield
 		outvalue = invalue
 	case "name":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "completed":
@@ -581,5 +783,63 @@ func (order *OrderAdminSearch) Extract(infield string, invalue string) (outfield
 }
 
 func (order *OrderAdminSearch) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(order)
+	return GetAllGroupTags(order)
+}
+
+func (order *OrderFinanceSearch) Check(field string) (valid bool, err error) {
+	return CheckQueryTag(field, order), nil
+}
+
+func (order *OrderFinanceSearch) Extract(infield string, invalue string) (outfield string, outvalue string, errField error, errValue error) {
+	outvalue = ""
+	outfield = GetSearchTag(infield, order)
+	errField = nil
+	errValue = nil
+
+	switch infield {
+	case "orderId":
+		fallthrough
+	case "projectId":
+		fallthrough
+	case "type":
+		fallthrough
+	case "supplierId":
+		fallthrough
+	case "actFileId":
+		fallthrough
+	case "invoiceFileId":
+		_, errConv := strconv.ParseInt(invalue, 0, 64)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "statusId":
+		_, errConv := strconv.ParseInt(invalue, 0, 32)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "cost":
+		_, errConv := strconv.ParseFloat(invalue, 64)
+		if errConv != nil {
+			errValue = errConv
+			break
+		}
+		outvalue = invalue
+	case "beginDate":
+		if strings.Contains(invalue, "'") {
+			invalue = strings.Replace(invalue, "'", "''", -1)
+		}
+		outvalue = "'" + invalue + "'"
+	default:
+		errField = errors.New("Unknown field")
+	}
+
+	return outfield, outvalue, errField, errValue
+}
+
+func (order *OrderFinanceSearch) GetAllFields(parameter interface{}) (fields *[]string) {
+	return GetAllGroupTags(order)
 }

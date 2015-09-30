@@ -12,37 +12,24 @@ import (
 
 // Структура для хранения данных пользователя объединения
 type SearchUnitUser struct {
-	ID         int64  `query:"id" search:"id"`                 // id пользователя
-	Blocked    bool   `query:"blocked" search:"(not active)"`  // Пользователь заблокирован
-	Confirmed  bool   `query:"confirmed" search:"confirmed"`   // Пользователь подтвержден
-	LastLogin  string `query:"lastLoginAt" search:"lastLogin"` // Последний заход
-	UnitAdmin  bool   `query:"unitAdmin" search:"unitAdmin"`   // Администратор объединения
-	Surname    string `query:"surname" search:"surname"`       // Фамилия пользователя
-	Name       string `query:"name" search:"name"`             // Имя пользователя
-	MiddleName string `query:"middleName" search:"middleName"` // Отчество пользователя
+	ID         int64  `query:"id" search:"id"`                                    // id пользователя
+	Blocked    bool   `query:"blocked" search:"(not active)"`                     // Пользователь заблокирован
+	Confirmed  bool   `query:"confirmed" search:"confirmed"`                      // Пользователь подтвержден
+	LastLogin  string `query:"lastLoginAt" search:"lastLogin"`                    // Последний заход
+	UnitAdmin  bool   `query:"unitAdmin" search:"unitAdmin"`                      // Администратор объединения
+	Surname    string `query:"surname" search:"surname" group:"surname"`          // Фамилия пользователя
+	Name       string `query:"name" search:"name" group:"name"`                   // Имя пользователя
+	MiddleName string `query:"middleName" search:"middleName" group:"middleName"` // Отчество пользователя
 }
 
-type ViewShortUnitUser struct {
+type ViewUnitUser struct {
 	UnitAdmin    bool              `json:"unitAdmin"`                        // Администратор объединения
-	Surname      string            `json:"surname" validate:"min=1,max=255"` // Фамилия пользователя
-	Name         string            `json:"name" validate:"min=1,max=255"`    // Имя пользователя
+	Surname      string            `json:"surname" validate:"max=255"`       // Фамилия пользователя
+	Name         string            `json:"name" validate:"max=255"`          // Имя пользователя
 	MiddleName   string            `json:"middleName" validate:"max=255"`    // Отчество пользователя
 	WorkPhone    string            `json:"workPhone" validate:"max=25"`      // Рабочий телефон
 	JobTitle     string            `json:"jobTitle" validate:"max=255"`      // Должность
 	Language     string            `json:"language" validate:"min=1,max=10"` // Язык пользователя по умолчанию
-	Emails       []ViewEmail       `json:"emails"`                           // Массив email
-	MobilePhones []ViewMobilePhone `json:"mobilePhones"`                     // Массив мобильных телефонов
-}
-
-type ViewLongUnitUser struct {
-	UnitAdmin    bool              `json:"unitAdmin"`                        // Администратор объединения
-	Surname      string            `json:"surname" validate:"min=1,max=255"` // Фамилия пользователя
-	Name         string            `json:"name" validate:"min=1,max=255"`    // Имя пользователя
-	MiddleName   string            `json:"middleName" validate:"max=255"`    // Отчество пользователя
-	WorkPhone    string            `json:"workPhone" validate:"max=25"`      // Рабочий телефон
-	JobTitle     string            `json:"jobTitle" validate:"max=255"`      // Должность
-	Language     string            `json:"language" validate:"min=1,max=10"` // Язык пользователя по умолчанию
-	Roles        []UserRole        `json:"groups"`                           // Массив значений уровней доступа пользователя
 	Emails       []ViewEmail       `json:"emails"`                           // Массив email
 	MobilePhones []ViewMobilePhone `json:"mobilePhones"`                     // Массив мобильных телефонов
 }
@@ -177,8 +164,7 @@ func (user *SearchUnitUser) Extract(infield string, invalue string) (outfield st
 		fallthrough
 	case "lastLoginAt":
 		if strings.Contains(invalue, "'") {
-			errValue = errors.New("Wrong field value")
-			break
+			invalue = strings.Replace(invalue, "'", "''", -1)
 		}
 		outvalue = "'" + invalue + "'"
 	case "blocked":
@@ -200,20 +186,10 @@ func (user *SearchUnitUser) Extract(infield string, invalue string) (outfield st
 }
 
 func (user *SearchUnitUser) GetAllFields(parameter interface{}) (fields *[]string) {
-	return GetAllSearchTags(user)
+	return GetAllGroupTags(user)
 }
 
-func (user *ViewShortUnitUser) Validate(errors binding.Errors, req *http.Request) binding.Errors {
-	for _, email := range user.Emails {
-		errors = ValidateWithLanguage(&email, errors, req, email.Language)
-	}
-	for _, mobilephone := range user.MobilePhones {
-		errors = ValidateWithLanguage(&mobilephone, errors, req, mobilephone.Language)
-	}
-	return ValidateWithLanguage(user, errors, req, user.Language)
-}
-
-func (user *ViewLongUnitUser) Validate(errors binding.Errors, req *http.Request) binding.Errors {
+func (user *ViewUnitUser) Validate(errors binding.Errors, req *http.Request) binding.Errors {
 	for _, email := range user.Emails {
 		errors = ValidateWithLanguage(&email, errors, req, email.Language)
 	}

@@ -7,6 +7,8 @@ import (
 
 const (
 	CODE_FIELD_MAX_LENGTH_VALUE = 255
+	CODE_TYPE_INN               = 3
+	CODE_TYPE_KPP               = 4
 )
 
 // Структура для организации хранения кода компании
